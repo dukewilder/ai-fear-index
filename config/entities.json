@@ -13,7 +13,7 @@
   {"slug": "scale-ai", "name": "Scale AI", "type": "AI company", "aliases": ["scale ai"], "domains": ["scale.com"], "homepage": ""},
   {"slug": "perplexity", "name": "Perplexity", "type": "AI company", "aliases": ["perplexity", "perplexity ai"], "domains": ["perplexity.ai"], "homepage": ""},
   {"slug": "character-ai", "name": "Character.AI", "type": "AI company", "aliases": ["character technologies", "character ai", "character.ai"], "domains": ["character.ai"], "homepage": ""},
-  {"slug": "a16z", "name": "Andreessen Horowitz", "type": "Investor", "aliases": ["andreessen horowitz", "a16z", "ah capital management"], "domains": ["a16z.com"], "homepage": "https://a16z.com/"},
+  {"slug": "a16z", "name": "Andreessen Horowitz", "type": "Investor", "aliases": ["andreessen horowitz", "a16z", "ah capital management", "a16z capital management", "a16z capital"], "domains": ["a16z.com"], "homepage": "https://a16z.com/"},
   {"slug": "leading-the-future", "name": "Leading the Future", "type": "Super PAC", "aliases": ["leading the future"], "domains": [], "homepage": "", "fec_search": ["Leading the Future"]},
   {"slug": "build-american-ai", "name": "Build American AI", "type": "Advocacy group", "aliases": ["build american ai"], "domains": [], "homepage": "", "flag": "Donors undisclosed"},
   {"slug": "public-first", "name": "Public First", "type": "Super PAC", "aliases": ["public first", "public first action"], "domains": [], "homepage": "", "fec_search": ["Public First"]},

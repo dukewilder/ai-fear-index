@@ -2,8 +2,9 @@
 
     python -m pipeline.run --mode auto --db state/index.db --out state
 
-auto = hourly sources every run, plus the daily sources on the 06:00 UTC run or when
-the database is new. backfill = everything, reaching back to January 2025.
+auto = hourly sources every run, plus the daily sources on the 06:00 UTC run. Any source
+that has never finished a run is added to the next run and reaches back to January 2025,
+so the index fills itself in without anyone starting a run by hand.
 """
 import argparse
 import importlib
@@ -27,19 +28,22 @@ def main():
     ap.add_argument("--base", default="/ai-fear-index")
     args = ap.parse_args()
     db = connect(args.db)
-    fresh = db.execute("SELECT COUNT(*) n FROM status").fetchone()["n"] == 0
+    done = {r["source"] for r in db.execute("SELECT source FROM status WHERE last_ok IS NOT NULL")}
     mode = args.mode
     if mode == "auto":
-        mode = "backfill" if fresh else ("daily" if now().hour == 6 else "hourly")
+        mode = "daily" if now().hour == 6 else "hourly"
     sources = HOURLY + (DAILY if mode in ("daily", "backfill") else [])
+    if mode == "hourly":
+        sources += [s for s in DAILY if s not in done]  # first run of a source catches it up
     if args.only:
         sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]
-    log(f"mode={mode} sources={sources}")
+    log(f"mode={mode} sources={sources} first run for: {[s for s in sources if s not in done] or 'none'}")
     started = time.time()
     for name in sources:
         module = importlib.import_module(f"pipeline.{MODULES[name]}")
         with source_run(db, name) as state:
-            module.run(db, state, mode)
+            # a source that has never finished reaches all the way back, whatever the run mode
+            module.run(db, state, "backfill" if name not in done else mode)
     if not args.only or "tag" in args.only.split(","):
         from . import tag
         with source_run(db, "tag") as state:

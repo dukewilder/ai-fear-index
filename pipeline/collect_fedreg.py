@@ -27,11 +27,26 @@ def run(db, state, mode):
             if page >= (data.get("total_pages") or 1) or not results:
                 break
             page += 1
+    dropped = prune(db)
     kv_set(db, "fedreg_backfilled", True)
     kv_set(db, "fedreg_since", iso()[:10])
     db.commit()
     state["added"] = added
-    state["message"] = f"{read} documents read since {since}"
+    state["message"] = f"{read} documents read since {since}" + (f"; dropped {dropped} not about AI" if dropped else "")
+
+
+def prune(db):
+    """Drop stored documents that only mention AI deep in the body, so they cost nothing to tag."""
+    gone = []
+    for r in db.execute("SELECT id, title, summary FROM measures WHERE id LIKE 'fr-%'"):
+        if not looks_ai(r["title"], r["summary"]):
+            gone.append(r["id"])
+    for chunk in (gone[i:i + 400] for i in range(0, len(gone), 400)):
+        marks = ",".join("?" for _ in chunk)
+        db.execute(f"DELETE FROM measures WHERE id IN ({marks})", chunk)
+        db.execute(f"DELETE FROM tags WHERE target IN ({marks})", chunk)
+        db.execute(f"DELETE FROM tag_runs WHERE target IN ({marks})", chunk)
+    return len(gone)
 
 
 def store(db, d):

@@ -4,7 +4,8 @@ from .common import SINCE, Http, HttpError, env, iso, kv_get, kv_set, log, statu
 BASE = "https://v3.openstates.org/bills"
 QUERIES = ["artificial intelligence", "deepfake", "chatbot", "data center", "automated decision",
            "synthetic media", "digital replica", "algorithmic"]
-MAX_REQUESTS = 420  # stays inside the free tier's daily allowance
+MAX_REQUESTS = 420  # per run
+DAY_BUDGET = 420    # and per day, so a long backfill cannot exhaust the free tier
 
 
 def jurisdiction_code(j):
@@ -19,13 +20,20 @@ def run(db, state, mode):
     key = env("OPENSTATES_API_KEY")
     http = Http(min_interval=6.5, headers={"X-API-KEY": key})
     cursors = kv_get(db, "openstates_cursors", {})
+    day = iso()[:10]
+    spent = kv_get(db, "openstates_spend", {})
+    used_today = spent.get("n", 0) if spent.get("date") == day else 0
+    budget = max(0, min(MAX_REQUESTS, DAY_BUDGET - used_today))
+    if not budget:
+        state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
+        return
     requests_used, added, seen = 0, 0, 0
     for query in QUERIES:
         cursor = cursors.get(query, {})
         page = cursor.get("page", 1) if cursor.get("backfilling", True) else 1
         since = None if cursor.get("backfilling", True) else cursor.get("since")
         run_started = iso()[:10]
-        while requests_used < MAX_REQUESTS:
+        while requests_used < budget:
             params = {"q": query, "sort": "updated_desc", "per_page": 20, "page": page,
                       "include": ["abstracts", "sponsorships"], "created_since": SINCE}
             if since:
@@ -54,6 +62,7 @@ def run(db, state, mode):
             break
         kv_set(db, "openstates_cursors", cursors)
     kv_set(db, "openstates_cursors", cursors)
+    kv_set(db, "openstates_spend", {"date": day, "n": used_today + requests_used})
     db.commit()
     state["added"] = added
     backlog = [q for q, c in cursors.items() if c.get("backfilling")] + [q for q in QUERIES if q not in cursors]

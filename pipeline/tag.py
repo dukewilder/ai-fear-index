@@ -12,11 +12,12 @@ import time
 
 import requests
 
-from .common import SINCE, config, env, iso, log, sha
+from .common import SINCE, config, env, iso, kv_get, kv_set, log, sha
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
-LIMITS = {"hourly": 60, "daily": 700, "backfill": 3500, "auto": 60}
+LIMITS = {"hourly": 150, "daily": 700, "backfill": 3500, "auto": 150}
+DAY_CAP = 1500  # items per day, so a large backlog drains at a predictable cost
 _lock = threading.Lock()
 
 
@@ -131,7 +132,13 @@ def targets(db, limit):
 def run(db, state, mode):
     key = env("ANTHROPIC_API_KEY")
     fears, controls = config("fears"), config("controls")
-    limit = LIMITS.get(mode, 60)
+    day = iso()[:10]
+    spent = kv_get(db, "tag_spend", {})
+    used_today = spent.get("n", 0) if spent.get("date") == day else 0
+    limit = max(0, min(LIMITS.get(mode, 150), DAY_CAP - used_today))
+    if not limit:
+        state["message"] = f"daily cap of {DAY_CAP} items reached; resumes tomorrow"
+        return
     work, backlog = targets(db, limit)
     done, errors = 0, 0
 
@@ -169,8 +176,10 @@ def run(db, state, mode):
                     if done % 25 == 0:
                         db.commit()
                         log(f"[tag] {done}/{len(work)} tagged")
+    kv_set(db, "tag_spend", {"date": day, "n": used_today + done})
     db.commit()
     state["added"] = done
-    state["message"] = f"{done} tagged, {errors} errors, {max(0, backlog - done)} still queued"
+    state["message"] = (f"{done} tagged, {errors} errors, {max(0, backlog - done)} still queued, "
+                        f"{used_today + done} of {DAY_CAP} today")
     if work and errors == len(work):
         raise RuntimeError(f"every tagging call failed; last error shown in logs")

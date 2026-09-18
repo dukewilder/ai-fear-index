@@ -1,0 +1,79 @@
+name: Update
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto, hourly, daily, or backfill"
+        required: false
+        default: "auto"
+      only:
+        description: "Comma-separated sources for a test run (leave blank for all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Restore data
+        run: |
+          mkdir -p state
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C state
+          fi
+          ls -la state
+      - name: Run pipeline
+        env:
+          FEC_API_KEY: ${{ secrets.FEC_API_KEY }}
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+          OPENSTATES_API_KEY: ${{ secrets.OPENSTATES_API_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+        run: python -m pipeline.run --mode "${{ inputs.mode || 'auto' }}" --only "${{ inputs.only }}" --db state/index.db --out state
+      - name: Save data
+        if: always()
+        run: |
+          if [ -f state/index.db ]; then
+            cd state
+            git init -q
+            git checkout -q --orphan data
+            git add -A
+            git -c user.name="ai-fear-index" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Data $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+          fi
+      - name: Build site
+        run: python site/build.py --data state/site_data.json --out dist --base /ai-fear-index
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

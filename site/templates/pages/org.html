@@ -1,0 +1,44 @@
+{% from "macros.html" import feed_item %}
+<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('rankings', anchor='funders') }}">{{ chevron|safe }}All funders</a>
+<p class="kicker">Rank {{ o.rank }} of {{ o.of }} funders <span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}</p>
+<h1 class="title">{{ o.name }}</h1>
+<p class="hero-num money">{{ o.spent }}</p>
+<p class="hero-text sm">{{ o.breakdown }}, {{ o.period }}</p>
+</div></section>
+
+{% if o.fears %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Fears its lobbying mentions</h2>
+<p class="sub">Lobbying on filings that mention each fear, {{ o.period }}</p>
+<ol class="rank">{% for f in o.fears %}<li><a class="row norank" href="{{ url('fear', f.slug) }}"><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span></span><span class="val">{{ f.amount }}</span></a></li>{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if o.lobbying %}
+<section class="block"><div class="wrap">
+<h2 class="h">Lobbying that mentions AI</h2>
+<ul class="list" style="margin-top:12px">{% for l in o.lobbying %}<li class="item"><span class="item-top"><a class="row-name" href="{{ l.url }}" rel="noopener" target="_blank">{{ l.bill }}</a><span class="val small">{{ l.amount }}</span></span><span class="meta" style="margin-top:0">{{ l.period }}</span>{% if l.controls %}<span class="chips">{% for c in l.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if o.money_out %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Where its money went</h2>
+<ul class="list" style="margin-top:12px">{% for m in o.money_out %}<li class="row norank"><span><a class="row-name" href="{{ m.url }}" rel="noopener" target="_blank">{{ m.to }}</a><span class="meta"><span class="chip">{{ m.source }}</span>{{ m.year }}</span></span><span class="val">{{ m.amount }}</span></li>{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if o.money_in %}
+<section class="block"><div class="wrap">
+<h2 class="h">Where its money came from</h2>
+<ul class="list" style="margin-top:12px">{% for m in o.money_in %}<li class="row norank"><span><a class="row-name" href="{{ m.url }}" rel="noopener" target="_blank">{{ m.from }}</a><span class="meta"><span class="chip">{{ m.source }}</span>{{ m.year }}</span></span><span class="val">{{ m.amount }}</span></li>{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if o.latest %}
+<section class="block band"><div class="wrap">
+<h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Latest from this organization</h2>
+<ul class="list" style="margin-top:12px">{% for i in o.latest %}{{ feed_item(i) }}{% endfor %}</ul>
+</div></section>
+{% endif %}

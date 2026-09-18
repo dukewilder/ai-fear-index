@@ -1,0 +1,29 @@
+name: Report an error
+description: Something on the AI Fear Index is wrong.
+title: "Error report"
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: Link to the page with the error.
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: What the site says
+      description: Copy the line or number that's wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source link
+      description: Optional. A filing, bill, or document showing the correct information.

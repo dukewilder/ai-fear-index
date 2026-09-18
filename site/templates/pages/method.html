@@ -1,0 +1,39 @@
+<section class="block first"><div class="wrap prose">
+<h1 class="title">How the numbers work</h1>
+<p>Every number on this site comes from public records and links to the document behind it. The data and the code that produce it are public.</p>
+<h3>Bills, rules, and orders</h3>
+<p>Every state and federal bill introduced since January 2025, plus federal rules and executive orders, that is substantially about artificial intelligence, algorithms, automated decisions, synthetic media, or AI data centers.</p>
+<h3>Fears and controls</h3>
+<p>Each measure is read for the fears it cites and the controls it would impose, using fixed definitions for each. A first pass proposes labels, and a second pass must back every label with a quote copied from the measure's own text, which is then checked word for word. Only labels that survive both count anywhere on this site.</p>
+<h3>Who's funding it</h3>
+<p>Lobbying reported on federal filings whose issue descriptions mention AI topics, over the past four quarters, plus independent expenditures by AI-focused super PACs and the donations they received. Amounts on a lobbying filing cover everything on that filing, so they measure spending by organizations lobbying on AI, not spending on AI alone.</p>
+<h3>Who benefits</h3>
+<p>Government agencies and officials that a measure would give new authority, duties, or enforcement power over AI, counted by the number of measures.</p>
+<h3>Public attention</h3>
+<p>Daily Wikipedia pageviews for each fear's articles, and daily news volume from GDELT.</p>
+</div></section>
+
+<section class="block band" id="sources"><div class="wrap">
+<h2 class="h">Where the data comes from</h2>
+<ul class="list" style="margin-top:12px">
+{% for what, where, when, ok in d.sources %}<li class="row norank"><span><span class="row-name">{{ what }}</span><span class="meta">{{ where }}{% if when %}. Updated <span data-rel="{{ when }}">recently</span>{% else %}. Not yet connected{% endif %}</span></span></li>
+{% endfor %}
+</ul>
+</div></section>
+
+<section class="block" id="schedule"><div class="wrap">
+<h2 class="h">Update schedule</h2>
+<ul class="sched">
+{% for when, what in d.schedule %}<li><b>{{ when }}</b><span>{{ what }}</span></li>
+{% endfor %}
+</ul>
+</div></section>
+
+<section class="block band" id="data"><div class="wrap">
+<h2 class="h">Get the data</h2>
+<ul class="links">
+<li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>
+<li><a href="{{ d.links.code }}">Source code</a></li>
+<li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
+</ul>
+</div></section>

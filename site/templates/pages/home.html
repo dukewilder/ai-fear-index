@@ -1,0 +1,62 @@
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row, feed_item %}
+{% if d.exhibit %}
+<section class="exhibit"><div class="wrap">
+<p class="chyron">{{ d.exhibit.chyron }}</p>
+<p class="scare"><a href="{{ d.exhibit.line_url }}" rel="noopener" target="_blank" style="color:inherit;text-decoration:none">{{ d.exhibit.line }}</a></p>
+</div></section>
+<section class="block receipt-block"><div class="wrap">
+<dl class="receipt">
+{% for label, value in d.exhibit.rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+{% endfor %}
+</dl>
+<a class="more" href="{{ url('fear', d.exhibit.fear_slug) }}" data-goatcounter-click="see-receipts">See the receipts</a>
+</div></section>
+{% endif %}
+
+<section class="block{{ ' first' if not d.exhibit }}"><div class="wrap">
+<p class="hero-num">{{ d.index.value }}{{ d.index.suffix }}</p>
+<p class="hero-text">{{ d.index.text }}</p>
+{% if d.index.change %}<p class="move">{{ d.index.change }}</p>{% endif %}
+<figure class="spark">{{ spark_svg|safe }}<figcaption><span>90 days ago</span><span>Today</span></figcaption></figure>
+</div></section>
+
+<section class="block band"><div class="wrap">
+<h2 class="h">The fears, ranked</h2>
+<p class="sub">By new controls in the bills, rules, and orders that cite them</p>
+<ol class="rank">{% for f in d.fears[:6] %}{{ fear_row(f) }}{% endfor %}</ol>
+<a class="more" href="{{ url('rankings', anchor='fears') }}">See all {{ d.fears|length }}</a>
+<p class="caption">Fears tracked: {{ d.fears_tracked|join(', ') }}.</p>
+</div></section>
+
+{% if d.feed %}
+<section class="block"><div class="wrap">
+<h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Just in</h2>
+<p class="sub">New bills, rules, filings, and statements, newest first</p>
+<ul class="list">{% for i in d.feed[:5] %}{{ feed_item(i) }}{% endfor %}</ul>
+<a class="more" href="{{ url('feed') }}">See the full feed</a>
+</div></section>
+{% endif %}
+
+{% if d.funders %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Who's funding it</h2>
+<p class="sub">Ranked by lobbying on filings that mention AI plus AI election money, {{ d.period }}</p>
+<ol class="rank">{% for o in d.funders[:5] %}{{ org_row(o) }}{% endfor %}</ol>
+<a class="more" href="{{ url('rankings', anchor='funders') }}">See all {{ d.funders_total }}</a>
+</div></section>
+{% endif %}
+
+{% if d.beneficiaries %}
+<section class="block"><div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials that would gain new authority, ranked by number of bills</p>
+<ol class="rank">{% for b in d.beneficiaries[:5] %}{{ benefit_row(b) }}{% endfor %}</ol>
+<a class="more" href="{{ url('rankings', anchor='beneficiaries') }}">See all {{ d.beneficiaries_total }}</a>
+</div></section>
+{% endif %}
+
+<section class="block band"><div class="wrap">
+<h2 class="h">What the fear is buying</h2>
+<p class="sub">Controls in AI bills, rules, and orders since January 2025, ranked by how many include each</p>
+<ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>
+</div></section>

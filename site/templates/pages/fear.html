@@ -1,0 +1,56 @@
+{% from "macros.html" import org_row, benefit_row, feed_item %}
+<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('rankings', anchor='fears') }}">{{ chevron|safe }}All fears</a>
+<p class="kicker">Rank {{ f.rank }} of {{ f.of }} fears</p>
+<h1 class="title">{{ f.name }}</h1>
+<p class="hero-num sm">{{ f.score }}</p>
+<p class="hero-text sm">{{ f.score_text }}</p>
+{% if f.change %}<p class="move">{{ f.change }}</p>{% endif %}
+</div></section>
+
+<section class="block band"><div class="wrap">
+<h2 class="h">The evidence</h2>
+<div style="margin-top:12px">{% for big, label in f.evidence %}<div class="ev"><b>{{ big }}</b><span>{{ label }}</span></div>{% endfor %}</div>
+</div></section>
+
+<section class="block"><div class="wrap">
+<h2 class="h">{{ f.timeline.lanes[0] }}, {{ f.timeline.lanes[1]|lower }}, and attention</h2>
+<div class="legend">
+<div><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect class="tl-money" x="2" y="2" width="10" height="10"/></svg>{{ f.timeline.lanes[0] }}</div>
+<div><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle class="tl-msg" cx="7" cy="7" r="5"/></svg>{{ f.timeline.lanes[1] }}</div>
+<div><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><line class="tl-line" x1="1" y1="7" x2="17" y2="7"/><circle class="tl-pt" cx="9" cy="7" r="3"/></svg>{{ f.timeline.lanes[2] }}</div>
+</div>
+<div class="chart">{{ timeline|safe }}</div>
+<p class="caption">{{ f.timeline_note }} Sources: {{ f.timeline_sources }}</p>
+</div></section>
+
+{% if f.latest %}
+<section class="block band"><div class="wrap">
+<h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Latest on this fear</h2>
+<p class="sub">Newest first</p>
+<ul class="list">{% for i in f.latest %}{{ feed_item(i) }}{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if f.pushers %}
+<section class="block"><div class="wrap">
+<h2 class="h">Who's funding it</h2>
+<p class="sub">Ranked by lobbying on filings that mention this fear, {{ d.period }}</p>
+<ol class="rank">{% for o in f.pushers %}{{ org_row(o, 'messages') }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if f.beneficiaries %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials these bills would give new authority</p>
+<ol class="rank">{% for b in f.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if f.bills %}
+<section class="block"><div class="wrap">
+<h2 class="h">What it's being used to pass</h2>
+<ul class="list" style="margin-top:12px">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="time">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+</div></section>
+{% endif %}

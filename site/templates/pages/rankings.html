@@ -1,0 +1,34 @@
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row %}
+<section class="block first"><div class="wrap">
+<h1 class="title">Rankings</h1>
+<nav class="jump" aria-label="Jump to a ranking">
+<a href="{{ url('rankings', anchor='fears') }}">Fears</a>
+<a href="{{ url('rankings', anchor='funders') }}">Funders</a>
+<a href="{{ url('rankings', anchor='beneficiaries') }}">Beneficiaries</a>
+<a href="{{ url('rankings', anchor='controls') }}">Controls</a>
+</nav>
+</div></section>
+
+<section class="block band" id="fears"><div class="wrap">
+<h2 class="h">The fears, ranked</h2>
+<p class="sub">By new controls in the bills, rules, and orders that cite them</p>
+<ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
+</div></section>
+
+<section class="block" id="funders"><div class="wrap">
+<h2 class="h">Who's funding it</h2>
+<p class="sub">Ranked by lobbying on filings that mention AI plus AI election money, {{ d.period }}</p>
+<ol class="rank">{% for o in d.funders %}{{ org_row(o) }}{% endfor %}</ol>
+</div></section>
+
+<section class="block band" id="beneficiaries"><div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials that would gain new authority, ranked by number of bills</p>
+<ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+</div></section>
+
+<section class="block" id="controls"><div class="wrap">
+<h2 class="h">What the fear is buying</h2>
+<p class="sub">Controls in AI bills, rules, and orders since January 2025, ranked by how many include each</p>
+<ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>
+</div></section>

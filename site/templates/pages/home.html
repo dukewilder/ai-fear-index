@@ -40,14 +40,24 @@
 {% if d.funders %}
 <section class="block band"><div class="wrap">
 <h2 class="h">Who's funding it</h2>
-<p class="sub">Ranked by lobbying on filings that mention AI plus AI election money, {{ d.period }}</p>
+<p class="sub">Ranked by lobbying on filings whose issue text names one of the tracked fears, {{ d.period }}</p>
 <ol class="rank">{% for o in d.funders[:5] %}{{ org_row(o) }}{% endfor %}</ol>
 <a class="more" href="{{ url('rankings', anchor='funders') }}">See all {{ d.funders_total }}</a>
 </div></section>
 {% endif %}
 
-{% if d.beneficiaries %}
+{% if d.election %}
 <section class="block"><div class="wrap">
+<h2 class="h">Election money</h2>
+<p class="sub">Committees spending on AI politics, by money raised or spent this cycle</p>
+<ol class="rank">{% for o in d.election[:5] %}{{ org_row(o) }}{% endfor %}</ol>
+<a class="more" href="{{ url('rankings', anchor='election') }}">See all {{ d.election_total }}</a>
+<p class="caption">Counted by committee. Individual donations appear on each committee's page, with the filing behind them.</p>
+</div></section>
+{% endif %}
+
+{% if d.beneficiaries %}
+<section class="block band"><div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials that would gain new authority, ranked by number of bills</p>
 <ol class="rank">{% for b in d.beneficiaries[:5] %}{{ benefit_row(b) }}{% endfor %}</ol>
@@ -55,7 +65,7 @@
 </div></section>
 {% endif %}
 
-<section class="block band"><div class="wrap">
+<section class="block"><div class="wrap">
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">Controls in AI bills, rules, and orders since January 2025, ranked by how many include each</p>
 <ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>

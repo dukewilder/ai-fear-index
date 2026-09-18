@@ -121,6 +121,8 @@ def export(db, out_dir, base=""):
         return o
 
     for r in lob_recent:
+        if not (r["entity"] or r["client_key"]):
+            continue  # a filing with no client name cannot be attributed to anyone
         o = org(r["entity"] or r["client_key"], r["client"], r["entity"])
         o["lobbying"] += r["amount"] or 0
         o["fears"].update(r["fears"])
@@ -133,6 +135,8 @@ def export(db, out_dir, base=""):
     receipts = [dict(r) for r in db.execute("SELECT * FROM fec WHERE kind='receipt'")]
     for r in receipts:
         ent = ents.match_name(r["counterparty"])
+        if not (ent or r["counterparty_key"]):
+            continue
         o = org(ent or r["counterparty_key"], r["counterparty"], ent)
         o["election"] += r["amount"] or 0
         o["type"] = o["type"] or "Donor"
@@ -288,14 +292,14 @@ def build_feed(db, ents, measures, lob, receipts, today):
             label = KIND_LABEL.get(m["kind"], "Bill")
             action = f" ({m['latest_action'][:90]})" if m["latest_action"] and m["kind"] not in ("rule", "order") else ""
             items.append({"type": "rule" if m["kind"] in ("rule", "order") else "bill", "label": label,
-                          "text": f"{m['jurisdiction_name']} {m['identifier']}: {m['title'][:150]}{action}",
+                          "text": f"{m['jurisdiction_name']} {m['identifier']}: {(m['title'] or 'Untitled')[:150]}{action}",
                           "url": m["url"], "time_iso": when[:10] + "T12:00:00+00:00", "time": when[:10],
                           "fears": m["fears"], "org": None})
     for r in lob:
         if (r["posted"] or "") >= horizon:
             refs = f", naming {r['bill_refs']}" if r["bill_refs"] else ""
             items.append({"type": "lobbying", "label": "Lobbying filing",
-                          "text": f"{nice_name(r['client'])} reported {money(r['amount'])} in lobbying that mentions AI{refs}",
+                          "text": f"{nice_name(r['client']) or 'A lobbying client'} reported {money(r['amount'])} in lobbying that mentions AI{refs}",
                           "url": r["url"], "time_iso": r["posted"][:19] + "+00:00", "time": r["posted"][:10],
                           "fears": r["fears"], "org": r["entity"] or slugify(nice_name(r["client"]))})
     for r in receipts:
@@ -316,7 +320,7 @@ def build_feed(db, ents, measures, lob, receipts, today):
     for p in db.execute("SELECT p.* FROM posts p JOIN tag_runs tr ON tr.target = 'post:' || p.id "
                         "WHERE tr.ai_related = 1 AND p.published >= ?", (horizon,)):
         ent = ents.by_slug.get(p["entity"], {})
-        items.append({"type": "statement", "label": "Statement", "text": f"{ent.get('name', p['entity'])}: {p['title'][:160]}",
+        items.append({"type": "statement", "label": "Statement", "text": f"{ent.get('name', p['entity'])}: {(p['title'] or '')[:160]}",
                       "url": p["url"], "time_iso": p["published"], "time": p["published"][:10],
                       "fears": sorted(post_tags.get(p["id"], [])), "org": p["entity"]})
     items.sort(key=lambda i: i["time_iso"] or "", reverse=True)
@@ -424,7 +428,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
     ben_rows = [{"rank": i, "name": names[k], "slug": None, "type": "Attorney general" if "attorney general" in k else "Agency",
                  "gains": "new authority", "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(agencies.most_common(5), 1)]
     bills = sorted(st["measures"], key=lambda m: (len(m["controls"]), m["introduced_date"] or ""), reverse=True)[:10]
-    bill_rows = [{"name": f"{m['identifier']}, {m['jurisdiction_name']}", "title": (m["title"] or "")[:160],
+    bill_rows = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": (m["title"] or "")[:160],
                   "status": STATUS_LABEL.get(m["status"], "Pending"), "url": m["url"],
                   "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in bills]
     evidence = [[f"{len(st['measures']):,}", "bills, rules, and orders cite this fear since January 2025"],

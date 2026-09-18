@@ -1,12 +1,14 @@
 """Institutional messaging: AI-related posts from tracked organizations' newsroom feeds."""
 import calendar
 import re
+import time
 import urllib.parse
 
 import feedparser
 
 from .common import Entities, Http, HttpError, iso, kv_get, kv_set, log, looks_ai, sha, strip_html, upsert
 
+DISCOVERY_BUDGET = 360  # seconds per run; unfinished sites are picked up next run
 LINK_TAG = re.compile(r"<link[^>]+>", re.I)
 COMMON_PATHS = ["feed", "rss", "feed.xml", "rss.xml", "index.xml", "atom.xml", "news/rss.xml", "blog/rss.xml", "news/feed"]
 
@@ -34,16 +36,20 @@ def discover(http, homepage):
 
 
 def run(db, state, mode):
-    http = Http(min_interval=1.0, timeout=25)
+    http = Http(min_interval=1.0, timeout=12)
     ents = Entities()
     feeds = kv_get(db, "feeds", {})
-    added, found, failed = 0, 0, []
+    added, found, failed, deferred = 0, 0, [], 0
+    started = time.time()
     for ent in ents.items:
         home = ent.get("homepage")
         if not home:
             continue
         feed_url = feeds.get(ent["slug"])
         if feed_url is None or (feed_url == "" and mode == "backfill"):
+            if time.time() - started > DISCOVERY_BUDGET:
+                deferred += 1  # leave it unrecorded so the next run tries again
+                continue
             feed_url = discover(http, home) or ""
             feeds[ent["slug"]] = feed_url
         if not feed_url:
@@ -71,7 +77,9 @@ def run(db, state, mode):
     kv_set(db, "feeds", feeds)
     db.commit()
     state["added"] = added
-    state["message"] = f"{found} feeds read" + (f"; no feed found for {len(failed)}: {', '.join(failed[:12])}" if failed else "")
+    state["message"] = (f"{found} feeds read"
+                        + (f"; {deferred} sites left for the next run" if deferred else "")
+                        + (f"; no feed found for {len(failed)}: {', '.join(failed[:12])}" if failed else ""))
 
 
 def iso_from_struct(ts):

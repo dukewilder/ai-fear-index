@@ -1,5 +1,5 @@
 """Federal rules, proposed rules, and presidential documents about AI from the Federal Register API."""
-from .common import SINCE, Http, iso, kv_get, kv_set, upsert
+from .common import SINCE, Http, iso, kv_get, kv_set, looks_ai, upsert
 
 BASE = "https://www.federalregister.gov/api/v1/documents.json"
 FIELDS = ["document_number", "title", "abstract", "html_url", "publication_date", "type", "subtype",
@@ -35,6 +35,8 @@ def run(db, state, mode):
 
 
 def store(db, d):
+    if not looks_ai(d.get("title"), d.get("abstract")):
+        return 0  # the term only appears deep in the body
     dtype = d.get("type") or ""
     eo = d.get("executive_order_number")
     if dtype == "Presidential Document":

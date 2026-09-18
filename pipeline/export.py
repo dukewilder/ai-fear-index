@@ -14,6 +14,7 @@ import re
 from .common import (REPO_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, name_key, now, sha)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
+ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
 STATUS_LABEL = {"passed": "Passed", "pending": "Pending", "failed": "Failed"}
 KIND_LABEL = {"bill": "Bill", "resolution": "Resolution", "rule": "Rule", "order": "Executive order"}
 
@@ -41,7 +42,7 @@ def nice_name(name):
         return name
     words = []
     for i, w in enumerate(name.split()):
-        if len(w) <= 3 and not re.search(r"[AEIOU]", w):
+        if w.strip(".,") in ACRONYMS or (len(w) <= 3 and not re.search(r"[AEIOU]", w)):
             words.append(w)
         elif i and w.lower() in SMALL:
             words.append(w.lower())
@@ -120,35 +121,46 @@ def export(db, out_dir, base=""):
                              "lobbying": 0.0, "election": 0.0, "fears": set(), "filings": []}
         return o
 
+    # Only filings whose issue text mentions a tracked fear count here. A filing that
+    # mentions AI without naming a fear stays on the org's own page and in the CSV.
     for r in lob_recent:
-        if not (r["entity"] or r["client_key"]):
-            continue  # a filing with no client name cannot be attributed to anyone
+        if not r["fears"] or not (r["entity"] or r["client_key"]):
+            continue
         o = org(r["entity"] or r["client_key"], r["client"], r["entity"])
         o["lobbying"] += r["amount"] or 0
         o["fears"].update(r["fears"])
         o["type"] = o["type"] or "Lobbying client"
-    committees = [dict(c) for c in db.execute("SELECT * FROM committees")]
-    for c in committees:
-        o = org(c["entity"] or name_key(c["name"]), c["name"], c["entity"])
-        o["election"] += c["independent_expenditures"] or 0
-        o["type"] = o["type"] or "Super PAC"
-    receipts = [dict(r) for r in db.execute("SELECT * FROM fec WHERE kind='receipt'")]
-    for r in receipts:
-        ent = ents.match_name(r["counterparty"])
-        if not (ent or r["counterparty_key"]):
-            continue
-        o = org(ent or r["counterparty_key"], r["counterparty"], ent)
-        o["election"] += r["amount"] or 0
-        o["type"] = o["type"] or "Donor"
-    ranked = sorted((o for o in orgs.values() if o["lobbying"] + o["election"] > 0),
-                    key=lambda o: -(o["lobbying"] + o["election"]))
+    ranked = sorted((o for o in orgs.values() if o["lobbying"] > 0), key=lambda o: -o["lobbying"])
     for i, o in enumerate(ranked, 1):
-        o["rank"], o["total"] = i, o["lobbying"] + o["election"]
+        o["rank"], o["total"] = i, o["lobbying"]
         o["slug"] = o["entity"] or slugify(o["name"])
     top = ranked[:30]
-    page_slugs = {o["slug"] for o in top}
     funders = [{"rank": o["rank"], "name": o["name"], "slug": o["slug"], "type": o["type"],
                 "fears": str(len(o["fears"])), "amount": money(o["total"]), "flag": o["flag"]} for o in top]
+
+    # ---------------- election money, kept separate and counted by committee
+    committees = [dict(c) for c in db.execute("SELECT * FROM committees")]
+    receipts = [dict(r) for r in db.execute("SELECT * FROM fec WHERE kind='receipt'")]
+    raised = collections.Counter()
+    for r in receipts:
+        raised[r["committee_id"]] += r["amount"] or 0
+    com_orgs = {}
+    for c in committees:
+        key = c["entity"] or name_key(c["name"])
+        ent = ents.by_slug.get(c["entity"]) if c["entity"] else None
+        o = com_orgs.setdefault(key, {
+            "key": key, "name": ent["name"] if ent else nice_name(c["name"]), "entity": c["entity"],
+            "type": c["committee_type"] or "Committee", "flag": (ent or {}).get("flag"),
+            "lobbying": 0.0, "election": 0.0, "fears": set(), "committee_ids": []})
+        o["election"] += max(c["independent_expenditures"] or 0, raised.get(c["id"], 0))
+        o["committee_ids"].append(c["id"])
+    com_ranked = sorted((o for o in com_orgs.values() if o["election"] > 0), key=lambda o: -o["election"])
+    for i, o in enumerate(com_ranked, 1):
+        o["rank"], o["total"] = i, o["election"]
+        o["slug"] = o["entity"] or slugify(o["name"])
+    election = [{"rank": o["rank"], "name": o["name"], "slug": o["slug"], "type": o["type"],
+                 "fears": "0", "amount": money(o["total"]), "flag": o["flag"]} for o in com_ranked[:30]]
+    page_slugs = {o["slug"] for o in top} | {o["slug"] for o in com_ranked[:30]}
 
     # ---------------- agencies that would gain authority
     agency_count, agency_name = collections.Counter(), {}
@@ -233,6 +245,8 @@ def export(db, out_dir, base=""):
     fear_pages = [fear_page(f, i + 1, len(fears), fear_stats, lob, feed, today, db, control_by, page_slugs, ents)
                   for i, f in enumerate(order)]
     org_pages = [org_page(o, len(ranked), lob, receipts, committees, feed, measures, control_by) for o in top]
+    org_pages += [org_page(o, len(com_ranked), lob, receipts, committees, feed, measures, control_by)
+                  for o in com_ranked[:30]]
 
     # ---------------- sources and status
     status = {r["source"]: dict(r) for r in db.execute("SELECT * FROM status")}
@@ -245,6 +259,7 @@ def export(db, out_dir, base=""):
     data = {
         "built_at": iso(), "sources_count": str(ok_count), "period": "past year",
         "funders_total": f"{len(ranked):,}", "beneficiaries_total": f"{len(agency_count):,}",
+        "election_total": f"{len(com_ranked):,}", "election": election,
         "links": {"data": f"{REPO_URL}/tree/data", "code": REPO_URL,
                   "report": f"{REPO_URL}/issues/new?template=error.yml"},
         "analytics": {"goatcounter": "dukewilder"},
@@ -257,7 +272,7 @@ def export(db, out_dir, base=""):
     }
     (out / "site_data.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
     (out / "status.json").write_text(json.dumps(status, indent=1, default=str))
-    write_csvs(out / "public", measures, lob_recent, ranked)
+    write_csvs(out / "public", measures, lob_recent, ranked, com_ranked)
     save_snapshot(db, today, {"fear_rank": {r["slug"]: r["rank"] for r in fear_rows},
                               "controlled": len(controlled), "measures": len(measures)})
     return data
@@ -307,7 +322,8 @@ def build_feed(db, ents, measures, lob, receipts, today):
             items.append({"type": "donation", "label": "Donation",
                           "text": f"{nice_name(r['counterparty'])} gave {money(r['amount'])} to {nice_name(r['committee_name'])}",
                           "url": r["url"], "time_iso": r["date"] + "T12:00:00+00:00", "time": r["date"],
-                          "fears": [], "org": ents.match_name(r["counterparty"]) or slugify(nice_name(r["counterparty"]))})
+                          "fears": [],
+                          "org": ents.match_name(r["committee_name"]) or slugify(nice_name(r["committee_name"]))})
     for r in db.execute("SELECT * FROM fec WHERE kind='independent_expenditure' AND date >= ?", (horizon,)):
         who = f" {r['support_oppose']} {nice_name(r['candidate'])}" if r["candidate"] else ""
         items.append({"type": "spending", "label": "Election spending",
@@ -475,10 +491,26 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by):
                  for r in receipts if (o["entity"] and o["entity"] == Entities_cache().match_name(r["counterparty"]))
                  or name_key(r["counterparty"]) == o["key"]][:8]
     own = [c for c in committees if (c["entity"] or name_key(c["name"])) == o["key"]]
-    money_in = []
-    for c in own:
-        money_in += [{"from": nice_name(r["counterparty"]), "amount": money(r["amount"]), "year": (r["date"] or "")[:4],
-                      "source": "FEC", "url": r["url"]} for r in receipts if r["committee_id"] == c["id"]][:10]
+    ids = {c["id"] for c in own}
+    givers = {}
+    ents_ = Entities_cache()
+    for r in receipts:
+        if r["committee_id"] not in ids or not (r["amount"] or 0):
+            continue
+        ent = ents_.match_name(r["counterparty"])
+        key = ent or r["counterparty_key"] or nice_name(r["counterparty"])
+        label = ents_.by_slug[ent]["name"] if ent else nice_name(r["counterparty"])
+        if ent and ent == o["entity"]:
+            label += " (affiliated committee)"  # a transfer between two committees of the same group
+        g = givers.setdefault(key, {"from": label, "total": 0.0, "years": set(), "url": r["url"], "n": 0})
+        g["total"] += r["amount"]
+        g["n"] += 1
+        if r["date"]:
+            g["years"].add(r["date"][:4])
+    money_in = [{"from": g["from"], "amount": money(g["total"]),
+                 "year": "-".join(sorted(g["years"])[::len(g["years"]) - 1 or 1]) if g["years"] else "",
+                 "source": f"FEC, {g['n']} filings" if g["n"] > 1 else "FEC", "url": g["url"]}
+                for g in sorted(givers.values(), key=lambda g: -g["total"])[:12]]
     latest = [i for i in feed if i.get("org") == o["slug"]][:6]
     parts = []
     if o["lobbying"]:
@@ -513,7 +545,7 @@ def save_snapshot(db, today, snap):
     db.commit()
 
 
-def write_csvs(folder, measures, lob_recent, ranked):
+def write_csvs(folder, measures, lob_recent, ranked, com_ranked):
     with open(folder / "measures.csv", "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["id", "kind", "jurisdiction", "identifier", "title", "status", "introduced", "url", "fears", "controls", "agencies"])
@@ -528,6 +560,11 @@ def write_csvs(folder, measures, lob_recent, ranked):
                         "; ".join(r["fears"]), r["url"]])
     with open(folder / "funders.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["rank", "name", "type", "lobbying mentioning AI", "election money", "total"])
+        w.writerow(["rank", "name", "type", "lobbying on filings mentioning a tracked fear", "fears mentioned"])
         for o in ranked:
-            w.writerow([o["rank"], o["name"], o["type"], round(o["lobbying"]), round(o["election"]), round(o["total"])])
+            w.writerow([o["rank"], o["name"], o["type"], round(o["lobbying"]), "; ".join(sorted(o["fears"]))])
+    with open(folder / "election.csv", "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["rank", "committee", "type", "election money", "committee ids"])
+        for o in com_ranked:
+            w.writerow([o["rank"], o["name"], o["type"], round(o["election"]), "; ".join(o.get("committee_ids", []))])

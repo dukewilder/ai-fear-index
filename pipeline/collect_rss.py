@@ -39,7 +39,7 @@ def run(db, state, mode):
     http = Http(min_interval=1.0, timeout=12)
     ents = Entities()
     feeds = kv_get(db, "feeds", {})
-    added, found, failed, deferred = 0, 0, [], 0
+    added, found, failed, deferred, undated = 0, 0, [], 0, 0
     started = time.time()
     for ent in ents.items:
         home = ent.get("homepage")
@@ -69,17 +69,29 @@ def run(db, state, mode):
             if not link or not looks_ai(title, summary):
                 continue
             ts = e.get("published_parsed") or e.get("updated_parsed")
-            published = iso_from_struct(ts) if ts else iso()
+            if not ts:
+                undated += 1
+                continue  # no date on the entry, and stamping it "now" would date it wrongly
+            published = iso_from_struct(ts)
             added += upsert(db, "posts", {
                 "id": sha(ent["slug"], link), "entity": ent["slug"], "title": title, "summary": summary,
                 "url": link, "published": published, "feed": feed_url, "first_seen": iso()})
         db.commit()
+    stale = drop_undated(db)
     kv_set(db, "feeds", feeds)
     db.commit()
     state["added"] = added
     state["message"] = (f"{found} feeds read"
                         + (f"; {deferred} sites left for the next run" if deferred else "")
+                        + (f"; skipped {undated} undated entries" if undated else "")
+                        + (f"; removed {stale} wrongly dated" if stale else "")
                         + (f"; no feed found for {len(failed)}: {', '.join(failed[:12])}" if failed else ""))
+
+
+def drop_undated(db):
+    """Remove posts stored before undated entries were skipped, which carry the time they were fetched."""
+    cur = db.execute("DELETE FROM posts WHERE published = first_seen")
+    return cur.rowcount
 
 
 def iso_from_struct(ts):

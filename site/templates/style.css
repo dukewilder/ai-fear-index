@@ -9,12 +9,18 @@
 --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 --quote:Georgia,'Iowan Old Style','Times New Roman',serif;
 color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
 --paper:#10131A;--bg:#10131A;--band:#161A23;--panel:#151922;
 --ink:#E7E2D4;--soft:#CFC9B9;--muted:#948F84;
 --rule:#2A2F39;--rule-band:#333945;--edge:#454C58;--line:#2A2F39;
 --accent:#E2543A;--ochre:#C9962F;--grey:#7E8797;
 --heat0:#171B23;--heat1:#33201C;--heat2:#602C21;--heat3:#963826;--heat4:#E2543A;--heat4t:#10131A}}
+:root[data-theme=dark]{
+--paper:#10131A;--bg:#10131A;--band:#161A23;--panel:#151922;
+--ink:#E7E2D4;--soft:#CFC9B9;--muted:#948F84;
+--rule:#2A2F39;--rule-band:#333945;--edge:#454C58;--line:#2A2F39;
+--accent:#E2543A;--ochre:#C9962F;--grey:#7E8797;
+--heat0:#171B23;--heat1:#33201C;--heat2:#602C21;--heat3:#963826;--heat4:#E2543A;--heat4t:#10131A}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;background:var(--paper)}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
@@ -33,6 +39,11 @@ a:hover{color:var(--accent)}
 .nav{display:flex;gap:18px}
 .nav a{display:inline-flex;align-items:center;min-height:44px;font:500 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:none}
 .nav a[aria-current=page]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.theme{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--edge);background:transparent;color:var(--muted);font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.theme:hover{border-color:var(--ink);color:var(--ink)}
+@media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.masthead .brand::before{padding:2px 5px 1px;font-size:12px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme{padding:0 6px}.theme span{display:none}.status .asof{display:none}}
+.theme i{display:inline-block;width:8px;height:8px;border:1px solid currentColor;background:var(--ink)}
+:root[data-theme=dark] .theme i,:root:not([data-theme=light]) .theme i{background:var(--ink)}
 .status{border-bottom:1px solid var(--rule);background:var(--band);font:500 11px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
 .status .wrap{display:flex;align-items:center;gap:9px;padding-top:7px;padding-bottom:7px}
 .status b{color:var(--ink);font-weight:600}

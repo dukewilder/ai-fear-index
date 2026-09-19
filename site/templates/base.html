@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <style>
 {% include "style.css" %}
 </style>
@@ -34,6 +35,7 @@
 <a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
 <a href="{{ url('rankings') }}" data-nav="rankings"{% if nav == 'rankings' %} aria-current="page"{% endif %}>Rankings</a>
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
+<button type="button" class="theme" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
 </nav>
 </div></header>
 <div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span></div></div>
@@ -144,6 +146,24 @@
       if (last) { if (!byId[s.id]) byId[s.id] = last; jo.observe(s); }
     });
   }
+
+  // light or dark, remembered on this device
+  var root = document.documentElement, sw = document.querySelector("[data-theme-switch]");
+  function themeNow() {
+    var set = root.getAttribute("data-theme");
+    if (set) return set;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function label() {
+    if (sw) sw.querySelector("span").textContent = themeNow() === "dark" ? "Light" : "Dark";
+  }
+  label();
+  if (sw) sw.addEventListener("click", function () {
+    var next = themeNow() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+    label();
+  });
 
   // copy the receipt
   document.querySelectorAll("button[data-copy]").forEach(function (btn) {

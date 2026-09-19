@@ -15,10 +15,11 @@
 <meta name="twitter:image" content="{{ og_image }}">
 {% else %}<meta name="twitter:card" content="summary">
 {% endif %}<meta name="twitter:title" content="{{ title }}">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#F1EDE3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10131A" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <style>
 {% include "style.css" %}
 </style>
@@ -28,22 +29,22 @@
 </head>
 <body>
 <header class="masthead"><div class="wrap">
-<a class="brand" href="{{ url('home') }}">AI Fear Index</a>
+<a class="brand" href="{{ url('home') }}">{{ d.site.name if d.site and d.site.name else "AI Fear Index" }}</a>
 <nav class="nav" aria-label="Main">
 <a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
 <a href="{{ url('rankings') }}" data-nav="rankings"{% if nav == 'rankings' %} aria-current="page"{% endif %}>Rankings</a>
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
 </nav>
 </div></header>
-<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span></span></div></div>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span></div></div>
 {% for page in pages %}
 <main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
 {{ page.html|safe }}
 </main>
 {% endfor %}
 <footer class="site-foot"><div class="wrap">
-<a class="brand" href="{{ url('home') }}">AI Fear Index</a>
-<p>Built from public records. Every number links to its source. Rebuilds itself around the clock.</p>
+<a class="brand" href="{{ url('home') }}">{{ d.site.name if d.site and d.site.name else "AI Fear Index" }}</a>
+<p class="colophon">Compiled from public records. Every number links to its source. Rebuilt around the clock, unattended.</p>
 <ul class="links">
 {% if nav != 'method' %}<li><a href="{{ url('method') }}">How the numbers work</a></li>{% endif %}
 {% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% elif d.site and d.site.donate_btc %}<li><a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}

@@ -79,6 +79,6 @@
 <section class="block band"><div class="wrap">
 <h2 class="h">The bills</h2>
 <p class="sub">The ones carrying the most controls, first.</p>
-<ul class="list">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="time">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+<ul class="list">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="stamp">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
 </div></section>
 {% endif %}

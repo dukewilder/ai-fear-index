@@ -4,9 +4,9 @@ on:
   schedule:
     # GitHub serves this repo's cron slots rarely: 2 of the first day's 19 at three an hour,
     # 0 of the 12 in the two hours after the move to six. So a run does not make one pass and
-    # stop. It keeps passing every twenty minutes for most of the six-hour job limit, and the
-    # concurrency group below holds the next scheduled run at the door to take over the moment
-    # this one ends. One slot firing every few hours is enough to keep the site current.
+    # stop. The first pass publishes, then the keep job carries on passing every twenty
+    # minutes for most of the six-hour job limit, and the concurrency group holds the next
+    # scheduled run at the door to take over the moment this one ends.
     - cron: "*/10 * * * *"
   push:
     branches: [main]
@@ -45,12 +45,12 @@ env:
   ONLY: ${{ inputs.only }}
 
 jobs:
-  update:
+  # One pass, published. Short, so the site is current a few minutes into every run.
+  pass:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -65,20 +65,15 @@ jobs:
           ls -la state
       - name: First pass
         run: bash .github/pass.sh once
-      # Every pass saves the built site to the gh-pages branch, which is what publishes it.
-      # This artifact is the belt and braces for the first pass of each run: it is what put
-      # the site live before the branch existed, and it costs nothing to keep.
       - uses: actions/upload-pages-artifact@v3
-        continue-on-error: true   # a bad first build must not stop the passes that follow
+        continue-on-error: true   # a bad build must not stop the passes that follow
         with:
           path: dist
-      - name: Pass, publish, wait, repeat
-        if: ${{ (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
-        run: bash .github/pass.sh more
 
+  # Publishes the first pass through Pages. Once Pages serves the gh-pages branch that
+  # every pass writes, this job has nothing left to do and can go.
   deploy:
-    needs: update
-    if: always() && needs.update.result != 'cancelled'
+    needs: pass
     runs-on: ubuntu-latest
     continue-on-error: true
     environment:
@@ -88,3 +83,28 @@ jobs:
       - id: deployment
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
+  # The rest of the run: a pass every twenty minutes until the job's time is up.
+  keep:
+    needs: pass
+    if: ${{ (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Restore data
+        run: |
+          mkdir -p state
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C state
+          fi
+      - name: Pass, publish, wait, repeat
+        env:
+          LOOP_MINUTES: "320"
+        run: bash .github/pass.sh more

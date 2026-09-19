@@ -137,34 +137,34 @@ def wrap_text(draw, text, font, width):
 
 
 def share_card(path, big, label, sub="", kicker="AI FEAR INDEX", foot="aifearindex"):
-    """A 1200 by 630 card in the site's own style: black, scanlines, red chyron, one number."""
+    """A 1200 by 630 card in the site's own style: paper, ink, one stamped figure."""
     from PIL import Image, ImageDraw, ImageFont
-    im = Image.new("RGB", (CARD_W, CARD_H), "#000000")
+    im = Image.new("RGB", (CARD_W, CARD_H), "#F1EDE3")
     d = ImageDraw.Draw(im)
-    for y in range(0, CARD_H, 3):
-        d.line([(0, y), (CARD_W, y)], fill="#0b0b0b")
+    d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline="#141210", width=3)
+    d.line([(0, 104), (CARD_W, 104)], fill="#141210", width=2)
     f_kick = ImageFont.load_default(size=28)
     f_big = ImageFont.load_default(size=200 if len(big) <= 5 else 150)
     f_lab = ImageFont.load_default(size=44)
     f_sub = ImageFont.load_default(size=28)
     f_foot = ImageFont.load_default(size=24)
     kb = d.textbbox((0, 0), kicker, font=f_kick)
-    d.rectangle([60, 52, 60 + (kb[2] - kb[0]) + 30, 52 + (kb[3] - kb[1]) + 24], fill="#ff4d3a")
-    d.text((75, 58), kicker, font=f_kick, fill="#000000")
+    d.rectangle([60, 38, 60 + (kb[2] - kb[0]) + 30, 38 + (kb[3] - kb[1]) + 24], fill="#B3321F")
+    d.text((75, 44), kicker, font=f_kick, fill="#F1EDE3")
     bb = d.textbbox((0, 0), big, font=f_big)
-    top = 120
-    d.text((52, top - bb[1]), big, font=f_big, fill="#ff4d3a")
+    top = 150
+    d.text((52, top - bb[1]), big, font=f_big, fill="#141210")
     y = top + (bb[3] - bb[1]) + 26
     for line in wrap_text(d, label, f_lab, CARD_W - 120)[:2]:
-        d.text((60, y), line, font=f_lab, fill="#f1f2f4")
+        d.text((60, y), line, font=f_lab, fill="#141210")
         y += 54
     if sub:
         y += 10
         for line in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]:
-            d.text((60, y), line, font=f_sub, fill="#a0a7b0")
+            d.text((60, y), line, font=f_sub, fill="#5D584D")
             y += 38
-    d.line([(60, CARD_H - 70), (CARD_W - 60, CARD_H - 70)], fill="#24272c", width=2)
-    d.text((60, CARD_H - 56), foot, font=f_foot, fill="#a0a7b0")
+    d.line([(60, CARD_H - 70), (CARD_W - 60, CARD_H - 70)], fill="#141210", width=2)
+    d.text((60, CARD_H - 56), foot, font=f_foot, fill="#5D584D")
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     im.save(path, "PNG", optimize=True)
 

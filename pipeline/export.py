@@ -350,6 +350,10 @@ def export(db, out_dir, base=""):
     # ---------------- feed
     feed = [i for i in build_feed(db, ents, measures, lob, receipts, today) if i["url"] not in suppressed]
 
+    kinds = collections.Counter(i["type"] for i in feed)
+    feed_types = [[key, label, f"{(len(feed) if key == 'all' else kinds[key]):,}"]
+                  for key, label in FEED_TYPES if key == "all" or kinds[key]]
+
     # ---------------- exhibit: the loudest fear right now, always on
     exhibit = build_exhibit(db, order, fear_stats, today, suppressed)
 
@@ -399,14 +403,12 @@ def export(db, out_dir, base=""):
         [money(spent[0][0]), spent[0][1]] if spent[0][0] else None,
         [money(spent[1][0]), spent[1][1]] if spent[1][0] else None,
         [f"{sum(len(m['controls']) for m in measures):,}",
-         "new government controls written into the bills"] if controlled else None,
+         "separate government controls across those bills"] if controlled else None,
         [f"{n_states}", ("states, plus Congress, " if has_fed else "states ") + "with AI measures on the books or in motion"]
         if n_states else None,
         [f"{filings_naming:,}", "federal lobbying filings naming one of the nine fears, past year"] if filings_naming else None,
         [f"{news_total:,}", "news articles on the nine fears, "
          + (f"30 days to {news_stop}" if news_stop else "last 30 days")] if news_total else None,
-        [f"{all_measures:,}", "bills, rules and orders collected so far"] if all_measures else None,
-        [f"{all_filings:,}", "lobbying filings on file"] if all_filings else None,
     ] if n]
 
     # ---------------- in their own words: the quotes the labels rest on
@@ -482,7 +484,7 @@ def export(db, out_dir, base=""):
         "tracked": {"measures": all_measures, "filings": all_filings, "orgs": len(ents.items)},
         "fears_tracked": [f["name"] if f["name"].startswith(("AI", "China")) else f["name"][0].lower() + f["name"][1:]
                           for f in fears],
-        "fears": fear_rows, "feed_types": FEED_TYPES, "feed": feed[:80], "funders": funders,
+        "fears": fear_rows, "feed_types": feed_types, "feed": feed[:80], "funders": funders,
         "beneficiaries": beneficiaries, "controls": control_rows, "sources": source_rows,
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
     }
@@ -744,10 +746,13 @@ def build_feed(db, ents, measures, lob, receipts, today):
         post_tags[t["target"][5:]].add(t["value"])
     for p in db.execute("SELECT p.* FROM posts p JOIN tag_runs tr ON tr.target = 'post:' || p.id "
                         "WHERE tr.ai_related = 1 AND p.published >= ?", (horizon,)):
+        named = sorted(post_tags.get(p["id"], []))
+        if not named:
+            continue  # AI-related is not the bar here; naming one of the nine fears is
         ent = ents.by_slug.get(p["entity"], {})
         items.append({"type": "statement", "label": "Statement", "text": f"{ent.get('name', p['entity'])}: {cut(p['title'] or '', 160)}",
                       "url": p["url"], "time_iso": p["published"], "time": p["published"][:10],
-                      "fears": sorted(post_tags.get(p["id"], [])), "org": p["entity"]})
+                      "fears": named, "org": p["entity"]})
     items.sort(key=lambda i: i["time_iso"] or "", reverse=True)
     return items
 

@@ -47,16 +47,21 @@
 </main>
 {% endfor %}
 <footer class="site-foot"><div class="wrap">
-<a class="brand" href="{{ url('home') }}">{{ d.site.name if d.site and d.site.name else "AI Fear Report" }}</a>
+<div class="foot-top">
+<div class="foot-id">
+{% set fbits = (d.site.name if d.site and d.site.name else "AI Fear Report").split(" ", 1) %}
+<a class="brand" href="{{ url('home') }}"><span class="badge">{{ fbits[0] }}</span>{{ fbits[1] if fbits|length > 1 else "" }}</a>
 <p class="colophon">Compiled from public records. Every number links to its source. Updated around the clock, unattended.</p>
-<ul class="links">
-{% if nav != 'method' %}<li><a href="{{ url('method') }}">How the numbers work</a></li>{% endif %}
-{% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% elif d.site and d.site.donate_btc %}<li><a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}
-<li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>
-<li><a href="{{ d.links.code }}">Source code</a></li>
-<li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
-</ul>
-<p>Last updated <span data-rel="{{ d.built_at }}">recently</span></p>
+</div>
+<nav class="foot-links" aria-label="Elsewhere">
+{% if nav != 'method' %}<a href="{{ url('method') }}">How the numbers work</a>{% endif %}
+{% if d.site and d.site.donate_url %}<a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% elif d.site and d.site.donate_btc %}<a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% endif %}
+<a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a>
+<a href="{{ d.links.code }}">Source code</a>
+<a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a>
+</nav>
+</div>
+<p class="foot-note">Last updated <span data-rel="{{ d.built_at }}">recently</span></p>
 </div></footer>
 <script>
 (function () {
@@ -176,6 +181,7 @@
   document.querySelectorAll("ol.rank, ul.rank, ul.list").forEach(function (list) {
     var n = list.children.length;
     if (n < 14) return;
+    if (list.id && document.querySelector('[data-filter-group="' + list.id + '"]')) return;
     list.classList.add("clip");
     var btn = document.createElement("button");
     btn.type = "button";

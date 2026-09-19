@@ -3,7 +3,7 @@
 <h1 class="title">Feed</h1>
 <p class="sub">Every new bill, rule, filing, donation and statement, newest first</p>
 <div class="filters" role="group" aria-label="Filter the feed" data-filter-group="feed-list">
-{% for key, label in d.feed_types %}<button type="button" class="filter" data-filter="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>{% endfor %}
+{% for key, label, n in d.feed_types %}<button type="button" class="filter" data-filter="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ label }}<i>{{ n }}</i></button>{% endfor %}
 </div>
 {% if d.feed %}<ul class="list" id="feed-list">{% for i in d.feed %}{{ feed_item(i) }}{% endfor %}</ul>{% else %}<p class="caption">The first items arrive with the next update.</p>{% endif %}
 </div></section>

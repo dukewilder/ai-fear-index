@@ -1,0 +1,34 @@
+{% macro move(m) -%}
+{% if m %}{% if m.dir == 'new' %}<span class="mv">New</span>{% elif m.dir == 'down' %}<span class="mv down">▼ {{ m.text }}</span>{% else %}<span class="mv">▲ {{ m.text }}</span>{% endif %}{% endif %}
+{%- endmacro %}
+
+{% macro fear_row(f) -%}
+<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span>{% if f.line %}<span class="meta">{{ f.line }}</span>{% endif %}</span><span class="row-end"><span class="val accent">{{ f.score }}</span>{{ move(f.move) }}</span></a></li>
+{%- endmacro %}
+
+{% macro grid(g) -%}
+<div class="gridwrap"><table class="grid">
+<thead><tr><th scope="col">Fear</th>{% for c in g.channels %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>
+<tbody>{% for r in g.rows %}<tr><th scope="row"><a href="{{ url('fear', r.slug) }}">{{ r.name }}</a></th>{% for c in r.cells %}<td class="l{{ c.level }}">{{ c.n }}</td>{% endfor %}</tr>
+{% endfor %}</tbody></table></div>
+{%- endmacro %}
+
+{% macro buying_row(c) -%}
+<li class="row"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} already passed</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
+{%- endmacro %}
+
+{% macro org_row(o, stat='fears') -%}
+<li>{% if o.slug %}<a class="row" href="{{ url('org', o.slug) }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ o.rank }}</span><span><span class="row-name">{{ o.name }}</span><span class="meta"><span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}{% if stat == 'messages' %}{{ o.messages }} filings{% elif o.fears and o.fears != '0' %}mentions {{ o.fears }} fear{{ 's' if o.fears != '1' }}{% endif %}</span></span><span class="val">{{ o.amount }}</span>{% if o.slug %}</a>{% else %}</div>{% endif %}</li>
+{%- endmacro %}
+
+{% macro benefit_row(b) -%}
+<li class="row"><span class="rank-n">{{ b.rank }}</span><span><span class="row-name">{{ b.name }}</span><span class="meta"><span class="chip">{{ b.type }}</span>gains {{ b.gains }}</span></span><span class="val accent">{{ b.score }}<span class="unit">{{ b.unit or 'bills' }}</span></span></li>
+{%- endmacro %}
+
+{% macro control_row(c) -%}
+<li class="row"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.pending }} pending</span></span><span class="val accent">{{ c.bills }}</span></li>
+{%- endmacro %}
+
+{% macro feed_item(i) -%}
+<li class="item" data-type="{{ i.type }}"><span class="item-top"><span class="chip">{{ i.label }}</span><span class="time"{% if i.time_iso %} data-rel="{{ i.time_iso }}"{% endif %}>{{ i.time }}</span></span>{% if i.url %}<a class="item-text" href="{{ i.url }}" rel="noopener" target="_blank">{{ i.text }}</a>{% else %}<span class="item-text">{{ i.text }}</span>{% endif %}</li>
+{%- endmacro %}

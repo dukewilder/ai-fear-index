@@ -1,0 +1,61 @@
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row, grid %}
+<section class="block first"><div class="wrap">
+<h1 class="title">Rankings</h1>
+<nav class="jump" aria-label="Jump to a ranking">
+<a href="{{ url('rankings', anchor='fears') }}">Fears</a>
+<a href="{{ url('rankings', anchor='everywhere') }}">Every channel</a>
+<a href="{{ url('rankings', anchor='controls') }}">Controls</a>
+<a href="{{ url('rankings', anchor='funders') }}">Funders</a>
+<a href="{{ url('rankings', anchor='beneficiaries') }}">Beneficiaries</a>
+<a href="{{ url('rankings', anchor='industry') }}">Industry</a>
+<a href="{{ url('rankings', anchor='election') }}">Election money</a>
+</nav>
+</div></section>
+
+<section class="block band" id="fears"><div class="wrap">
+<h2 class="h">The Fear Index</h2>
+<p class="sub">Nine fears, scored 0 to 100 on public attention, legislation and lobbying. Updated hourly.</p>
+<ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
+</div></section>
+
+{% if d.grid %}
+<section class="block" id="everywhere"><div class="wrap">
+<h2 class="h">The same fears, everywhere</h2>
+<p class="sub">Every fear, every channel, counted.</p>
+{{ grid(d.grid) }}
+</div></section>
+{% endif %}
+
+<section class="block band" id="controls"><div class="wrap">
+<h2 class="h">What the fear is buying</h2>
+<p class="sub">The government controls written into the bills that cite these fears, by how many bills carry each.</p>
+<ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>
+</div></section>
+
+<section class="block" id="funders"><div class="wrap">
+<h2 class="h">Who's funding it</h2>
+<p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
+<ol class="rank">{% for o in d.funders %}{{ org_row(o) }}{% endfor %}</ol>
+</div></section>
+
+<section class="block band" id="beneficiaries"><div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
+<ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+</div></section>
+
+{% if d.industry %}
+<section class="block" id="industry"><div class="wrap">
+<h2 class="h">Industry at the table</h2>
+<p class="sub">Companies and trade groups whose federal lobbying filings name these fears, past year, by number of filings.</p>
+<ol class="rank">{% for o in d.industry %}{{ org_row(o) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if d.election %}
+<section class="block band" id="election"><div class="wrap">
+<h2 class="h">Election money</h2>
+<p class="sub">Committees spending on AI politics this cycle, counted by committee.</p>
+<ol class="rank">{% for o in d.election %}{{ org_row(o) }}{% endfor %}</ol>
+</div></section>
+{% endif %}

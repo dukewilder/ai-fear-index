@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<meta name="description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:type" content="website">
+<meta property="og:description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
+{% if og_image %}<meta property="og:image" content="{{ og_image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_image }}">
+{% else %}<meta name="twitter:card" content="summary">
+{% endif %}<meta name="twitter:title" content="{{ title }}">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+{% include "style.css" %}
+</style>
+{% if not preview and d.analytics and d.analytics.goatcounter %}
+<script data-goatcounter="https://{{ d.analytics.goatcounter }}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+{% endif %}
+</head>
+<body>
+<header class="masthead"><div class="wrap">
+<a class="brand" href="{{ url('home') }}">AI Fear Index</a>
+<nav class="nav" aria-label="Main">
+<a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
+<a href="{{ url('rankings') }}" data-nav="rankings"{% if nav == 'rankings' %} aria-current="page"{% endif %}>Rankings</a>
+<a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
+</nav>
+</div></header>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Updated <span data-rel="{{ d.built_at }}">recently</span> from {{ d.sources_count }} sources</span></div></div>
+{% for page in pages %}
+<main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
+{{ page.html|safe }}
+</main>
+{% endfor %}
+<footer class="site-foot"><div class="wrap">
+<a class="brand" href="{{ url('home') }}">AI Fear Index</a>
+<p>Built from public records. Every number links to its source. Rebuilt every hour.</p>
+<ul class="links">
+<li><a href="{{ url('method') }}">How the numbers work</a></li>
+<li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>
+<li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
+</ul>
+<p>Last rebuilt <span data-rel="{{ d.built_at }}">recently</span></p>
+</div></footer>
+<script>
+(function () {
+  function ago(iso) {
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (isNaN(s)) return "recently";
+    if (s < 90) return "just now";
+    var m = Math.round(s / 60);
+    if (m < 60) return m + " min ago";
+    var h = Math.round(m / 60);
+    if (h < 24) return h + " hr ago";
+    var days = Math.round(h / 24);
+    return days + (days === 1 ? " day ago" : " days ago");
+  }
+  function tick() {
+    document.querySelectorAll("[data-rel]").forEach(function (el) {
+      el.textContent = ago(el.getAttribute("data-rel"));
+    });
+  }
+  tick();
+  setInterval(tick, 60000);
+
+  document.querySelectorAll("[data-filter-group]").forEach(function (group) {
+    var list = document.getElementById(group.getAttribute("data-filter-group"));
+    group.addEventListener("click", function (e) {
+      var btn = e.target.closest("button[data-filter]");
+      if (!btn || !list) return;
+      group.querySelectorAll("button[data-filter]").forEach(function (b) {
+        b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+      });
+      var f = btn.getAttribute("data-filter");
+      list.querySelectorAll("[data-type]").forEach(function (li) {
+        li.hidden = !(f === "all" || li.getAttribute("data-type") === f);
+      });
+    });
+  });
+{% if preview %}
+
+  var pages = Array.prototype.slice.call(document.querySelectorAll("main[data-route]"));
+  var navFor = { fear: "rankings", org: "rankings", feed: "feed", rankings: "rankings", method: "method" };
+  function has(route) {
+    return pages.some(function (p) { return p.getAttribute("data-route") === route; });
+  }
+  function show() {
+    var parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+    var route = "";
+    var tries = [parts.join("/"), parts.slice(0, 2).join("/"), parts.slice(0, 1).join("/")];
+    for (var i = 0; i < tries.length; i++) {
+      if (tries[i] && has(tries[i])) { route = tries[i]; break; }
+    }
+    pages.forEach(function (p) { p.hidden = p.getAttribute("data-route") !== route; });
+    var section = route.split("/")[0];
+    document.querySelectorAll(".nav a").forEach(function (a) {
+      if (navFor[section] === a.getAttribute("data-nav")) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+    var used = route ? route.split("/").length : 0;
+    var anchor = parts.slice(used).join("/");
+    var target = anchor ? document.getElementById(anchor) : null;
+    if (target) target.scrollIntoView();
+    else window.scrollTo(0, 0);
+    pages.forEach(function (p) { if (!p.hidden) document.title = p.getAttribute("data-title"); });
+  }
+  window.addEventListener("hashchange", show);
+  show();
+{% endif %}
+})();
+</script>
+</body>
+</html>

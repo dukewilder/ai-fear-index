@@ -1,0 +1,82 @@
+{
+ "fedreg": {
+  "source": "fedreg",
+  "last_run": "2026-09-19T20:10:48+00:00",
+  "ok": 1,
+  "added": 0,
+  "message": "0 documents read since 2026-09-19",
+  "last_ok": "2026-09-19T20:10:48+00:00"
+ },
+ "fec": {
+  "source": "fec",
+  "last_run": "2026-09-19T17:13:20+00:00",
+  "ok": 1,
+  "added": 26,
+  "message": "Leading the Future -> LEADING THE FUTURE (C00916114); Public First -> PUBLIC FIRST (C00930503); Public First -> PUBLIC FIRST ACTION INC. (C30003586)",
+  "last_ok": "2026-09-19T17:13:20+00:00"
+ },
+ "wikipedia": {
+  "source": "wikipedia",
+  "last_run": "2026-09-19T08:36:15+00:00",
+  "ok": 1,
+  "added": 70,
+  "message": "ok",
+  "last_ok": "2026-09-19T08:36:15+00:00"
+ },
+ "gdelt": {
+  "source": "gdelt",
+  "last_run": "2026-09-19T20:09:17+00:00",
+  "ok": 1,
+  "added": 0,
+  "message": "0 articles and 2 volume series read for 6 fears, starting at bioweapons; 3 fears left for the next run; bioweapons timeline: rate limited by GDELT; bioweapons: rate limited by GDELT; bias timeline: rate limited by GDELT; bias: rate limited by GDELT; loss-of-control: rate limited by GDELT; china-race timeline: rate limited by GDELT; job-loss timeline: rate limited by GDELT",
+  "last_ok": "2026-09-19T20:09:17+00:00"
+ },
+ "rss": {
+  "source": "rss",
+  "last_run": "2026-09-19T20:10:44+00:00",
+  "ok": 1,
+  "added": 234,
+  "message": "35 feeds read; skipped 22 undated entries; no feed found for 10: Anthropic, xAI, Andreessen Horowitz, Leading the Future, Build American AI, Center for AI Policy, Center for a New American Security, Cato Institute, American Enterprise Institute, Samsung",
+  "last_ok": "2026-09-19T20:10:44+00:00"
+ },
+ "tag": {
+  "source": "tag",
+  "last_run": "2026-09-19T20:10:48+00:00",
+  "ok": 1,
+  "added": 0,
+  "message": "daily cap of 4000 items reached; resumes tomorrow",
+  "last_ok": "2026-09-19T20:10:48+00:00"
+ },
+ "congress": {
+  "source": "congress",
+  "last_run": "2026-09-19T08:32:45+00:00",
+  "ok": 1,
+  "added": 2,
+  "message": "2 AI-titled bills checked",
+  "last_ok": "2026-09-19T08:32:45+00:00"
+ },
+ "openstates": {
+  "source": "openstates",
+  "last_run": "2026-09-19T08:35:22+00:00",
+  "ok": 1,
+  "added": 0,
+  "message": "0 bills read in 0 requests; daily allowance reached; still backfilling: data center, automated decision, synthetic media, digital replica, algorithmic",
+  "last_ok": "2026-09-19T08:35:22+00:00"
+ },
+ "lda": {
+  "source": "lda",
+  "last_run": "2026-09-19T08:36:04+00:00",
+  "ok": 1,
+  "added": 67,
+  "message": "466 filings read for 2026-2026",
+  "last_ok": "2026-09-19T08:36:04+00:00"
+ },
+ "news": {
+  "source": "news",
+  "last_run": "2026-09-19T20:09:32+00:00",
+  "ok": 1,
+  "added": 44,
+  "message": "39 of 429 stories matched a fear, from 16 feeds",
+  "last_ok": "2026-09-19T20:09:32+00:00"
+ }
+}

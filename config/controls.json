@@ -1,22 +1,62 @@
 [
-  {"slug": "license-to-build", "name": "Licenses required to build AI", "chip": "License to build",
-   "definition": "Requires a license, registration, certification, or government permission before developing, training, or deploying an AI system or model."},
-  {"slug": "training-caps", "name": "Caps on who can train models", "chip": "Compute cap",
-   "definition": "Sets compute, cost, or capability thresholds that trigger restrictions or obligations on who may train or release large AI models."},
-  {"slug": "open-model-limits", "name": "Limits on sharing open models", "chip": "Open-model limits",
-   "definition": "Restricts publishing, sharing, or open-sourcing AI model weights or code."},
-  {"slug": "id-age-checks", "name": "ID and age checks for users", "chip": "ID and age checks",
-   "definition": "Requires identity verification, age verification, or know-your-customer checks for users, customers, or buyers of AI services or compute."},
-  {"slug": "mandatory-reporting", "name": "Mandatory reporting to government", "chip": "Mandatory reporting",
-   "definition": "Requires developers or deployers to report, disclose, register, or submit safety plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand."},
-  {"slug": "labeling-mandates", "name": "Labels and watermarks on AI content", "chip": "Labeling mandate",
-   "definition": "Requires labels, watermarks, provenance data, or disclosures on AI-generated content or AI interactions."},
-  {"slug": "new-agency-powers", "name": "New powers for government agencies", "chip": "New agency powers",
-   "definition": "Creates a new government office or agency for AI, or gives an existing agency or attorney general new rulemaking, oversight, or enforcement authority over AI."},
-  {"slug": "export-controls", "name": "Export controls on models and chips", "chip": "Export controls",
-   "definition": "Restricts exports or foreign access to AI chips, models, compute, or AI technology."},
-  {"slug": "preemption", "name": "State laws overridden by Washington", "chip": "State laws overridden",
-   "definition": "Overrides, preempts, or blocks state or local AI laws, or conditions funding on states not regulating AI."},
-  {"slug": "data-center-limits", "name": "Moratoriums and limits on data centers", "chip": "Data center limits",
-   "definition": "Pauses, bans, or adds new permitting restrictions or special conditions on building or operating data centers."}
+  {
+    "slug": "license-to-build",
+    "name": "Licenses required to build AI",
+    "chip": "License to build",
+    "definition": "Requires a license, registration, certification, or government permission before developing, training, or deploying an AI system or model."
+  },
+  {
+    "slug": "training-caps",
+    "name": "Caps on who can train models",
+    "chip": "Caps on who can train",
+    "definition": "Sets compute, cost, or capability thresholds that trigger restrictions or obligations on who may train or release large AI models."
+  },
+  {
+    "slug": "open-model-limits",
+    "name": "Limits on sharing open models",
+    "chip": "Open-model limits",
+    "definition": "Restricts publishing, sharing, or open-sourcing AI model weights or code."
+  },
+  {
+    "slug": "id-age-checks",
+    "name": "ID and age checks for users",
+    "chip": "ID checks for users",
+    "definition": "Requires identity verification, age verification, or know-your-customer checks for users, customers, or buyers of AI services or compute."
+  },
+  {
+    "slug": "mandatory-reporting",
+    "name": "Mandatory reporting to government",
+    "chip": "Mandatory reporting",
+    "definition": "Requires developers or deployers to report, disclose, register, or submit safety plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand."
+  },
+  {
+    "slug": "labeling-mandates",
+    "name": "Labels and watermarks on AI content",
+    "chip": "Labeling mandate",
+    "definition": "Requires labels, watermarks, provenance data, or disclosures on AI-generated content or AI interactions."
+  },
+  {
+    "slug": "new-agency-powers",
+    "name": "New powers for government agencies",
+    "chip": "New agency powers",
+    "definition": "Creates a new government office or agency for AI, or gives an existing agency or attorney general new rulemaking, oversight, or enforcement authority over AI."
+  },
+  {
+    "slug": "export-controls",
+    "name": "Export controls on models and chips",
+    "chip": "Export controls",
+    "definition": "Restricts exports or foreign access to AI chips, models, compute, or AI technology."
+  },
+  {
+    "slug": "preemption",
+    "name": "State laws overridden by Washington",
+    "chip": "State laws overridden",
+    "definition": "Overrides, preempts, or blocks state or local AI laws, or conditions funding on states not regulating AI."
+  },
+  {
+    "slug": "data-center-limits",
+    "name": "Moratoriums and limits on data centers",
+    "chip": "Data center limits",
+    "definition": "Pauses, bans, or adds new permitting restrictions or special conditions on building or operating data centers."
+  }
 ]

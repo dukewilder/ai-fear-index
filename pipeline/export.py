@@ -329,6 +329,10 @@ def export(db, out_dir, base=""):
     numbers = [n for n in [
         [f"{len(measures):,}", "bills, rules and orders about AI since January 2025"] if measures else None,
         [f"{len(controlled):,}", "would put AI under new government control"] if controlled else None,
+        [f"{sum(len(m['controls']) for m in measures):,}",
+         "new government controls written into those bills"] if controlled else None,
+        [f"{len(agency_count):,}",
+         "agencies and officials the bills would hand new power over AI"] if agency_count else None,
         [index["where"], "with AI measures on the books or in motion"] if index["where"] else None,
         [f"{filings_naming:,}", "federal lobbying filings naming one of the nine fears, past year"] if filings_naming else None,
         [money(advocacy_total), "spent lobbying on the fears by advocacy groups, past year"] if advocacy_total else None,
@@ -340,7 +344,7 @@ def export(db, out_dir, base=""):
     ] if n]
 
     # ---------------- in their own words: the quotes the labels rest on
-    quotes = own_words(db, measures, fear_by, suppressed)
+    quotes = own_words(db, measures, fear_by, control_by, suppressed)
 
     # ---------------- already law
     passed = sorted((m for m in controlled if m["status"] == "passed"),
@@ -371,7 +375,7 @@ def export(db, out_dir, base=""):
                   for i, f in enumerate(order)]
     for fp in fear_pages:
         st = fear_stats[fp["slug"]]
-        fp["quotes"] = own_words(db, st["measures"], fear_by, suppressed, per_fear=fp["slug"], limit=6)
+        fp["quotes"] = own_words(db, st["measures"], fear_by, control_by, suppressed, per_fear=fp["slug"], limit=6)
         fp["receipt"] = " ".join(x for x in [
             f"{fp['name']}: {fp['score']} of 100 on the AI Fear Index.",
             f"{len(st['measures']):,} bills since January 2025" + (f" in {len(st['states'])} states." if st["states"] else ".") if st["measures"] else "",
@@ -404,7 +408,7 @@ def export(db, out_dir, base=""):
                   "report": f"{REPO_URL}/issues/new?template=error.yml"},
         "analytics": {"goatcounter": "dukewilder"},
         "exhibit": exhibit, "index": index, "grid": grid, "polls": polls, "numbers": numbers, "site": site,
-        "quotes": quotes[:6], "already_law": already_law, "law_total": law_total,
+        "quotes": quotes[:9], "already_law": already_law, "law_total": law_total,
         "states": state_rows, "states_total": len(state_rows), "runs_today": runs_today,
         "feed_today": sum(1 for i in feed if (i.get("time_iso") or "") >= (today - dt.timedelta(days=1)).isoformat()),
         "tracked": {"measures": all_measures, "filings": all_filings, "orgs": len(ents.items)},
@@ -538,8 +542,9 @@ def law_date(m, today):
     return f"Effective {d}" if d > today.isoformat() else f"Passed · {d}"
 
 
-def own_words(db, measures, fear_by, suppressed=(), per_fear=None, limit=40):
-    """The exact words, from the bills themselves, that each fear label rests on."""
+def own_words(db, measures, fear_by, control_by, suppressed=(), per_fear=None, limit=40):
+    """The exact words each fear label rests on, next to the control the same bill
+    would create and the office it would go to."""
     ev = {}
     for t in db.execute("SELECT target, value, evidence FROM tags WHERE kind='fear' AND target NOT LIKE 'post:%'"):
         ev.setdefault(t["target"], []).append((t["value"], t["evidence"]))
@@ -547,23 +552,34 @@ def own_words(db, measures, fear_by, suppressed=(), per_fear=None, limit=40):
     for m in measures:
         if m["url"] in suppressed:
             continue
+        chips = [control_by[c]["chip"] for c in m["controls"] if c in control_by]
+        who = [a.strip() for a in m["agencies"] if name_key(a)]
         for slug, quote in ev.get(m["id"], []):
             if slug not in fear_by or (per_fear and slug != per_fear):
                 continue
-            words = len((quote or "").split())
-            if words < 5:
+            quote = (quote or "").strip().strip('"')
+            words = len(quote.split())
+            letters = [c for c in quote if c.isalpha()]
+            # a shouted bill title is a header, not language anyone wrote to persuade
+            shouted = letters and sum(c.isupper() for c in letters) / len(letters) > 0.6
+            if words < 6 or shouted:
                 continue
-            out.append({"fear": fear_by[slug]["name"], "slug": slug, "quote": quote.strip().strip('"'),
+            out.append({"fear": fear_by[slug]["name"], "slug": slug, "quote": quote,
                         "bill": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "url": m["url"],
                         "status": STATUS_LABEL.get(m["status"], "Pending"), "words": words,
+                        "controls": chips, "agency": cut(who[0], 58) if who else "",
                         "when": m["introduced_date"] or ""})
-    # newest first, then spread across fears so one loud topic does not take every slot
-    out.sort(key=lambda q: (q["when"], q["words"]), reverse=True)
-    spread, seen = [], collections.Counter()
+    # the bills that carry a control first, then newest, then spread across fears
+    # so one loud topic does not take every slot
+    out.sort(key=lambda q: (bool(q["controls"]), q["when"], q["words"]), reverse=True)
+    spread, seen, bills = [], collections.Counter(), set()
     for q in out:
+        if per_fear is None and q["url"] in bills:  # one card per bill on the front page
+            continue
         if seen[q["slug"]] < (3 if per_fear is None else limit):
             spread.append(q)
             seen[q["slug"]] += 1
+            bills.add(q["url"])
         if len(spread) >= limit:
             break
     return spread
@@ -614,6 +630,13 @@ def build_feed(db, ents, measures, lob, receipts, today):
     return items
 
 
+def bill_headline(title):
+    """The name a legislature gave a bill, without the drafting boilerplate after it."""
+    head = re.split(r"\s*;", (title or "").strip(), 1)[0]
+    head = re.sub(r"^(an?\s+act\s+(relating to|providing for|concerning|to)\s+)", "", head, flags=re.I)
+    return head.strip().strip('"').strip("\u201c\u201d").strip()
+
+
 def build_exhibit(db, order, fear_stats, today, suppressed=()):
     """The top of the front page: the fear leading the index, its loudest headline, the receipt.
 
@@ -628,14 +651,25 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
     arts = [dict(a) for a in db.execute(
         "SELECT * FROM articles WHERE fear=? AND seen > ? AND length(title) > 25 ORDER BY seen DESC LIMIT 120",
         (best["slug"], d7)) if a["url"] not in suppressed]
-    line, line_url, source = None, None, None
+    line, line_url, source, source_label = None, None, None, "Headline from"
     if arts:
         words = [set(w for w in re.findall(r"[a-z]{4,}", a["title"].lower())) for a in arts]
 
         def score(i):
             return sum(len(words[i] & w) / (len(words[i] | w) or 1) for j, w in enumerate(words) if j != i)
         pick = arts[max(range(len(arts)), key=score)]
-        line, line_url, source = pick["title"], pick["url"], pick["domain"]
+        line, line_url, source = cut(pick["title"], 110), pick["url"], pick["domain"]
+    if not line:
+        # no fresh headline on file for the leader: its newest bill speaks for it.
+        # Legislatures put the bill's name first and the boilerplate after a semicolon.
+        newest = sorted(st["measures"], key=lambda m: (m["introduced_date"] or "", m["id"]), reverse=True)
+        named = [(m, bill_headline(m["title"])) for m in newest]
+        named = [(m, h) for m, h in named if len(h) > 24]
+        bill = next((mh for mh in named if len(mh[1]) <= 70), named[0] if named else None)
+        if bill:
+            line, line_url = cut(bill[1], 70), bill[0]["url"]
+            source = f"{bill[0]['identifier'] or 'Measure'}, {bill[0]['jurisdiction_name']}"
+            source_label = "Newest bill"
     if not line:
         bits = []
         if st["measures"]:
@@ -658,12 +692,22 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         rows.append(["Bills", f"{len(st['measures']):,} since January 2025{where}" + (", plus Congress" if st["federal"] else "")])
     if st["controls"]:
         rows.append(["Controls", f"{st['controls']:,} written into those bills"])
+    gains, gain_name = collections.Counter(), {}
+    for m in st["measures"]:
+        for a in m["agencies"]:
+            k = name_key(a)
+            if k:
+                gains[k] += 1
+                gain_name.setdefault(k, a.strip())
+    if gains:
+        k, n = gains.most_common(1)[0]
+        rows.append(["Goes to", f"{cut(gain_name[k], 58)}, in {n} of them"])
     if st["filings"]:
         rows.append(["Lobbying", f"{st['filings']:,} filings name it, past year"])
     if st["advocacy"]:
         rows.append(["Funding", f"{money(st['advocacy'])} from advocacy groups, past year"])
     if source:
-        rows.append(["Headline from", source])
+        rows.append([source_label, source])
     return {"chyron": f"Loudest fear right now: {best['name']}", "line": line, "line_url": line_url,
             "rows": rows, "fear_slug": best["slug"]}
 

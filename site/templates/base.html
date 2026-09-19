@@ -35,7 +35,7 @@
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
 </nav>
 </div></header>
-<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span>{% if d.runs_today %} · {{ d.runs_today }} update{{ 's' if d.runs_today != 1 }} today{% endif %}{% if d.tracked %} · {{ '{:,}'.format(d.tracked.measures) }} bills · {{ '{:,}'.format(d.tracked.filings) }} filings · {{ d.tracked.orgs }} organizations tracked{% endif %}</span></div></div>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span></span></div></div>
 {% for page in pages %}
 <main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
 {{ page.html|safe }}
@@ -45,9 +45,10 @@
 <a class="brand" href="{{ url('home') }}">AI Fear Index</a>
 <p>Built from public records. Every number links to its source. Rebuilds itself around the clock.</p>
 <ul class="links">
-<li><a href="{{ url('method') }}">How the numbers work</a></li>
-{% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}
+{% if nav != 'method' %}<li><a href="{{ url('method') }}">How the numbers work</a></li>{% endif %}
+{% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% elif d.site and d.site.donate_btc %}<li><a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}
 <li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>
+<li><a href="{{ d.links.code }}">Source code</a></li>
 <li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
 </ul>
 <p>Last rebuilt <span data-rel="{{ d.built_at }}">recently</span></p>
@@ -81,7 +82,13 @@
       entries.forEach(function (en) {
         if (!en.isIntersecting) return;
         io.unobserve(en.target);
-        var el = en.target, text = el.textContent, m = text.match(/^([^0-9]*)([0-9][0-9,]*)(\.[0-9]+)?(.*)$/);
+        // count only the number itself: the element may also hold a unit label
+        var node = null, kids = en.target.childNodes;
+        for (var i = 0; i < kids.length; i++) {
+          if (kids[i].nodeType === 3 && /[0-9]/.test(kids[i].nodeValue)) { node = kids[i]; break; }
+        }
+        if (!node) return;
+        var text = node.nodeValue, m = text.match(/^([^0-9]*)([0-9][0-9,]*)(\.[0-9]+)?(.*)$/);
         if (!m) return;
         var end = parseFloat(m[2].replace(/,/g, "") + (m[3] || "")), dec = m[3] ? m[3].length - 1 : 0;
         if (!isFinite(end) || end === 0) return;
@@ -89,8 +96,8 @@
         function step(ts) {
           if (!t0) t0 = ts;
           var p = Math.min(1, (ts - t0) / dur), v = end * (1 - Math.pow(1 - p, 3));
-          el.textContent = m[1] + v.toLocaleString(undefined, {minimumFractionDigits: dec, maximumFractionDigits: dec}) + m[4];
-          if (p < 1) requestAnimationFrame(step); else el.textContent = text;
+          node.nodeValue = m[1] + v.toLocaleString(undefined, {minimumFractionDigits: dec, maximumFractionDigits: dec}) + m[4];
+          if (p < 1) requestAnimationFrame(step); else node.nodeValue = text;
         }
         requestAnimationFrame(step);
       });

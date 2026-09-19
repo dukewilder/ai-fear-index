@@ -34,7 +34,7 @@
 {%- endmacro %}
 
 {% macro quote_card(q) -%}
-<li class="quote-card"><span class="chip">{{ q.fear }}</span><blockquote>“{{ q.quote }}”</blockquote><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="time">{{ q.status }}</span></li>
+<li class="quote-card"><span class="chip">{{ q.fear }}</span><blockquote>“{{ q.quote }}”</blockquote><span class="q-src"><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="time">{{ q.status }}</span></span>{% if q.controls %}<span class="buys">{% for c in q.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% if q.agency %}<span class="arw" aria-hidden="true">→</span><span class="who">{{ q.agency }}</span>{% endif %}</span>{% endif %}</li>
 {%- endmacro %}
 
 {% macro law_row(a) -%}

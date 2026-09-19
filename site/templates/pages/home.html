@@ -30,46 +30,47 @@
 <figure class="spark">{{ spark_svg|safe }}<figcaption>{{ d.index.series_label }}</figcaption></figure>
 </div></section>
 
-{% if d.numbers %}
 <section class="block band"><div class="wrap">
-<h2 class="h">By the numbers</h2>
-<ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
-</div></section>
-{% endif %}
-
-<section class="block"><div class="wrap">
 <h2 class="h">The Fear Index</h2>
 <p class="sub">Scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
 <ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
 </div></section>
 
-{% if d.grid %}
+<section class="block"><div class="wrap">
+<h2 class="h">What the fear is buying</h2>
+<p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
+<ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
+</div></section>
+
+{% if d.beneficiaries %}
 <section class="block band"><div class="wrap">
-<h2 class="h">The same fears, everywhere</h2>
-<p class="sub">Every fear, every channel, counted.</p>
-{{ grid(d.grid) }}
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
+<ol class="rank">{% for b in d.beneficiaries[:6] %}{{ benefit_row(b) }}{% endfor %}</ol>
+{% if d.totals.beneficiaries > 6 %}<a class="more" href="{{ url('rankings', anchor='beneficiaries') }}">See all {{ d.beneficiaries_total }}</a>{% endif %}
 </div></section>
 {% endif %}
 
 {% if d.quotes %}
 <section class="block"><div class="wrap">
 <h2 class="h">In their own words</h2>
-<p class="sub">The exact language in the bills.</p>
+<p class="sub">The fear as the bill states it, and the power the same bill hands out.</p>
 <ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 
-<section class="block band"><div class="wrap">
-<h2 class="h">What the fear is buying</h2>
-<p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
-<ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>
-</div></section>
-
 {% if d.already_law %}
-<section class="block"><div class="wrap">
+<section class="block band"><div class="wrap">
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
 <ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if d.numbers %}
+<section class="block"><div class="wrap">
+<h2 class="h">By the numbers</h2>
+<ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
 </div></section>
 {% endif %}
 
@@ -79,24 +80,6 @@
 <p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
 <ol class="rank">{% for o in d.funders[:6] %}{{ org_row(o) }}{% endfor %}</ol>
 {% if d.totals.funders > 6 %}<a class="more" href="{{ url('rankings', anchor='funders') }}">See all {{ d.funders_total }}</a>{% endif %}
-</div></section>
-{% endif %}
-
-{% if d.beneficiaries %}
-<section class="block"><div class="wrap">
-<h2 class="h">Who benefits</h2>
-<p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
-<ol class="rank">{% for b in d.beneficiaries[:5] %}{{ benefit_row(b) }}{% endfor %}</ol>
-{% if d.totals.beneficiaries > 5 %}<a class="more" href="{{ url('rankings', anchor='beneficiaries') }}">See all {{ d.beneficiaries_total }}</a>{% endif %}
-</div></section>
-{% endif %}
-
-{% if d.states %}
-<section class="block band"><div class="wrap">
-<h2 class="h">Where it's happening</h2>
-<p class="sub">Legislatures ranked by AI measures.</p>
-<ol class="rank">{% for s in d.states[:6] %}{{ state_row(s) }}{% endfor %}</ol>
-{% if d.states_total > 6 %}<a class="more" href="{{ url('rankings', anchor='states') }}">See all {{ d.states_total }}</a>{% endif %}
 </div></section>
 {% endif %}
 
@@ -118,11 +101,20 @@
 </div></section>
 {% endif %}
 
-{% if d.site.donate_url %}
+{% if d.grid %}
+<section class="block"><div class="wrap">
+<h2 class="h">The same fears, everywhere</h2>
+<p class="sub">Every fear, every channel, counted.</p>
+{{ grid(d.grid) }}
+</div></section>
+{% endif %}
+
+{% if d.states %}
 <section class="block band"><div class="wrap">
-<h2 class="h">Keep it running</h2>
-<p class="sub">{{ d.site.donate_text }}</p>
-<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
+<h2 class="h">Where it's happening</h2>
+<p class="sub">Legislatures ranked by AI measures.</p>
+<ol class="rank">{% for s in d.states[:6] %}{{ state_row(s) }}{% endfor %}</ol>
+{% if d.states_total > 6 %}<a class="more" href="{{ url('rankings', anchor='states') }}">See all {{ d.states_total }}</a>{% endif %}
 </div></section>
 {% endif %}
 
@@ -133,4 +125,13 @@
 <ul class="list">{% for i in d.feed[:6] %}{{ feed_item(i) }}{% endfor %}</ul>
 <a class="more" href="{{ url('feed') }}">See the full feed</a>
 </div></section>
+{% endif %}
+
+{% if d.site.donate_url or d.site.donate_btc %}
+<section class="block band" id="keep"><div class="wrap">
+<h2 class="h">Keep it running</h2>
+<p class="sub">{{ d.site.donate_text }}</p>
+{% if d.site.donate_url %}<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
+{% endif %}{% if d.site.donate_btc %}<div class="btc"><span class="btc-k">Bitcoin</span><a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc">{{ d.site.donate_btc }}</a><button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy</button></div>
+{% endif %}</div></section>
 {% endif %}

@@ -19,8 +19,8 @@
 <a href="{{ url('home', anchor='buying') }}" data-jump="buying">What it buys</a>
 <a href="{{ url('home', anchor='benefits') }}" data-jump="benefits">Who benefits</a>
 <a href="{{ url('home', anchor='words') }}" data-jump="words">Their words</a>
-<a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>
 <a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>
+<a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>
 <a href="{{ url('home', anchor='funding') }}" data-jump="funding">The money</a>
 </div></div></nav>
 
@@ -48,14 +48,20 @@
 {{ grid(d.grid) }}
 </div></section>
 {% endif %}
-<section class="block band" id="buying"><div class="wrap">
+{% if d.numbers %}
+<section class="block band" id="numbers"><div class="wrap">
+<h2 class="h">The totals</h2>
+<ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
+</div></section>
+{% endif %}
+<section class="block" id="buying"><div class="wrap">
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
 {% if d.controls|length > d.controls|selectattr('n')|list|length %}<a class="more" href="{{ url('rankings', anchor='controls') }}">All {{ d.controls|length }} controls tracked</a>{% endif %}
 </div></section>
 {% if d.beneficiaries %}
-<section class="block" id="benefits"><div class="wrap">
+<section class="block band" id="benefits"><div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries[:6] %}{{ benefit_row(b) }}{% endfor %}</ol>
@@ -63,17 +69,10 @@
 </div></section>
 {% endif %}
 {% if d.quotes %}
-<section class="block band" id="words"><div class="wrap">
+<section class="block" id="words"><div class="wrap">
 <h2 class="h">In their own words</h2>
 <p class="sub">The fear as the bill states it, and the power the same bill hands out.</p>
 <ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
-</div></section>
-{% endif %}
-{% if d.already_law %}
-<section class="block" id="law"><div class="wrap">
-<h2 class="h">Already law</h2>
-<p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
-<ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 {% if d.states %}
@@ -84,10 +83,11 @@
 {% if d.states_total > 6 %}<a class="more" href="{{ url('rankings', anchor='states') }}">See all {{ d.states_total }}</a>{% endif %}
 </div></section>
 {% endif %}
-{% if d.numbers %}
-<section class="block" id="numbers"><div class="wrap">
-<h2 class="h">The totals</h2>
-<ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
+{% if d.already_law %}
+<section class="block" id="law"><div class="wrap">
+<h2 class="h">Already law</h2>
+<p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
+<ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 {% if d.funders %}

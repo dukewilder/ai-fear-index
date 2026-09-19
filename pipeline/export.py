@@ -319,7 +319,7 @@ def export(db, out_dir, base=""):
         [f"{len(controlled):,}", "of them put AI under new government control"] if controlled else None,
         [f"{len(agency_count):,}", "agencies and officials handed new power"] if agency_count else None,
     ] if c]
-    polls = [p for p in config("polls") if p.get("figure") and p.get("url")]
+    polls = live_polls(config("polls"), today)
     site = config("site")
 
     # ---------------- the wall of numbers
@@ -448,6 +448,17 @@ SCHEDULE = [
 ]
 FEED_TYPES = [["all", "All"], ["bill", "Bills"], ["rule", "Rules and orders"], ["lobbying", "Lobbying"],
               ["donation", "Donations"], ["spending", "Election spending"], ["statement", "Statements"]]
+
+
+def live_polls(polls, today, months=18):
+    """Newest first, and nothing old enough to be describing a different year.
+
+    The figures are the one thing here kept by hand, so they are the one thing that can
+    quietly rot. A poll past its shelf life leaves rather than sits at the top of the page.
+    """
+    floor = (today - dt.timedelta(days=int(months * 30.44))).isoformat()
+    good = [p for p in polls if p.get("figure") and p.get("url") and (p.get("date") or "") >= floor]
+    return sorted(good, key=lambda p: p["date"], reverse=True)
 
 
 def window_30(db, prefix, today):

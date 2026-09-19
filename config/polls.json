@@ -1,20 +1,23 @@
 [
   {
     "figure": "63%",
-    "text": "say AI is advancing too quickly. 2% say too slowly",
-    "source": "Pew Research Center, survey of 5,119 U.S. adults, February 2026",
-    "url": "https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/"
+    "text": "say advanced AI poses at least a moderate risk of destroying humanity. 70% of Harris voters, 60% of Trump voters",
+    "source": "The POLITICO Poll by Public First, 2,064 U.S. adults, September 13-15, 2026",
+    "url": "https://www.politico.com/news/2026/09/16/poll-ai-technology-risks-humanity-trump-voters-01078087",
+    "date": "2026-09-15"
   },
   {
     "figure": "67%",
     "text": "have little or no confidence in the federal government to regulate AI effectively, up from 62% in 2024",
     "source": "Pew Research Center, survey of 5,119 U.S. adults, February 2026",
-    "url": "https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/"
+    "url": "https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/",
+    "date": "2026-02-23"
   },
   {
-    "figure": "50%",
-    "text": "are more concerned than excited about AI in daily life, up from 37% in 2021",
-    "source": "Pew Research Center, survey of 5,023 U.S. adults, June 2025",
-    "url": "https://www.pewresearch.org/science/2025/09/17/how-americans-view-ai-and-its-impact-on-people-and-society/"
+    "figure": "53%",
+    "text": "are extremely or very concerned about the environmental impact of AI, up from 41% a year earlier",
+    "source": "AP-NORC, survey of 3,424 U.S. adults, July 2026",
+    "url": "https://apnorc.org/projects/americans-are-increasingly-concerned-about-the-environmental-consequences-of-ai/",
+    "date": "2026-07-24"
   }
 ]

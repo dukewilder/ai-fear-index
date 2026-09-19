@@ -36,7 +36,6 @@ env:
   FEC_API_KEY: ${{ secrets.FEC_API_KEY }}
   CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
   OPENSTATES_API_KEY: ${{ secrets.OPENSTATES_API_KEY }}
-  LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
   LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}

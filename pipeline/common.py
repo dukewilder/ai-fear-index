@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS committees(
 CREATE TABLE IF NOT EXISTS fec(
   id TEXT PRIMARY KEY, kind TEXT, committee_id TEXT, committee_name TEXT, counterparty TEXT,
   counterparty_key TEXT, amount REAL, date TEXT, description TEXT, support_oppose TEXT,
-  candidate TEXT, url TEXT, first_seen TEXT, receipt_type TEXT);
+  candidate TEXT, url TEXT, first_seen TEXT, receipt_type TEXT, line_number TEXT);
 CREATE TABLE IF NOT EXISTS articles(
   id TEXT PRIMARY KEY, fear TEXT, title TEXT, url TEXT, domain TEXT, seen TEXT, entity TEXT);
 CREATE TABLE IF NOT EXISTS posts(
@@ -182,7 +182,7 @@ def congress_id(session, identifier):
 def add_columns(db):
     """Columns added to a table after a database already exists. CREATE TABLE IF NOT EXISTS
     will not add them, so they are added here once, in place."""
-    for table, column, kind in (("fec", "receipt_type", "TEXT"),):
+    for table, column, kind in (("fec", "receipt_type", "TEXT"), ("fec", "line_number", "TEXT")):
         have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         if column not in have:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")

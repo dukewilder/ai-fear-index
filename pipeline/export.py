@@ -63,10 +63,16 @@ def short_type(committee_type):
     return committee_type or "Committee"
 
 
-def gave(receipt_type):
-    """True for money someone put in, as opposed to interest, offsets and refunds."""
-    kind = (receipt_type or "").upper()
-    return ("CONTRIBUTION" in kind or "TRANSFER" in kind or "EARMARK" in kind) and "REFUND" not in kind
+def gave(line_number, known=None):
+    """FEC Form 3X, Schedule A, by the line the filing puts a receipt on.
+
+    Lines 11 and 12 are money given to the committee. Line 17, other receipts, is mostly
+    the committee's own bank interest, so it counts only when the payer is an organization
+    this report already tracks: a group moving its own money into a super PAC is a source,
+    a bank paying that PAC interest on its balance is not.
+    """
+    code = (line_number or "").strip().upper()
+    return code.startswith(("11", "12")) or (code.startswith("17") and bool(known))
 
 
 def donor_name(name):
@@ -232,13 +238,13 @@ def export(db, out_dir, base=""):
             for c in committees}
     com_entity = {c["id"]: c["entity"] for c in committees}
     # A committee banks its money, so its own bank interest arrives on Schedule A beside the
-    # donations. Once the filings say which is which, only the money someone gave is listed.
-    typed = any((r.get("receipt_type") or "") for r in receipts)
+    # donations. Once the filings say which line each sits on, only what was given is listed.
+    filed = any((r.get("line_number") or "") for r in receipts)
     pairs = {}
     for r in receipts:
-        if typed and not gave(r.get("receipt_type")):
-            continue
         known = ents.match_name(r["counterparty"] or "")
+        if filed and not gave(r.get("line_number"), known):
+            continue
         if known and known == com_entity.get(r["committee_id"]):
             known = None  # one arm of a network paying another: say which arm, not the network
         who = ents.by_slug[known]["name"] if known else donor_name(r["counterparty"])

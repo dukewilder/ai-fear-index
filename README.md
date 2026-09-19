@@ -13,7 +13,7 @@ Everything runs on GitHub Actions:
   the item's own source document, and pulls items the source doesn't support.
 
 Secrets used: `FEC_API_KEY`, `CONGRESS_API_KEY`, `OPENSTATES_API_KEY`, `LDA_API_KEY`,
-`ANTHROPIC_API_KEY`, `CONTACT_EMAIL`, and optionally `LEGISCAN_API_KEY`.
+`ANTHROPIC_API_KEY` and `CONTACT_EMAIL`.
 
 Data: the `data` branch holds the SQLite database, `site_data.json`, `status.json`, and CSVs
 in `public/`. Each source's last successful run is listed in `status.json` and on the Method page.

@@ -57,8 +57,10 @@ def receipts(db, http, key, cid, cname, cycle):
             "counterparty": who, "counterparty_key": name_key(who), "amount": amount,
             "date": (r.get("contribution_receipt_date") or "")[:10],
             "description": r.get("contributor_employer") or r.get("entity_type_desc") or "",
-            # a committee's bank interest arrives on the same schedule as its donations
+            # a committee's bank interest arrives on the same schedule as its donations,
+            # and only the line it is filed on tells them apart
             "receipt_type": r.get("receipt_type_desc") or r.get("receipt_type") or "",
+            "line_number": r.get("line_number") or "",
             "support_oppose": None, "candidate": None,
             "url": f"https://www.fec.gov/data/receipts/?committee_id={cid}&two_year_transaction_period={cycle}",
             "first_seen": iso()})

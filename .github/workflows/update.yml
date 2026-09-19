@@ -2,7 +2,11 @@ name: Update
 
 on:
   schedule:
-    - cron: "23 * * * *"
+    # Three chances an hour. GitHub drops scheduled runs under load, so a single
+    # hourly entry loses whole hours; the run is idempotent, so a spare costs nothing.
+    - cron: "7,27,47 * * * *"
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:

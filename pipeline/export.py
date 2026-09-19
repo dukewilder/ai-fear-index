@@ -213,9 +213,13 @@ def export(db, out_dir, base=""):
     # ---------------- election money, kept separate and counted by committee
     committees = [dict(c) for c in db.execute("SELECT * FROM committees")]
     receipts = [dict(r) for r in db.execute("SELECT * FROM fec WHERE kind='receipt'")]
+    # A committee's own bank interest arrives on Schedule A beside the donations. It is money the
+    # committee has, but nobody raised it, so the same line rule that names the donors below counts
+    # it here too, and the headline figure means what the words under it say.
     raised = collections.Counter()
     for r in receipts:
-        raised[r["committee_id"]] += r["amount"] or 0
+        if gave(r.get("line_number"), ents.match_name(r["counterparty"] or "")):
+            raised[r["committee_id"]] += r["amount"] or 0
     com_orgs = {}
     for c in committees:
         key = c["entity"] or name_key(c["name"])

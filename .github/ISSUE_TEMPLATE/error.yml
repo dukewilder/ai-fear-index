@@ -1,5 +1,5 @@
 name: Report an error
-description: Something on the AI Fear Index is wrong.
+description: Something on the AI Fear Report is wrong.
 title: "Error report"
 body:
   - type: input

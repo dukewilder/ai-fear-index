@@ -332,14 +332,18 @@ def export(db, out_dir, base=""):
     news_total = sum(int(v) for v in news30.values())
     all_filings = db.execute("SELECT COUNT(*) c FROM lobbying").fetchone()["c"]
     all_measures = db.execute("SELECT COUNT(*) c FROM measures").fetchone()["c"]
+    # the money leads, largest first: it is the number that says most in one glance
+    spent = sorted(((election_total, "raised and spent by AI super PACs this cycle"),
+                    (advocacy_total, "spent lobbying on the fears by advocacy groups, past year")),
+                   reverse=True)
     numbers = [n for n in [
+        [money(spent[0][0]), spent[0][1]] if spent[0][0] else None,
+        [money(spent[1][0]), spent[1][1]] if spent[1][0] else None,
         [f"{sum(len(m['controls']) for m in measures):,}",
          "new government controls written into the bills"] if controlled else None,
         [f"{n_states}", ("states, plus Congress, " if has_fed else "states ") + "with AI measures on the books or in motion"]
         if n_states else None,
         [f"{filings_naming:,}", "federal lobbying filings naming one of the nine fears, past year"] if filings_naming else None,
-        [money(advocacy_total), "spent lobbying on the fears by advocacy groups, past year"] if advocacy_total else None,
-        [money(election_total), "raised and spent by AI super PACs this cycle"] if election_total else None,
         [f"{news_total:,}", "news articles on the nine fears in the last 30 days"] if news_total else None,
         [f"{all_measures:,}", "bills collected and read so far"] if all_measures else None,
         [f"{all_filings:,}", "lobbying filings in the database"] if all_filings else None,
@@ -379,7 +383,7 @@ def export(db, out_dir, base=""):
         st = fear_stats[fp["slug"]]
         fp["quotes"] = own_words(db, st["measures"], fear_by, control_by, suppressed, per_fear=fp["slug"], limit=5)
         fp["receipt"] = " ".join(x for x in [
-            f"{fp['name']}: {fp['score']} of 100 on the AI Fear Index.",
+            f"{fp['name']}: {fp['score']} of 100 on the Fear Index.",
             f"{len(st['measures']):,} bills since January 2025" + (f" in {len(st['states'])} states." if st["states"] else ".") if st["measures"] else "",
             f"{st['controls']:,} new government controls written into them." if st["controls"] else "",
             f"{st['filings']:,} federal lobbying filings name it." if st["filings"] else "",

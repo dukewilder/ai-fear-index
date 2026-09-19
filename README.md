@@ -1,4 +1,4 @@
-# AI Fear Index
+# AI Fear Report
 
 Tracks the fears cited in AI bills, rules, and orders, the controls those measures would add,
 who funds the lobbying and election money around them, and who would gain authority.

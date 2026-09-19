@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the AI Fear Index site from one data file.
+"""Render the AI Fear Report site from one data file.
 
 Production (one folder per page, ready for GitHub Pages):
     python site/build.py --data data/site_data.json --out dist --base /ai-fear-index
@@ -136,7 +136,7 @@ def wrap_text(draw, text, font, width):
     return lines
 
 
-def share_card(path, big, label, sub="", kicker="AI FEAR INDEX", foot="aifearindex"):
+def share_card(path, big, label, sub="", kicker="AI FEAR REPORT", foot="aifearreport"):
     """A 1200 by 630 card in the site's own style: paper, ink, one stamped figure."""
     from PIL import Image, ImageDraw, ImageFont
     im = Image.new("RGB", (CARD_W, CARD_H), "#F1EDE3")
@@ -200,19 +200,25 @@ def make_url(preview, base):
     return url
 
 
+def site_name(d):
+    """The site is named in config, so a rename is one line there."""
+    return (d.get("site") or {}).get("name") or "AI Fear Report"
+
+
 def page_specs(d):
+    name = site_name(d)
     specs = [{"kind": "home", "route": "", "out": "index.html", "template": "home.html",
-              "title": "AI Fear Index", "ctx": {}}]
+              "title": name, "ctx": {}}]
     for f in d["fear_pages"]:
         specs.append({"kind": "fear", "route": f"fear/{f['slug']}", "out": f"fear/{f['slug']}/index.html",
-                      "template": "fear.html", "title": f"{f['name']}, AI Fear Index",
+                      "template": "fear.html", "title": f"{f['name']}, {name}",
                       "ctx": {"f": f, "timeline": timeline_svg(f["timeline"])}})
     for o in d["org_pages"]:
         specs.append({"kind": "org", "route": f"org/{o['slug']}", "out": f"org/{o['slug']}/index.html",
-                      "template": "org.html", "title": f"{o['name']}, AI Fear Index", "ctx": {"o": o}})
+                      "template": "org.html", "title": f"{o['name']}, {name}", "ctx": {"o": o}})
     for kind, title in (("feed", "Feed"), ("rankings", "Rankings"), ("method", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
-                      "title": f"{title}, AI Fear Index", "ctx": {}})
+                      "title": f"{title}, {name}", "ctx": {}})
     for s in specs:
         s["nav"] = NAV_FOR[s["kind"]]
         s["card"] = {"home": "home", "rankings": "rankings"}.get(s["kind"]) or \
@@ -220,7 +226,7 @@ def page_specs(d):
         s["description"] = None
         if s["kind"] == "fear":
             f = s["ctx"]["f"]
-            s["description"] = f"{f['name']} scores {f['score']} on the AI Fear Index. {f.get('line') or ''}".strip()
+            s["description"] = f"{f['name']} scores {f['score']} on the Fear Index. {f.get('line') or ''}".strip()
         elif s["kind"] == "home":
             s["description"] = (f"{d['index']['value']} {d['index']['text']}. {d['index']['second']} "
                                 f"{d['index']['second_text']}.")
@@ -232,6 +238,7 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     if d.get("built_at") in (None, "", "now"):
         d["built_at"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     preview = preview_path is not None
+    name = site_name(d)
     env = Environment(loader=FileSystemLoader(HERE / "templates"),
                       autoescape=select_autoescape(["html"]), trim_blocks=True, lstrip_blocks=True)
     series = d["index"].get("series") or [[dt.date.today().isoformat(), v] for v in d["index"]["trend"]]
@@ -244,16 +251,16 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     shell = env.get_template("base.html")
     if preview:
         pathlib.Path(preview_path).write_text(shell.render(pages=pages, preview=True,
-                                                           title="AI Fear Index", nav=""))
+                                                           title=name, nav=""))
         return [preview_path]
     written = []
     site_url = (d.get("site_url") or "").rstrip("/")
     cards = {}
     try:
-        for name, big, label, sub in card_specs(d):
-            share_card(pathlib.Path(out_dir) / "og" / f"{name}.png", big, label, sub,
-                       foot=site_url.replace("https://", "") or "AI Fear Index")
-            cards[name] = f"{site_url}/og/{name}.png" if site_url else None
+        for card, big, label, sub in card_specs(d):
+            share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
+                       kicker=name.upper(), foot=site_url.replace("https://", "") or name)
+            cards[card] = f"{site_url}/og/{card}.png" if site_url else None
     except Exception as exc:  # cards are a nicety; the pages must still build
         print("share cards skipped:", exc)
     for page in pages:

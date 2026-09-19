@@ -1,8 +1,8 @@
 {
-  "name": "AI Fear Index",
+  "name": "AI Fear Report",
   "tagline": "Every fear about AI, and what it buys.",
   "donate_url": "",
   "donate_label": "Chip in",
-  "donate_text": "This site rebuilds itself through the day from public records. The servers are free; the reading is not.",
+  "donate_text": "",
   "donate_btc": "1AhncrENQLEKQtoa7Tqqfbp4aiguynYmNe"
 }

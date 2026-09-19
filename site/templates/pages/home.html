@@ -140,7 +140,7 @@
 {% if d.site.donate_url or d.site.donate_btc %}
 <section class="block band" id="keep"><div class="wrap">
 <h2 class="h">Keep it running</h2>
-<p class="sub">{{ d.site.donate_text }}</p>
+{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
 {% if d.site.donate_url %}<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
 {% endif %}{% if d.site.donate_btc %}<div class="btc"><span class="btc-k">Bitcoin</span><a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc">{{ d.site.donate_btc }}</a><button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy</button></div>
 {% endif %}</div></section>

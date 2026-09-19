@@ -87,12 +87,78 @@ def timeline_svg(t):
     if pts:
         (fx, fy), (lx, ly) = pts[0], pts[-1]
         if t.get("first_label"):
-            p.append(f'<text class="tl-val" x="{fx}" y="{fy - 10}" text-anchor="middle">{esc(t["first_label"])}</text>')
+            fy_label = fy + 20 if fy < 200 else fy - 10  # keep clear of the lane title at the top left
+            p.append(f'<text class="tl-val" x="{fx + 14}" y="{fy_label}" text-anchor="middle">{esc(t["first_label"])}</text>')
         if t.get("last_label") and len(pts) > 1:
             p.append(f'<text class="tl-val" x="{lx}" y="{ly - 10}" text-anchor="middle">{esc(t["last_label"])}</text>')
     elif not t.get("concern"):
         label(175, 222, "No attention series for this fear yet", "middle")
     return f'<svg viewBox="0 0 350 280" role="img" aria-label="{esc(t["aria"])}">' + "".join(p) + "</svg>"
+
+
+# ---------------------------------------------------------------- share cards
+CARD_W, CARD_H = 1200, 630
+
+
+def wrap_text(draw, text, font, width):
+    words, lines, line = text.split(), [], ""
+    for w in words:
+        trial = (line + " " + w).strip()
+        if draw.textlength(trial, font=font) <= width:
+            line = trial
+        else:
+            if line:
+                lines.append(line)
+            line = w
+    if line:
+        lines.append(line)
+    return lines
+
+
+def share_card(path, big, label, sub="", kicker="AI FEAR INDEX", foot="aifearindex"):
+    """A 1200 by 630 card in the site's own style: black, scanlines, red chyron, one number."""
+    from PIL import Image, ImageDraw, ImageFont
+    im = Image.new("RGB", (CARD_W, CARD_H), "#000000")
+    d = ImageDraw.Draw(im)
+    for y in range(0, CARD_H, 3):
+        d.line([(0, y), (CARD_W, y)], fill="#0b0b0b")
+    f_kick = ImageFont.load_default(size=28)
+    f_big = ImageFont.load_default(size=200 if len(big) <= 5 else 150)
+    f_lab = ImageFont.load_default(size=44)
+    f_sub = ImageFont.load_default(size=28)
+    f_foot = ImageFont.load_default(size=24)
+    kb = d.textbbox((0, 0), kicker, font=f_kick)
+    d.rectangle([60, 52, 60 + (kb[2] - kb[0]) + 30, 52 + (kb[3] - kb[1]) + 24], fill="#ff4d3a")
+    d.text((75, 58), kicker, font=f_kick, fill="#000000")
+    bb = d.textbbox((0, 0), big, font=f_big)
+    top = 120
+    d.text((52, top - bb[1]), big, font=f_big, fill="#ff4d3a")
+    y = top + (bb[3] - bb[1]) + 26
+    for line in wrap_text(d, label, f_lab, CARD_W - 120)[:2]:
+        d.text((60, y), line, font=f_lab, fill="#f1f2f4")
+        y += 54
+    if sub:
+        y += 10
+        for line in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]:
+            d.text((60, y), line, font=f_sub, fill="#a0a7b0")
+            y += 38
+    d.line([(60, CARD_H - 70), (CARD_W - 60, CARD_H - 70)], fill="#24272c", width=2)
+    d.text((60, CARD_H - 56), foot, font=f_foot, fill="#a0a7b0")
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+    im.save(path, "PNG", optimize=True)
+
+
+def card_specs(d):
+    """Which cards to draw: one for the front page, one per fear, one for the rankings."""
+    ix = d["index"]
+    yield "home", ix["value"], ix["text"] + (f", in {ix['where']}" if ix.get("where") else ""), \
+        f"{ix.get('second', '')} {ix.get('second_text', '')}".strip()
+    for f in d["fear_pages"]:
+        yield f"fear-{f['slug']}", f["score"], f["name"], \
+            f"{f['score']} of 100 on the Fear Index" + (f" · {f['line']}" if f.get("line") else "")
+    top = d["fears"][:3]
+    yield "rankings", str(len(d["fears"])), "fears, ranked on the Fear Index", \
+        " · ".join(f"{f['name']} {f['score']}" for f in top)
 
 
 def make_url(preview, base):
@@ -127,6 +193,15 @@ def page_specs(d):
                       "title": f"{title}, AI Fear Index", "ctx": {}})
     for s in specs:
         s["nav"] = NAV_FOR[s["kind"]]
+        s["card"] = {"home": "home", "rankings": "rankings"}.get(s["kind"]) or \
+            (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else None)
+        s["description"] = None
+        if s["kind"] == "fear":
+            f = s["ctx"]["f"]
+            s["description"] = f"{f['name']} scores {f['score']} on the AI Fear Index. {f.get('line') or ''}".strip()
+        elif s["kind"] == "home":
+            s["description"] = (f"{d['index']['value']} {d['index']['text']}. {d['index']['second']} "
+                                f"{d['index']['second_text']}.")
     return specs
 
 
@@ -149,10 +224,20 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
                                                            title="AI Fear Index", nav=""))
         return [preview_path]
     written = []
+    site_url = (d.get("site_url") or "").rstrip("/")
+    cards = {}
+    try:
+        for name, big, label, sub in card_specs(d):
+            share_card(pathlib.Path(out_dir) / "og" / f"{name}.png", big, label, sub,
+                       foot=site_url.replace("https://", "") or "AI Fear Index")
+            cards[name] = f"{site_url}/og/{name}.png" if site_url else None
+    except Exception as exc:  # cards are a nicety; the pages must still build
+        print("share cards skipped:", exc)
     for page in pages:
         target = pathlib.Path(out_dir) / page["out"]
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(shell.render(pages=[page], preview=False, title=page["title"], nav=page["nav"]))
+        target.write_text(shell.render(pages=[page], preview=False, title=page["title"], nav=page["nav"],
+                                       og_image=cards.get(page.get("card")), description=page.get("description")))
         written.append(str(target))
     return written
 

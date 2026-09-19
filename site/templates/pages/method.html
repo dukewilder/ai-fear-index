@@ -1,18 +1,20 @@
 <section class="block first"><div class="wrap prose">
 <h1 class="title">How the numbers work</h1>
-<p>Every number on this site comes from public records and links to the document behind it. The data and the code that produce it are public.</p>
-<h3>Bills, rules, and orders</h3>
-<p>Every state and federal bill introduced since January 2025, plus federal rules and executive orders, that is substantially about artificial intelligence, algorithms, automated decisions, synthetic media, or AI data centers.</p>
+<p>Every number on this site comes from a public record and links to it. The data and the code that produce it are public, and the site rebuilds itself every hour.</p>
+<h3>The Fear Index</h3>
+<p>Each of the nine fears is scored from 0 to 100 against the loudest fear on each channel. Legislation counts 40%: bills, rules and orders citing the fear since January 2025. Lobbying counts 30%: federal lobbying filings naming the fear in the past year. Public attention counts 30%, split evenly between news coverage and Wikipedia readership over the last 30 days. Each channel is log scaled to its leader, so a fear with a tenth of the leader's bills still registers rather than rounding to zero, and a fear with no Wikipedia article on file is scored on the channels it has. The raw counts behind every score are shown on its page and in the grid.</p>
+<h3>Bills, rules and orders</h3>
+<p>Every state and federal bill introduced since January 2025, plus federal rules and executive orders, that is substantially about artificial intelligence, algorithms, automated decisions, synthetic media or AI data centers. Bills are collected from Congress.gov and from Open States for all 50 states, DC and Puerto Rico. Federal rules and orders come from the Federal Register and are kept only when AI appears in the title or abstract.</p>
 <h3>Fears and controls</h3>
-<p>Each measure is read for the fears it cites and the controls it would impose, using fixed definitions for each. A first pass proposes labels, and a second pass must back every label with a quote copied from the measure's own text, which is then checked word for word. Only labels that survive both count anywhere on this site.</p>
+<p>Each measure is read for the fears it cites and the controls it would impose, against fixed definitions of each. A first pass proposes labels. A second pass has to back every label with a quote copied from the measure's own title or summary, and that quote is then checked word for word in code. A label with no supporting quote of at least four words does not exist on this site. Every stored label is re-checked against the current rules on every run.</p>
 <h3>Who's funding it</h3>
-<p>Lobbying reported on federal filings whose issue descriptions name one of the tracked fears, over the past four quarters. Amounts on a lobbying filing cover everything on that filing, so they measure spending by organizations that lobby on these fears, not spending on the fear alone. Filings that mention AI without naming a tracked fear are still shown on each organization's page and in the downloadable data.</p>
+<p>Federal lobbying filings whose issue descriptions name one of the tracked fears, over the past four quarters. Advocacy groups and foundations are ranked by dollars, because an organization whose stated purpose is a given risk is spending that money on the fear. Companies and trade groups are ranked by number of filings, because a trade group's filing reports one total for everything it lobbied on that quarter, so its dollar figure says how much it lobbies, not how much it spends on AI. Those dollar figures appear on each organization's page with that note attached.</p>
 <h3>Election money</h3>
-<p>Money raised and spent by political committees working on AI policy, counted by committee rather than by donor, and kept separate from the funding ranking because a committee's spending does not say which side of a fear it is on. Individual donations appear on the receiving committee's page, each linked to the filing it came from.</p>
+<p>Money raised and spent by political committees working on AI policy, counted by committee and kept out of the funding ranking, because a committee's spending does not say which side of a fear it is on. Individual donations appear on the receiving committee's page, each linked to its filing.</p>
 <h3>Who benefits</h3>
-<p>Government agencies and officials that a measure would give new authority, duties, or enforcement power over AI, counted by the number of measures.</p>
+<p>Government agencies and officials that a measure would give new authority, duties or enforcement power over AI, counted by the number of measures. Legislatures and bare jurisdiction names are excluded.</p>
 <h3>Public attention</h3>
-<p>Daily Wikipedia pageviews for each fear's articles, and daily news volume from GDELT.</p>
+<p>Daily Wikipedia readership of each fear's articles, and daily news volume from GDELT. The polling lines at the top of the front page are from the surveys they link to and are updated by hand.</p>
 </div></section>
 
 <section class="block band" id="sources"><div class="wrap">

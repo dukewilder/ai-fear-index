@@ -57,5 +57,15 @@
   {"slug": "us-chamber", "name": "U.S. Chamber of Commerce", "type": "Trade group", "aliases": ["u s chamber of commerce", "us chamber of commerce", "chamber of commerce of the u s a", "chamber of commerce of the united states"], "domains": ["uschamber.com"], "homepage": ""},
   {"slug": "data-center-coalition", "name": "Data Center Coalition", "type": "Trade group", "aliases": ["data center coalition"], "domains": ["datacentercoalition.org"], "homepage": ""},
   {"slug": "afl-cio", "name": "AFL-CIO", "type": "Union", "aliases": ["afl cio", "american federation of labor and congress of industrial organizations"], "domains": ["aflcio.org"], "homepage": ""},
-  {"slug": "sag-aftra", "name": "SAG-AFTRA", "type": "Union", "aliases": ["sag aftra", "screen actors guild"], "domains": ["sagaftra.org"], "homepage": ""}
+  {"slug": "sag-aftra", "name": "SAG-AFTRA", "type": "Union", "aliases": ["sag aftra", "screen actors guild"], "domains": ["sagaftra.org"], "homepage": ""},
+  {"slug": "business-roundtable", "name": "Business Roundtable", "type": "Trade group", "aliases": ["business roundtable"], "domains": ["businessroundtable.org"], "homepage": ""},
+  {"slug": "phrma", "name": "PhRMA", "type": "Trade group", "aliases": ["pharmaceutical research and manufacturers of america", "phrma"], "domains": ["phrma.org"], "homepage": ""},
+  {"slug": "ama", "name": "American Medical Association", "type": "Trade group", "aliases": ["american medical association"], "domains": ["ama-assn.org"], "homepage": ""},
+  {"slug": "ahip", "name": "AHIP", "type": "Trade group", "aliases": ["america s health insurance plans", "ahip"], "domains": ["ahip.org"], "homepage": ""},
+  {"slug": "ctia", "name": "CTIA", "type": "Trade group", "aliases": ["ctia the wireless association", "ctia"], "domains": ["ctia.org"], "homepage": ""},
+  {"slug": "aha", "name": "American Hospital Association", "type": "Trade group", "aliases": ["american hospital association"], "domains": ["aha.org"], "homepage": ""},
+  {"slug": "att", "name": "AT&T", "type": "Telecom", "aliases": ["at t", "at t services", "at t services and its affiliates", "at&t"], "domains": ["att.com"], "homepage": ""},
+  {"slug": "adobe", "name": "Adobe", "type": "AI company", "aliases": ["adobe", "adobe systems"], "domains": ["adobe.com"], "homepage": ""},
+  {"slug": "aaj", "name": "American Association for Justice", "type": "Trade group", "aliases": ["american association for justice"], "domains": ["justice.org"], "homepage": ""},
+  {"slug": "verizon", "name": "Verizon", "type": "Telecom", "aliases": ["verizon", "verizon communications", "cellco partnership"], "domains": ["verizon.com"], "homepage": ""}
 ]

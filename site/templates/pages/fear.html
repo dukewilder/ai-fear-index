@@ -1,20 +1,55 @@
-{% from "macros.html" import org_row, benefit_row, feed_item %}
+{% from "macros.html" import org_row, benefit_row, feed_item, buying_row %}
 <section class="block first"><div class="wrap">
-<a class="back" href="{{ url('rankings', anchor='fears') }}">{{ chevron|safe }}All fears</a>
-<p class="kicker">Rank {{ f.rank }} of {{ f.of }} fears</p>
+<a class="back" href="{{ url('rankings', anchor='fears') }}">{{ chevron|safe }}The Fear Index</a>
+<p class="kicker">Rank {{ f.rank }} of {{ f.of }}</p>
 <h1 class="title">{{ f.name }}</h1>
 <p class="hero-num sm">{{ f.score }}</p>
 <p class="hero-text sm">{{ f.score_text }}</p>
+{% if f.line %}<p class="lead">{{ f.line }}</p>{% endif %}
 {% if f.change %}<p class="move">{{ f.change }}</p>{% endif %}
 </div></section>
 
+{% if f.evidence %}
 <section class="block band"><div class="wrap">
-<h2 class="h">The evidence</h2>
+<h2 class="h">The receipts</h2>
 <div style="margin-top:12px">{% for big, label in f.evidence %}<div class="ev"><b>{{ big }}</b><span>{{ label }}</span></div>{% endfor %}</div>
 </div></section>
+{% endif %}
+
+{% if f.buying %}
+<section class="block"><div class="wrap">
+<h2 class="h">What it's buying</h2>
+<p class="sub">The government controls written into the bills that cite this fear.</p>
+<ol class="rank">{% for c in f.buying %}{{ buying_row(c) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if f.pushers %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Who's funding it</h2>
+<p class="sub">Advocacy groups and foundations lobbying on this fear, past year.</p>
+<ol class="rank">{% for o in f.pushers %}{{ org_row(o, 'messages') }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if f.beneficiaries %}
+<section class="block"><div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials these bills would hand new power.</p>
+<ol class="rank">{% for b in f.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if f.industry %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Industry at the table</h2>
+<p class="sub">Companies and trade groups whose lobbying filings name this fear, past year.</p>
+<ol class="rank">{% for o in f.industry %}{{ org_row(o, 'messages') }}{% endfor %}</ol>
+</div></section>
+{% endif %}
 
 <section class="block"><div class="wrap">
-<h2 class="h">{{ f.timeline.lanes[0] }}, {{ f.timeline.lanes[1]|lower }}, and attention</h2>
+<h2 class="h">Money, bills and attention</h2>
 <div class="legend">
 <div><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect class="tl-money" x="2" y="2" width="10" height="10"/></svg>{{ f.timeline.lanes[0] }}</div>
 <div><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle class="tl-msg" cx="7" cy="7" r="5"/></svg>{{ f.timeline.lanes[1] }}</div>
@@ -27,30 +62,14 @@
 {% if f.latest %}
 <section class="block band"><div class="wrap">
 <h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Latest on this fear</h2>
-<p class="sub">Newest first</p>
-<ul class="list">{% for i in f.latest %}{{ feed_item(i) }}{% endfor %}</ul>
-</div></section>
-{% endif %}
-
-{% if f.pushers %}
-<section class="block"><div class="wrap">
-<h2 class="h">Who's funding it</h2>
-<p class="sub">Ranked by lobbying on filings that mention this fear, {{ d.period }}</p>
-<ol class="rank">{% for o in f.pushers %}{{ org_row(o, 'messages') }}{% endfor %}</ol>
-</div></section>
-{% endif %}
-
-{% if f.beneficiaries %}
-<section class="block band"><div class="wrap">
-<h2 class="h">Who benefits</h2>
-<p class="sub">Agencies and officials these bills would give new authority</p>
-<ol class="rank">{% for b in f.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+<ul class="list" style="margin-top:12px">{% for i in f.latest %}{{ feed_item(i) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 
 {% if f.bills %}
 <section class="block"><div class="wrap">
-<h2 class="h">What it's being used to pass</h2>
-<ul class="list" style="margin-top:12px">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="time">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+<h2 class="h">The bills</h2>
+<p class="sub">The ones carrying the most controls, first.</p>
+<ul class="list">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="time">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
 </div></section>
 {% endif %}

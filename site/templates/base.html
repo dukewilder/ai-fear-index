@@ -4,9 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
-<meta name="description" content="Who funds AI fear messaging, who benefits, and what it is being used to pass.">
+<meta name="description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
 <meta property="og:title" content="{{ title }}">
-<meta property="og:description" content="Who funds AI fear messaging, who benefits, and what it is being used to pass.">
+<meta property="og:type" content="website">
+<meta property="og:description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
+{% if og_image %}<meta property="og:image" content="{{ og_image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_image }}">
+{% else %}<meta name="twitter:card" content="summary">
+{% endif %}<meta name="twitter:title" content="{{ title }}">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +43,7 @@
 {% endfor %}
 <footer class="site-foot"><div class="wrap">
 <a class="brand" href="{{ url('home') }}">AI Fear Index</a>
-<p>Built from public records. Every number links to its source.</p>
+<p>Built from public records. Every number links to its source. Rebuilt every hour.</p>
 <ul class="links">
 <li><a href="{{ url('method') }}">How the numbers work</a></li>
 <li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>

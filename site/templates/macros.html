@@ -3,7 +3,18 @@
 {%- endmacro %}
 
 {% macro fear_row(f) -%}
-<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span></span><span class="row-end"><span class="val accent">{{ f.score }}</span>{{ move(f.move) }}</span></a></li>
+<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span>{% if f.line %}<span class="meta">{{ f.line }}</span>{% endif %}</span><span class="row-end"><span class="val accent">{{ f.score }}</span>{{ move(f.move) }}</span></a></li>
+{%- endmacro %}
+
+{% macro grid(g) -%}
+<div class="gridwrap"><table class="grid">
+<thead><tr><th scope="col">Fear</th>{% for c in g.channels %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>
+<tbody>{% for r in g.rows %}<tr><th scope="row"><a href="{{ url('fear', r.slug) }}">{{ r.name }}</a></th>{% for c in r.cells %}<td class="l{{ c.level }}">{{ c.n }}</td>{% endfor %}</tr>
+{% endfor %}</tbody></table></div>
+{%- endmacro %}
+
+{% macro buying_row(c) -%}
+<li class="row"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} already passed</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
 {%- endmacro %}
 
 {% macro org_row(o, stat='fears') -%}

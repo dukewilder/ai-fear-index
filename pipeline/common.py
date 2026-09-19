@@ -18,6 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 SINCE = "2025-01-01"  # current legislative sessions
 REPO_URL = "https://github.com/dukewilder/ai-fear-index"
+SITE_URL = "https://dukewilder.github.io/ai-fear-index"
 
 
 def now():

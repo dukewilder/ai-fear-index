@@ -36,10 +36,12 @@ def main():
                             ("control", ["mandatory-reporting", "new-agency-powers", "labeling-mandates"][i % 3]),
                             ("agency", ["California Attorney General", "Federal Trade Commission"][i % 2])]:
             db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, kind, value, "quote", "test", iso()))
+    clients = ["OPENAI OPCO, LLC", "META PLATFORMS, INC.", "BUSINESS ROUNDTABLE",
+               "CENTER FOR AI SAFETY ACTION FUND", "AMERICANS FOR RESPONSIBLE INNOVATION"]
     for i in range(30):
         y, q = today.year - (i // 12), (i % 4) + 1
-        upsert(db, "lobbying", {"id": f"l{i}", "client": ["OPENAI OPCO, LLC", "META PLATFORMS, INC.", "BUSINESS ROUNDTABLE"][i % 3],
-                                "client_key": name_key(["OPENAI OPCO, LLC", "META PLATFORMS, INC.", "BUSINESS ROUNDTABLE"][i % 3]),
+        upsert(db, "lobbying", {"id": f"l{i}", "client": clients[i % len(clients)],
+                                "client_key": name_key(clients[i % len(clients)]),
                                 "registrant": "Firm", "year": y, "period": "q", "quarter": f"Q{q}", "amount": 50000 + i * 1000,
                                 "issues": "Artificial intelligence safety, deepfakes, children online, H.R. 1003",
                                 "bill_refs": "H.R. 1003", "gov_entities": "SENATE", "url": "https://example.com",
@@ -65,7 +67,11 @@ def main():
     db.commit()
     data = export.export(db, tmp)
     assert data["index"]["value"] != "0", data["index"]
-    assert data["fears"] and data["funders"] and data["controls"]
+    assert data["fears"] and data["controls"]
+    assert data["funders"], "advocacy lobbying should rank separately"
+    assert data["industry"], "company and trade group lobbying should rank separately"
+    assert not ({f["name"] for f in data["funders"]} & {i["name"] for i in data["industry"]}), \
+        "an organization must appear in one ranking or the other, never both"
     site = ROOT / "site" / "build.py"
     subprocess.run([sys.executable, str(site), "--data", str(tmp / "site_data.json"), "--out", str(tmp / "dist"),
                     "--base", "/ai-fear-index"], check=True)
@@ -75,7 +81,9 @@ def main():
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])
     print("exhibit:", json.dumps(data["exhibit"])[:300])
-    print("top fear:", data["fears"][0], "top funder:", data["funders"][0])
+    print("top fear:", data["fears"][0])
+    print("top funder:", data["funders"][0]["name"], data["funders"][0]["amount"],
+          "| top industry:", data["industry"][0]["name"], data["industry"][0]["amount"])
     print("OK", tmp)
 
 

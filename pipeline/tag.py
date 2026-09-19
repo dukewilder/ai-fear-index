@@ -16,8 +16,8 @@ from .common import SINCE, config, env, iso, kv_get, kv_set, log, sha
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
-LIMITS = {"hourly": 150, "daily": 700, "backfill": 3500, "auto": 150}
-DAY_CAP = 1500  # items per day, so a large backlog drains at a predictable cost
+LIMITS = {"hourly": 400, "daily": 1200, "backfill": 3500, "auto": 400}
+DAY_CAP = 4000  # items per day: a first backfill clears in a day, then steady state is a trickle
 _lock = threading.Lock()
 
 

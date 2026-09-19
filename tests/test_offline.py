@@ -74,7 +74,7 @@ def main():
         "an organization must appear in one ranking or the other, never both"
     site = ROOT / "site" / "build.py"
     subprocess.run([sys.executable, str(site), "--data", str(tmp / "site_data.json"), "--out", str(tmp / "dist"),
-                    "--base", "/ai-fear-index"], check=True)
+                    "--base", ""], check=True)
     subprocess.run([sys.executable, str(site), "--data", str(tmp / "site_data.json"), "--preview", str(tmp / "p.html")],
                    check=True)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))

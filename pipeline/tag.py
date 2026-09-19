@@ -72,7 +72,10 @@ def propose(key, fears, controls, doc, is_measure):
             f"Return JSON: {schema}\nRules: ai_related is true only if the text is substantially about artificial "
             "intelligence, algorithms, automated decisions, synthetic media, or AI data centers. A fear counts only if "
             "the text states or clearly invokes that harm. A control counts only if the measure itself would impose it. "
-            "Use empty lists when nothing applies.")
+            "Summaries often recite law already in force before saying what the measure does. Ignore every "
+            "sentence that describes existing law, including ones that open with \"Existing law\" or name an "
+            "act that already requires something. Only what this measure would newly impose or newly hand to a "
+            "government body counts. Use empty lists when nothing applies.")
     return call(key, system, user, max_tokens=500)
 
 
@@ -92,7 +95,7 @@ def verify(key, fears, controls, doc, proposal):
             'Return JSON: {"fears": {"slug": "quote or null"}, "controls": {"slug": "quote or null"}, '
             '"agencies": {"name": "quote or null"}}\nEach value must be a quote copied word for word from the Title '
             'or Summary, between 4 and 30 words, never from the Jurisdiction or Identifier line. Always return the '
-            'three keys as objects, never as lists.')
+            'three keys as objects, never as lists. A sentence describing law already in force does not support a label, so return null when that is the only support.')
     return call(key, system, user, max_tokens=900)
 
 

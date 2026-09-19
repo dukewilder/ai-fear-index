@@ -20,7 +20,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 SINCE = "2025-01-01"  # current legislative sessions
 REPO_URL = "https://github.com/dukewilder/ai-fear-index"
-SITE_URL = "https://dukewilder.github.io/ai-fear-index"
+SITE_URL = "https://aifearreport.com"
 
 
 def now():
@@ -158,6 +158,10 @@ CREATE TABLE IF NOT EXISTS posts(
   id TEXT PRIMARY KEY, entity TEXT, title TEXT, summary TEXT, url TEXT, published TEXT,
   feed TEXT, first_seen TEXT);
 CREATE TABLE IF NOT EXISTS series(series TEXT, date TEXT, value REAL, PRIMARY KEY(series, date));
+CREATE TABLE IF NOT EXISTS brief(
+  target TEXT PRIMARY KEY, edition TEXT, sentence TEXT, evidence TEXT, office TEXT, controls TEXT,
+  written_at TEXT);
+CREATE INDEX IF NOT EXISTS brief_edition ON brief(edition);
 CREATE TABLE IF NOT EXISTS status(
   source TEXT PRIMARY KEY, last_run TEXT, ok INTEGER, added INTEGER, message TEXT, last_ok TEXT);
 CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
@@ -218,6 +222,30 @@ def repair(db):
     return len(rows)
 
 
+RECITAL = ("SELECT id FROM measures WHERE summary LIKE '%This bill would%' "
+           "AND (summary LIKE '%Existing law%' OR summary LIKE '%Act requires%' OR summary LIKE '%Act authorizes%')")
+
+
+def retag_recitals(db):
+    """A state summary often recites the law already in force before saying what the bill does.
+
+    The first tagger read both as the bill's own text, so a handful of measures carried a control
+    the bill would not impose. The prompt now draws that line; these are the rows tagged before it
+    did, queued once so the next pass reads them again.
+    """
+    if kv_get(db, "retag:recitals"):
+        return 0
+    ids = [r["id"] for r in db.execute(RECITAL)]
+    if ids:
+        marks = ",".join("?" * len(ids))
+        db.execute(f"DELETE FROM tag_runs WHERE target IN ({marks})", ids)
+        db.execute(f"DELETE FROM tags WHERE target IN ({marks})", ids)
+    kv_set(db, "retag:recitals", True)
+    db.commit()
+    log(f"[repair] {len(ids)} summaries that recite existing law queued for a second reading")
+    return len(ids)
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
@@ -225,6 +253,7 @@ def connect(path):
     db.executescript(SCHEMA)
     add_columns(db)
     repair(db)
+    retag_recitals(db)
     return db
 
 

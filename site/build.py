@@ -2,7 +2,7 @@
 """Render the AI Fear Report site from one data file.
 
 Production (one folder per page, ready for GitHub Pages):
-    python site/build.py --data data/site_data.json --out dist --base /ai-fear-index
+    python site/build.py --data data/site_data.json --out dist
 
 Preview (every page in one HTML file, hash navigation):
     python site/build.py --data state/site_data.json --preview preview.html
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", help="output folder for the production site")
     ap.add_argument("--preview", help="write a single-file preview here instead")
-    ap.add_argument("--base", default="", help="URL prefix, e.g. /ai-fear-index")
+    ap.add_argument("--base", default="", help="URL prefix, for serving under a subpath rather than a domain root")
     args = ap.parse_args()
     if not args.out and not args.preview:
         ap.error("give --out or --preview")

@@ -38,10 +38,19 @@ one_pass() {
     save state data Data
     data_saved=$(date +%s)
   fi
+  # One edition of the brief a day, written but not posted. It rides the data branch so the
+  # next run knows what has already been said, and is copied onto the site to be looked at.
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    python -m pipeline.brief --db state/index.db --out state/brief \
+      || echo "::warning::pass $1 wrote no brief"
+  fi
   if [ -f state/site_data.json ]; then
     rm -rf dist
-    if python site/build.py --data state/site_data.json --out dist --base /ai-fear-index > /dev/null; then
+    if python site/build.py --data state/site_data.json --out dist --base "" > /dev/null; then
       touch dist/.nojekyll
+      # Pages keeps the custom domain in this file, and every pass replaces the branch
+      printf 'aifearreport.com\n' > dist/CNAME
+      [ -d state/brief ] && cp -r state/brief dist/brief
       save dist gh-pages Site
     else
       echo "::warning::pass $1 built no site; the last one stays up"

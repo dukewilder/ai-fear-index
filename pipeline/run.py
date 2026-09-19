@@ -27,7 +27,7 @@ def main():
     ap.add_argument("--db", default="state/index.db")
     ap.add_argument("--out", default="state")
     ap.add_argument("--only", default="", help="comma-separated sources to run (for testing)")
-    ap.add_argument("--base", default="/ai-fear-index")
+    ap.add_argument("--base", default="")
     args = ap.parse_args()
     db = connect(args.db)
     done = {r["source"] for r in db.execute("SELECT source FROM status WHERE last_ok IS NOT NULL")}

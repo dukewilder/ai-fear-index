@@ -11,7 +11,7 @@ import argparse
 import importlib
 import time
 
-from .common import connect, kv_get, kv_set, log, now, source_run
+from .common import connect, kv_get, kv_set, log, now, retry_due, source_run
 
 HOURLY = ["gdelt", "rss", "fedreg"]
 DAILY = ["congress", "openstates", "lda", "fec", "wikipedia"]
@@ -38,6 +38,8 @@ def main():
     sources = HOURLY + (DAILY if mode in ("daily", "backfill") else [])
     if mode == "hourly":
         sources += [s for s in DAILY if s not in done]  # first run of a source catches it up
+    # a source that asked to be tried again later today, having been refused for nothing
+    sources += [s for s in DAILY if s not in sources and retry_due(db, s)]
     if args.only:
         sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]
     log(f"mode={mode} sources={sources} first run for: {[s for s in sources if s not in done] or 'none'}")

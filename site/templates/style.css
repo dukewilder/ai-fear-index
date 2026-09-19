@@ -227,6 +227,7 @@ a.copy.donate{text-decoration:none}
 .grid{border-collapse:collapse;min-width:640px;width:100%;font-variant-numeric:tabular-nums}
 .grid th{padding:7px 8px;font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;line-height:1.3;color:var(--muted);text-align:right;vertical-align:bottom}
 .grid thead th{border-bottom:1px solid var(--ink)}
+.grid thead th i{display:block;font-style:normal;font-size:9px;letter-spacing:.06em;opacity:.7}
 .grid thead th:first-child{text-align:left;padding-left:0}
 .grid th[scope=row]{text-align:left;font:500 13px var(--body);letter-spacing:0;text-transform:none;color:var(--ink);white-space:nowrap;padding-left:0;border-bottom:1px solid var(--rule)}
 .grid th[scope=row] a{text-decoration:none}

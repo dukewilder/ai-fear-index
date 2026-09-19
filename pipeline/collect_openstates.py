@@ -1,11 +1,18 @@
-"""State bills from the Open States (Plural) v3 API."""
-from .common import SINCE, Http, HttpError, env, iso, kv_get, kv_set, log, status_from_action, upsert
+"""State bills from the Open States (Plural) v3 API.
+
+Open States searches bill text, so it also finds federal bills whose titles never say AI
+and Congress.gov's title match therefore misses. Those land on the same row Congress.gov
+would write, and Congress.gov's own record wins wherever both have one.
+"""
+from .common import (SINCE, Http, HttpError, congress_id, env, iso, kv_get, kv_set, log, retry_at, retry_clear,
+                     status_from_action, upsert)
 
 BASE = "https://v3.openstates.org/bills"
 QUERIES = ["artificial intelligence", "deepfake", "chatbot", "data center", "automated decision",
            "synthetic media", "digital replica", "algorithmic"]
 MAX_REQUESTS = 240  # per run
 DAY_BUDGET = 240    # the free tier allows 250 a day, so stop short of it and resume tomorrow
+RETRY_HOURS = 3     # a refusal is their rolling day, not ours, so wait it out and go again
 
 
 def jurisdiction_code(j):
@@ -13,6 +20,8 @@ def jurisdiction_code(j):
     for part in jid.split("/"):
         if part.startswith(("state:", "district:", "territory:")):
             return part.split(":", 1)[1]
+    if "country:us" in jid:
+        return "us"  # Congress, which Open States files under the country and not a state
     return jid.rsplit("/", 1)[-1] or "state"
 
 
@@ -28,7 +37,12 @@ def run(db, state, mode):
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
         return
     requests_used, added, seen, capped = 0, 0, 0, False
-    for query in QUERIES:
+    # Start where the last run stopped. Without this the first query spends the whole
+    # allowance every day and the last ones are never searched at all.
+    offset = kv_get(db, "openstates_offset", 0) % len(QUERIES)
+    ordered = QUERIES[offset:] + QUERIES[:offset]
+    stopped_at = None
+    for i, query in enumerate(ordered):
         cursor = cursors.get(query, {})
         page = cursor.get("page", 1) if cursor.get("backfilling", True) else 1
         since = None if cursor.get("backfilling", True) else cursor.get("since")
@@ -62,14 +76,23 @@ def run(db, state, mode):
             page += 1
             cursors[query] = {"backfilling": True, "page": page} if cursor.get("backfilling", True) else cursor
         if capped:
-            log("[openstates] daily allowance reached; resuming tomorrow")
+            stopped_at = (offset + i) % len(QUERIES)
+            log("[openstates] allowance refused the run; backing off")
             break
         if requests_used >= budget:
+            stopped_at = (offset + i) % len(QUERIES)
             log(f"[openstates] request budget used; resuming '{query}' next run")
             break
         kv_set(db, "openstates_cursors", cursors)
     kv_set(db, "openstates_cursors", cursors)
     kv_set(db, "openstates_spend", {"date": day, "n": used_today + requests_used})
+    kv_set(db, "openstates_offset", stopped_at if stopped_at is not None else 0)
+    # A refusal that cost nothing is their rolling window, not our budget: the run is worth
+    # repeating later the same day rather than writing the day off.
+    if capped and not requests_used:
+        retry_at(db, "openstates", RETRY_HOURS)
+    else:
+        retry_clear(db, "openstates")
     db.commit()
     state["added"] = added
     backlog = [q for q, c in cursors.items() if c.get("backfilling")] + [q for q in QUERIES if q not in cursors]
@@ -81,8 +104,11 @@ def run(db, state, mode):
 def store(db, b):
     j = b.get("jurisdiction") or {}
     code = jurisdiction_code(j)
-    ident = "os-" + (b.get("id", "").rsplit("/", 1)[-1] or f"{code}-{b.get('session')}-{b.get('identifier')}")
-    row = db.execute("SELECT updated FROM measures WHERE id=?", (ident,)).fetchone()
+    federal = code == "us" and congress_id(b.get("session"), b.get("identifier"))
+    ident = federal or "os-" + (b.get("id", "").rsplit("/", 1)[-1] or f"{code}-{b.get('session')}-{b.get('identifier')}")
+    row = db.execute("SELECT updated, source FROM measures WHERE id=?", (ident,)).fetchone()
+    if row and row["source"] == "Congress.gov":
+        return 0  # the same bill, and Congress.gov carries the summary, the sponsors and the actions
     if row and row["updated"] == b.get("updated_at"):
         return 0
     abstracts = " ".join(a.get("abstract", "") for a in (b.get("abstracts") or []))
@@ -90,7 +116,8 @@ def store(db, b):
                [s.get("name") for s in (b.get("sponsorships") or [])][:3]
     kind = "resolution" if "resolution" in " ".join(b.get("classification") or []) else "bill"
     return upsert(db, "measures", {
-        "id": ident, "kind": kind, "jurisdiction": code, "jurisdiction_name": j.get("name") or code.upper(),
+        "id": ident, "kind": kind, "jurisdiction": code,
+        "jurisdiction_name": "Congress" if code == "us" else (j.get("name") or code.upper()),
         "session": b.get("session"), "identifier": b.get("identifier"), "title": b.get("title"),
         "summary": abstracts[:6000], "status": status_from_action(b.get("latest_action_description")),
         "latest_action": b.get("latest_action_description"), "latest_action_date": (b.get("latest_action_date") or "")[:10],

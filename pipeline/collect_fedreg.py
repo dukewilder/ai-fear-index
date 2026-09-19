@@ -4,12 +4,18 @@ from .common import SINCE, Http, iso, kv_get, kv_set, looks_ai, upsert
 BASE = "https://www.federalregister.gov/api/v1/documents.json"
 FIELDS = ["document_number", "title", "abstract", "html_url", "publication_date", "type", "subtype",
           "agencies", "executive_order_number", "action"]
-TERMS = ["artificial intelligence", "deepfake", "data center"]
+# The executive branch is where the bills send the power, so the search reaches as wide as the
+# state search does. Anything whose title and abstract do not mention AI is pruned below.
+TERMS = ["artificial intelligence", "deepfake", "data center", "machine learning", "automated decision",
+         "synthetic media", "digital replica", "chatbot", "facial recognition", "large language model"]
 
 
 def run(db, state, mode):
     http = Http(min_interval=0.5)
-    since = SINCE if (mode == "backfill" or not kv_get(db, "fedreg_backfilled")) else kv_get(db, "fedreg_since", SINCE)
+    # A term added later has to reach back to the start, or it only ever sees today onward.
+    fresh = kv_get(db, "fedreg_terms") != TERMS
+    since = SINCE if (mode == "backfill" or fresh or not kv_get(db, "fedreg_backfilled")) \
+        else kv_get(db, "fedreg_since", SINCE)
     added, read = 0, 0
     for term in TERMS:
         page = 1
@@ -29,6 +35,7 @@ def run(db, state, mode):
             page += 1
     dropped = prune(db)
     kv_set(db, "fedreg_backfilled", True)
+    kv_set(db, "fedreg_terms", TERMS)
     kv_set(db, "fedreg_since", iso()[:10])
     db.commit()
     state["added"] = added

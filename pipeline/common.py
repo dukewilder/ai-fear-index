@@ -161,11 +161,52 @@ CREATE INDEX IF NOT EXISTS idx_lobbying_year ON lobbying(year, quarter);
 """
 
 
+BILL_NUMBER = re.compile(r"([A-Za-z]+)\s*0*(\d+)$")
+
+
+def congress_id(session, identifier):
+    """The id Congress.gov gives a federal bill, so one bill is one row whoever saw it first."""
+    m = BILL_NUMBER.match((identifier or "").replace(".", "").strip())
+    if not m or not str(session or "").isdigit():
+        return None
+    return f"us-{session}-{m.group(1).lower()}-{m.group(2)}"
+
+
+def repair(db):
+    """Correct rows an earlier version of a collector stored wrongly. Idempotent, and cheap
+    once there is nothing left to correct.
+
+    Open States files Congress under country:us rather than a state, which an earlier reading
+    turned into a jurisdiction called "government": a phantom state in every count, and a
+    federal bill that counted as neither. Each one moves onto the Congress row it belongs to.
+    """
+    rows = db.execute("SELECT id, session, identifier FROM measures WHERE jurisdiction='government'").fetchall()
+    for r in rows:
+        ident = congress_id(r["session"], r["identifier"])
+        if ident and db.execute("SELECT 1 FROM measures WHERE id=?", (ident,)).fetchone():
+            for table in ("tags", "tag_runs"):
+                db.execute(f"DELETE FROM {table} WHERE target=?", (r["id"],))
+            db.execute("DELETE FROM measures WHERE id=?", (r["id"],))
+        elif ident:
+            for table in ("tags", "tag_runs"):
+                db.execute(f"DELETE FROM {table} WHERE target=?", (ident,))
+                db.execute(f"UPDATE {table} SET target=? WHERE target=?", (ident, r["id"]))
+            db.execute("UPDATE measures SET id=?, jurisdiction='us', jurisdiction_name='Congress' WHERE id=?",
+                       (ident, r["id"]))
+        else:
+            db.execute("UPDATE measures SET jurisdiction='us', jurisdiction_name='Congress' WHERE id=?", (r["id"],))
+    if rows:
+        db.commit()
+        log(f"[repair] {len(rows)} federal bills moved out of the phantom jurisdiction")
+    return len(rows)
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    repair(db)
     return db
 
 
@@ -177,6 +218,20 @@ def kv_get(db, key, default=None):
 def kv_set(db, key, value):
     db.execute("INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                (key, json.dumps(value)))
+
+
+def retry_at(db, name, hours):
+    """Ask for another run of one source later today, when a refusal cost nothing."""
+    kv_set(db, f"retry:{name}", (now() + dt.timedelta(hours=hours)).isoformat(timespec="seconds"))
+
+
+def retry_clear(db, name):
+    db.execute("DELETE FROM kv WHERE key=?", (f"retry:{name}",))
+
+
+def retry_due(db, name):
+    when = kv_get(db, f"retry:{name}")
+    return bool(when) and now().isoformat(timespec="seconds") >= when
 
 
 def upsert(db, table, row, key="id"):

@@ -242,11 +242,8 @@ def export(db, out_dir, base=""):
         r["rank"] = i
 
     # ---------------- fears: every channel counted, then scored
-    d30 = (today - dt.timedelta(days=30)).isoformat()
-    news30 = {r["s"][5:]: r["v"] or 0 for r in db.execute(
-        "SELECT series s, SUM(value) v FROM series WHERE series LIKE 'news:%' AND date >= ? GROUP BY series", (d30,))}
-    wiki30 = {r["s"][5:]: r["v"] or 0 for r in db.execute(
-        "SELECT series s, SUM(value) v FROM series WHERE series LIKE 'wiki:%' AND date >= ? GROUP BY series", (d30,))}
+    news30, news_end = window_30(db, "news", today)
+    wiki30, wiki_end = window_30(db, "wiki", today)
     post_fears = collections.Counter(t["value"] for t in db.execute(
         "SELECT value FROM tags WHERE kind='fear' AND target LIKE 'post:%'"))
     filings_by_fear, advocacy_by_fear = collections.Counter(), collections.Counter()
@@ -286,7 +283,7 @@ def export(db, out_dir, base=""):
         fear_rows.append({"rank": i, "name": f["name"], "slug": f["slug"], "score": str(st["index"]),
                           "bar": max(3, st["index"]), "move": move, "line": fear_line(st),
                           "new_week": st["new_week"], "segments": segments(st)})
-    grid = build_grid(order, fear_stats)
+    grid = build_grid(order, fear_stats, {"news30": news_end, "wiki30": wiki_end}, today)
 
     # ---------------- feed
     feed = [i for i in build_feed(db, ents, measures, lob, receipts, today) if i["url"] not in suppressed]
@@ -453,6 +450,20 @@ FEED_TYPES = [["all", "All"], ["bill", "Bills"], ["rule", "Rules and orders"], [
               ["donation", "Donations"], ["spending", "Election spending"], ["statement", "Statements"]]
 
 
+def window_30(db, prefix, today):
+    """Thirty days of a daily series, ending at the last day the series actually has.
+
+    A source that stops answering must not quietly shorten the window and leave every
+    fear looking quieter than it is. The count stays a true thirty days and lags instead.
+    """
+    last = db.execute("SELECT MAX(date) FROM series WHERE series LIKE ?", (prefix + ":%",)).fetchone()[0]
+    end = min(last, today.isoformat()) if last else today.isoformat()
+    start = (dt.date.fromisoformat(end) - dt.timedelta(days=29)).isoformat()
+    rows = db.execute("SELECT series s, SUM(value) v FROM series WHERE series LIKE ? AND date BETWEEN ? AND ? "
+                      "GROUP BY series", (prefix + ":%", start, end)).fetchall()
+    return {r["s"][len(prefix) + 1:]: r["v"] or 0 for r in rows}, end
+
+
 # ---------------------------------------------------------------- the index
 INDEX_WEIGHTS = {"bills": 0.4, "filings": 0.3, "news30": 0.15, "wiki30": 0.15}
 
@@ -501,7 +512,7 @@ GRID_CHANNELS = [("bills", "Bills"), ("states", "States"), ("congress", "Congres
                  ("statements", "Statements"), ("news30", "News, 30 days"), ("wiki30", "Wikipedia, 30 days")]
 
 
-def build_grid(order, stats):
+def build_grid(order, stats, ends=None, today=None):
     """The same nine fears down the side, every channel across the top, every cell a count."""
     tops = {key: max((channel_value(stats[f["slug"]], key) for f in order), default=0) for key, _ in GRID_CHANNELS}
     rows = []
@@ -515,7 +526,19 @@ def build_grid(order, stats):
                 level = min(level, v)  # a lone 1 or 2 should never glow like a column leader
             cells.append({"n": compact(v) if v >= 10000 else f"{v:,}", "level": level})
         rows.append({"name": f.get("short") or f["name"], "slug": f["slug"], "cells": cells, "index": str(st["index"])})
-    return {"channels": [label for _, label in GRID_CHANNELS], "rows": rows}
+    return {"channels": [{"label": label, "note": stalled(ends, key, today)} for key, label in GRID_CHANNELS],
+            "rows": rows}
+
+
+def stalled(ends, key, today, days=3):
+    """The last day a window covers, shown only once a source is far enough behind to notice."""
+    end = (ends or {}).get(key)
+    if not end or not today:
+        return None
+    last = dt.date.fromisoformat(end)
+    if (today - last).days < days:
+        return None
+    return f"to {last:%b} {last.day}"
 
 
 def segments(st):

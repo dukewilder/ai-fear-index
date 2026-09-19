@@ -1,14 +1,20 @@
 [
   {
-    "figure": "50%",
-    "text": "of Americans are more concerned than excited about AI in daily life, up from 37% in 2021",
-    "source": "Pew Research Center, survey of 5,023 U.S. adults, June 2025",
-    "url": "https://www.pewresearch.org/science/2025/09/17/how-americans-view-ai-and-its-impact-on-people-and-society/"
+    "figure": "63%",
+    "text": "say AI is advancing too quickly. 2% say too slowly",
+    "source": "Pew Research Center, survey of 5,119 U.S. adults, February 2026",
+    "url": "https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/"
   },
   {
-    "figure": "6 in 10",
-    "text": "want more control over how AI is used in their lives",
-    "source": "Pew Research Center, June 2025",
+    "figure": "67%",
+    "text": "have little or no confidence in the federal government to regulate AI effectively, up from 62% in 2024",
+    "source": "Pew Research Center, survey of 5,119 U.S. adults, February 2026",
+    "url": "https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/"
+  },
+  {
+    "figure": "50%",
+    "text": "are more concerned than excited about AI in daily life, up from 37% in 2021",
+    "source": "Pew Research Center, survey of 5,023 U.S. adults, June 2025",
     "url": "https://www.pewresearch.org/science/2025/09/17/how-americans-view-ai-and-its-impact-on-people-and-society/"
   }
 ]

@@ -43,10 +43,11 @@ def run(db, state, mode):
     started = time.time()
     for ent in ents.items:
         home = ent.get("homepage")
-        if not home:
+        known = ent.get("rss")  # a feed found by hand, where the site advertises none
+        if not home and not known:
             continue
-        feed_url = feeds.get(ent["slug"])
-        if feed_url is None or (feed_url == "" and mode == "backfill"):
+        feed_url = known or feeds.get(ent["slug"])
+        if not known and (feed_url is None or (feed_url == "" and mode == "backfill")):
             if time.time() - started > DISCOVERY_BUDGET:
                 deferred += 1  # leave it unrecorded so the next run tries again
                 continue

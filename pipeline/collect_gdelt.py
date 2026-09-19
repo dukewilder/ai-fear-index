@@ -9,7 +9,7 @@ import datetime as dt
 import time
 import urllib.parse
 
-from .common import Entities, Http, HttpError, config, iso, log, sha, upsert
+from .common import Entities, Http, HttpError, config, iso, kv_get, kv_set, log, sha, upsert
 
 BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
 SPACING = 11.0   # seconds between calls, double what GDELT asks for
@@ -20,13 +20,21 @@ def run(db, state, mode):
     http = Http(min_interval=SPACING)
     ents = Entities()
     fears = config("fears")
+    # Start where the last run stopped. Without this the same early fears spend the
+    # rate limit every hour and the last ones never get any news at all.
+    offset = kv_get(db, "gdelt_offset", 0) % len(fears)
+    ordered = fears[offset:] + fears[:offset]
     started = time.time()
-    added, errors, read, skipped = 0, [], 0, 0
+    added, errors, read, skipped, handled = 0, [], 0, 0, 0
+    unserved = None  # the first fear that came away with nothing; next run starts there
 
-    for fear in fears:
+    for i, fear in enumerate(ordered):
         if time.time() - started > BUDGET:
             skipped += 1
+            if unserved is None:
+                unserved = (offset + i) % len(fears)
             continue
+        handled += 1
         query = f"{fear['gdelt']} sourcelang:english"
         try:
             arts = http.json(BASE, tries=4, params={
@@ -37,6 +45,8 @@ def run(db, state, mode):
             errors.append(f"{fear['slug']}: {short(exc)}")
             arts = []
         read += len(arts)
+        if not arts and unserved is None:
+            unserved = (offset + i) % len(fears)
         for a in arts:
             url = a.get("url") or ""
             if not url:
@@ -66,11 +76,12 @@ def run(db, state, mode):
                 errors.append(f"{fear['slug']} timeline: {short(exc)}")
         db.commit()
 
+    kv_set(db, "gdelt_offset", unserved if unserved is not None else (offset + 1) % len(fears))
     cutoff = (dt.date.today() - dt.timedelta(days=120)).isoformat()
     db.execute("DELETE FROM articles WHERE seen < ?", (cutoff,))
     db.commit()
     state["added"] = added
-    note = f"{read} articles read"
+    note = f"{read} articles read for {handled} fears, starting at {fears[offset]['slug']}"
     if skipped:
         note += f"; {skipped} fears left for the next run"
     if errors:

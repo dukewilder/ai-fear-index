@@ -67,9 +67,16 @@ def main():
     _, shown, url = match
     try:
         page = requests.get(url, timeout=40, headers={"User-Agent": user_agent()})
+        kind = (page.headers.get("Content-Type") or "").lower()
         source = strip_html(page.text)[:24000]
     except requests.RequestException as exc:
         comment(f"Thanks. I matched this to [the item's source]({url}) but couldn't load it ({exc}). Left open for review.")
+        return
+    # A source we cannot actually read must never become grounds for pulling an item:
+    # a filing served as a PDF would otherwise look like a document that fails to support it.
+    if "html" not in kind and "text/plain" not in kind or len(source) < 200:
+        comment(f"Thanks. I matched this to [the item's source]({url}), but it is not readable as text "
+                f"({kind or 'unknown type'}), so I am not ruling on it automatically. Left open for review.")
         return
     prompt = (
         "A public data site shows the line below and links it to a source document. A reader reported it as wrong. "

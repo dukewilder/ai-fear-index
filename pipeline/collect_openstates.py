@@ -4,8 +4,8 @@ from .common import SINCE, Http, HttpError, env, iso, kv_get, kv_set, log, statu
 BASE = "https://v3.openstates.org/bills"
 QUERIES = ["artificial intelligence", "deepfake", "chatbot", "data center", "automated decision",
            "synthetic media", "digital replica", "algorithmic"]
-MAX_REQUESTS = 420  # per run
-DAY_BUDGET = 420    # and per day, so a long backfill cannot exhaust the free tier
+MAX_REQUESTS = 240  # per run
+DAY_BUDGET = 240    # the free tier allows 250 a day, so stop short of it and resume tomorrow
 
 
 def jurisdiction_code(j):
@@ -27,7 +27,7 @@ def run(db, state, mode):
     if not budget:
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
         return
-    requests_used, added, seen = 0, 0, 0
+    requests_used, added, seen, capped = 0, 0, 0, False
     for query in QUERIES:
         cursor = cursors.get(query, {})
         page = cursor.get("page", 1) if cursor.get("backfilling", True) else 1
@@ -43,6 +43,10 @@ def run(db, state, mode):
             except HttpError as exc:
                 if exc.status == 400 and page > 1:
                     break  # past the last page
+                if "exceeded limit" in str(exc) or exc.status == 429:
+                    # the daily allowance is gone; keep what we have and pick up tomorrow
+                    capped = True
+                    break
                 raise
             requests_used += 1
             results = data.get("results", [])
@@ -57,7 +61,10 @@ def run(db, state, mode):
                 break
             page += 1
             cursors[query] = {"backfilling": True, "page": page} if cursor.get("backfilling", True) else cursor
-        else:
+        if capped:
+            log("[openstates] daily allowance reached; resuming tomorrow")
+            break
+        if requests_used >= budget:
             log(f"[openstates] request budget used; resuming '{query}' next run")
             break
         kv_set(db, "openstates_cursors", cursors)
@@ -66,7 +73,8 @@ def run(db, state, mode):
     db.commit()
     state["added"] = added
     backlog = [q for q, c in cursors.items() if c.get("backfilling")] + [q for q in QUERIES if q not in cursors]
-    state["message"] = f"{seen} bills read in {requests_used} requests" + (
+    state["message"] = (f"{seen} bills read in {requests_used} requests"
+                        + ("; daily allowance reached" if capped else "")) + (
         f"; still backfilling: {', '.join(backlog)}" if backlog else "")
 
 

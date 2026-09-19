@@ -69,6 +69,7 @@ jobs:
       # This artifact is the belt and braces for the first pass of each run: it is what put
       # the site live before the branch existed, and it costs nothing to keep.
       - uses: actions/upload-pages-artifact@v3
+        continue-on-error: true   # a bad first build must not stop the passes that follow
         with:
           path: dist
       - name: Pass, publish, wait, repeat

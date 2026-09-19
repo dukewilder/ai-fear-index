@@ -13,37 +13,47 @@
 </div></section>
 {% endif %}
 
+<nav class="jumpbar" aria-label="On this page"><div class="wrap"><div class="jump">
+<a href="{{ url('home', anchor='index') }}" data-jump="index">The index</a>
+<a href="{{ url('home', anchor='buying') }}" data-jump="buying">What it buys</a>
+<a href="{{ url('home', anchor='benefits') }}" data-jump="benefits">Who benefits</a>
+<a href="{{ url('home', anchor='words') }}" data-jump="words">Their words</a>
+<a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>
+<a href="{{ url('home', anchor='funding') }}" data-jump="funding">The money</a>
+<a href="{{ url('home', anchor='everywhere') }}" data-jump="everywhere">Everywhere</a>
+<a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>
+<a href="{{ url('home', anchor='feed') }}" data-jump="feed">Just in</a>
+</div></div></nav>
+
 {% if d.polls %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="afraid"><div class="wrap">
 <h2 class="h">How afraid people are</h2>
 <ul class="polls">{% for p in d.polls %}<li><b>{{ p.figure }}</b><span>{{ p.text }}. <a href="{{ p.url }}" rel="noopener" target="_blank">{{ p.source }}</a></span></li>{% endfor %}</ul>
 </div></section>
 {% endif %}
 
-<section class="block"><div class="wrap">
+<section class="block" id="turning"><div class="wrap">
 <h2 class="h">What the fear is turning into</h2>
-<p class="hero-num">{{ d.index.value }}</p>
-<p class="hero-text">{{ d.index.text }}{% if d.index.where %}, in {{ d.index.where }}{% endif %}</p>
-<p class="hero-num sm">{{ d.index.second }}</p>
-<p class="hero-text">{{ d.index.second_text }}</p>
+<ol class="chain">{% for big, label in d.index.chain %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ol>
 {% if d.index.change %}<p class="move">{{ d.index.change }}</p>{% endif %}
 <figure class="spark">{{ spark_svg|safe }}<figcaption>{{ d.index.series_label }}</figcaption></figure>
 </div></section>
 
-<section class="block band"><div class="wrap">
+<section class="block band" id="index"><div class="wrap">
 <h2 class="h">The Fear Index</h2>
 <p class="sub">Scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
 <ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
 </div></section>
 
-<section class="block"><div class="wrap">
+<section class="block" id="buying"><div class="wrap">
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
+{% if d.controls|length > d.controls|selectattr('n')|list|length %}<a class="more" href="{{ url('rankings', anchor='controls') }}">All {{ d.controls|length }} controls tracked</a>{% endif %}
 </div></section>
 
 {% if d.beneficiaries %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="benefits"><div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries[:6] %}{{ benefit_row(b) }}{% endfor %}</ol>
@@ -52,7 +62,7 @@
 {% endif %}
 
 {% if d.quotes %}
-<section class="block"><div class="wrap">
+<section class="block" id="words"><div class="wrap">
 <h2 class="h">In their own words</h2>
 <p class="sub">The fear as the bill states it, and the power the same bill hands out.</p>
 <ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
@@ -60,7 +70,7 @@
 {% endif %}
 
 {% if d.already_law %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="law"><div class="wrap">
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
 <ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
@@ -68,14 +78,14 @@
 {% endif %}
 
 {% if d.numbers %}
-<section class="block"><div class="wrap">
+<section class="block" id="numbers"><div class="wrap">
 <h2 class="h">By the numbers</h2>
 <ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
 </div></section>
 {% endif %}
 
 {% if d.funders %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="funding"><div class="wrap">
 <h2 class="h">Who's funding it</h2>
 <p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
 <ol class="rank">{% for o in d.funders[:6] %}{{ org_row(o) }}{% endfor %}</ol>
@@ -84,7 +94,7 @@
 {% endif %}
 
 {% if d.industry %}
-<section class="block"><div class="wrap">
+<section class="block" id="industry"><div class="wrap">
 <h2 class="h">Industry at the table</h2>
 <p class="sub">Companies and trade groups with lobbying filings naming these fears, past year.</p>
 <ol class="rank">{% for o in d.industry[:5] %}{{ org_row(o) }}{% endfor %}</ol>
@@ -93,7 +103,7 @@
 {% endif %}
 
 {% if d.election %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="election"><div class="wrap">
 <h2 class="h">Election money</h2>
 <p class="sub">Committees spending on AI politics this cycle, counted by committee.</p>
 <ol class="rank">{% for o in d.election[:5] %}{{ org_row(o) }}{% endfor %}</ol>
@@ -102,7 +112,7 @@
 {% endif %}
 
 {% if d.grid %}
-<section class="block"><div class="wrap">
+<section class="block" id="everywhere"><div class="wrap">
 <h2 class="h">The same fears, everywhere</h2>
 <p class="sub">Every fear, every channel, counted.</p>
 {{ grid(d.grid) }}
@@ -110,7 +120,7 @@
 {% endif %}
 
 {% if d.states %}
-<section class="block band"><div class="wrap">
+<section class="block band" id="states"><div class="wrap">
 <h2 class="h">Where it's happening</h2>
 <p class="sub">Legislatures ranked by AI measures.</p>
 <ol class="rank">{% for s in d.states[:6] %}{{ state_row(s) }}{% endfor %}</ol>
@@ -119,7 +129,7 @@
 {% endif %}
 
 {% if d.feed %}
-<section class="block"><div class="wrap">
+<section class="block" id="feed"><div class="wrap">
 <h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Just in</h2>
 <p class="sub">{% if d.feed_today %}{{ d.feed_today }} new in the last 24 hours. {% endif %}Bills, rules, filings and statements, newest first.</p>
 <ul class="list">{% for i in d.feed[:6] %}{{ feed_item(i) }}{% endfor %}</ul>

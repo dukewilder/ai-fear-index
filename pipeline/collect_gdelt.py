@@ -25,7 +25,7 @@ def run(db, state, mode):
     offset = kv_get(db, "gdelt_offset", 0) % len(fears)
     ordered = fears[offset:] + fears[:offset]
     started = time.time()
-    added, errors, read, skipped, handled = 0, [], 0, 0, 0
+    added, errors, read, skipped, handled, series_ok = 0, [], 0, 0, 0, 0
     unserved = None  # the first fear that came away with nothing; next run starts there
 
     for i, fear in enumerate(ordered):
@@ -36,16 +36,37 @@ def run(db, state, mode):
             continue
         handled += 1
         query = f"{fear['gdelt']} sourcelang:english"
-        try:
-            arts = http.json(BASE, tries=4, params={
-                "query": query, "mode": "ArtList", "maxrecords": 250,
-                "timespan": "3d" if mode != "backfill" else "2w",
-                "sort": "DateDesc", "format": "json"}).get("articles", [])
-        except HttpError as exc:
-            errors.append(f"{fear['slug']}: {short(exc)}")
-            arts = []
+        # The daily volume series is what the index reads, so it comes first and gets
+        # the retries. Headlines only dress the front page and take what budget is left.
+        got_series = False
+        if needs_timeline(db, fear["slug"], mode):
+            try:
+                tl = http.json(BASE, tries=3, params={
+                    "query": query, "mode": "TimelineVolRaw", "timespan": "3m", "format": "json"}).get("timeline", [])
+                daily = {}
+                for series in tl[:1]:
+                    for point in series.get("data", []):
+                        day = f"{point['date'][0:4]}-{point['date'][4:6]}-{point['date'][6:8]}"
+                        daily[day] = daily.get(day, 0) + (point.get("value") or 0)
+                for day, value in daily.items():
+                    db.execute("INSERT INTO series(series,date,value) VALUES(?,?,?) "
+                               "ON CONFLICT(series,date) DO UPDATE SET value=excluded.value",
+                               (f"news:{fear['slug']}", day, value))
+                got_series = bool(daily)
+                series_ok += got_series
+            except HttpError as exc:
+                errors.append(f"{fear['slug']} timeline: {short(exc)}")
+        arts = []
+        if time.time() - started <= BUDGET:
+            try:
+                arts = http.json(BASE, tries=2, params={
+                    "query": query, "mode": "ArtList", "maxrecords": 250,
+                    "timespan": "3d" if mode != "backfill" else "2w",
+                    "sort": "DateDesc", "format": "json"}).get("articles", [])
+            except HttpError as exc:
+                errors.append(f"{fear['slug']}: {short(exc)}")
         read += len(arts)
-        if not arts and unserved is None:
+        if not arts and not got_series and unserved is None:
             unserved = (offset + i) % len(fears)
         for a in arts:
             url = a.get("url") or ""
@@ -59,21 +80,6 @@ def run(db, state, mode):
                 "id": sha(fear["slug"], url), "fear": fear["slug"], "title": (a.get("title") or "").strip(),
                 "url": url, "domain": domain, "seen": seen_iso, "entity": ents.match_domain(domain)})
 
-        if needs_timeline(db, fear["slug"], mode) and time.time() - started <= BUDGET:
-            try:
-                tl = http.json(BASE, tries=4, params={
-                    "query": query, "mode": "TimelineVolRaw", "timespan": "3m", "format": "json"}).get("timeline", [])
-                daily = {}
-                for series in tl[:1]:
-                    for point in series.get("data", []):
-                        day = f"{point['date'][0:4]}-{point['date'][4:6]}-{point['date'][6:8]}"
-                        daily[day] = daily.get(day, 0) + (point.get("value") or 0)
-                for day, value in daily.items():
-                    db.execute("INSERT INTO series(series,date,value) VALUES(?,?,?) "
-                               "ON CONFLICT(series,date) DO UPDATE SET value=excluded.value",
-                               (f"news:{fear['slug']}", day, value))
-            except HttpError as exc:
-                errors.append(f"{fear['slug']} timeline: {short(exc)}")
         db.commit()
 
     kv_set(db, "gdelt_offset", unserved if unserved is not None else (offset + 1) % len(fears))
@@ -81,13 +87,13 @@ def run(db, state, mode):
     db.execute("DELETE FROM articles WHERE seen < ?", (cutoff,))
     db.commit()
     state["added"] = added
-    note = f"{read} articles read for {handled} fears, starting at {fears[offset]['slug']}"
+    note = f"{read} articles and {series_ok} volume series read for {handled} fears, starting at {fears[offset]['slug']}"
     if skipped:
         note += f"; {skipped} fears left for the next run"
     if errors:
         note += "; " + "; ".join(errors)
     state["message"] = note[:700]
-    if errors and not read:
+    if errors and not read and not series_ok:
         raise RuntimeError(note[:700])
 
 

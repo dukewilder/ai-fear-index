@@ -76,7 +76,7 @@
 
   // numbers count up on first sight, unless the reader asked for less motion
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var targets = document.querySelectorAll(".hero-num, .numbers b, .val.accent, .ev b, .polls b");
+  var targets = document.querySelectorAll(".hero-num, .numbers b, .chain b, .val.accent, .ev b, .polls b");
   if (!reduce && "IntersectionObserver" in window) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -119,6 +119,30 @@
   document.addEventListener("mousemove", showTip);
   document.addEventListener("touchstart", showTip, {passive: true});
   document.addEventListener("mouseleave", function () { tip.hidden = true; });
+
+  // the jump bar follows the reader down the page
+  var jumps = document.querySelectorAll(".jumpbar a[data-jump]");
+  if (jumps.length && "IntersectionObserver" in window) {
+    var byId = {}, current = null;
+    jumps.forEach(function (a) { byId[a.getAttribute("data-jump")] = a; });
+    var jo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var a = byId[en.target.id];
+        if (!a || a === current) return;
+        if (current) current.removeAttribute("aria-current");
+        a.setAttribute("aria-current", "true"); current = a;
+        var row = a.parentNode;
+        row.scrollTo({left: a.offsetLeft - row.clientWidth / 2 + a.offsetWidth / 2, behavior: "smooth"});
+      });
+    }, {rootMargin: "-120px 0px -55% 0px"});
+    // every section lights the chip of the last named stop the reader passed
+    var last = null;
+    document.querySelectorAll("main section[id]").forEach(function (s) {
+      if (byId[s.id]) last = byId[s.id];
+      if (last) { if (!byId[s.id]) byId[s.id] = last; jo.observe(s); }
+    });
+  }
 
   // copy the receipt
   document.querySelectorAll("button[data-copy]").forEach(function (btn) {

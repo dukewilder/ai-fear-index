@@ -1,7 +1,7 @@
 {% from "macros.html" import feed_item %}
 <section class="block first"><div class="wrap">
-<a class="back" href="{{ url('rankings', anchor='funders') }}">{{ chevron|safe }}All funders</a>
-<p class="kicker">Rank {{ o.rank }} of {{ o.of }} funders <span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}</p>
+{% set g = o.group or 'funders' %}<a class="back" href="{{ url('rankings', anchor=g) }}">{{ chevron|safe }}{{ {'funders': 'All funders', 'industry': 'Industry at the table', 'election': 'Election money'}[g] }}</a>
+<p class="kicker">Rank {{ o.rank }} of {{ o.of }} {{ {'funders': 'funders', 'industry': 'in industry', 'election': 'committees'}[g] }} <span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}</p>
 <h1 class="title">{{ o.name }}</h1>
 <p class="hero-num money">{{ o.spent }}</p>
 <p class="hero-text sm">{{ o.breakdown }}, {{ o.period }}</p>

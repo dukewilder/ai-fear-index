@@ -2,15 +2,16 @@
 
     python -m pipeline.run --mode auto --db state/index.db --out state
 
-auto = hourly sources every run, plus the daily sources on the 06:00 UTC run. Any source
-that has never finished a run is added to the next run and reaches back to January 2025,
-so the index fills itself in without anyone starting a run by hand.
+auto = hourly sources every run, plus the daily sources once a day, on the first run at or
+after 06:00 UTC that gets through. Any source that has never finished a run is added to the
+next run and reaches back to January 2025, so the index fills itself in without anyone
+starting a run by hand.
 """
 import argparse
 import importlib
 import time
 
-from .common import connect, log, now, source_run
+from .common import connect, kv_get, kv_set, log, now, source_run
 
 HOURLY = ["gdelt", "rss", "fedreg"]
 DAILY = ["congress", "openstates", "lda", "fec", "wikipedia"]
@@ -30,8 +31,10 @@ def main():
     db = connect(args.db)
     done = {r["source"] for r in db.execute("SELECT source FROM status WHERE last_ok IS NOT NULL")}
     mode = args.mode
+    today = now().date().isoformat()
     if mode == "auto":
-        mode = "daily" if now().hour == 6 else "hourly"
+        # one daily pass per UTC day, however many runs the schedule manages to start
+        mode = "daily" if now().hour >= 6 and kv_get(db, "daily_done") != today else "hourly"
     sources = HOURLY + (DAILY if mode in ("daily", "backfill") else [])
     if mode == "hourly":
         sources += [s for s in DAILY if s not in done]  # first run of a source catches it up
@@ -50,6 +53,9 @@ def main():
             tag.run(db, state, mode)
     from . import export
     data = export.export(db, args.out, args.base)
+    if mode == "daily":
+        kv_set(db, "daily_done", today)
+        db.commit()
     log(f"exported: {data['index']['value']} controlled measures, {len(data['fears'])} fears, "
         f"{len(data['funders'])} funders, {len(data['feed'])} feed items in {time.time() - started:.0f}s")
 

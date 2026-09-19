@@ -174,7 +174,7 @@ a.row-name:hover{text-decoration:underline}
 .tagline{margin:6px 0 0!important;font-family:var(--disp);font-size:18px;font-weight:700;color:var(--text)}
 .btc{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;padding:12px 14px;border:1px solid var(--edge);border-radius:4px;background:#0e0f12}
 .btc-k{font:700 12px/1 var(--disp);letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
-.btc-a{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;word-break:break-all;color:var(--ink)}
+.btc-a{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;word-break:break-all;color:var(--text)}
 a.copy.donate{text-decoration:none}
 
 .bar3{display:flex;height:6px;margin-top:8px;border-radius:3px;overflow:hidden;background:#15171a}
@@ -186,3 +186,16 @@ a.copy.donate{text-decoration:none}
 .part{display:grid;grid-template-columns:110px minmax(0,1fr) 60px;gap:10px;align-items:center;font-size:13px;color:var(--soft)}
 .part-bar{display:block;height:8px;border-radius:4px;overflow:hidden;background:#15171a}
 .part-v{font-family:var(--disp);font-size:18px;font-weight:700;text-align:right;color:var(--text)}
+
+.jumpbar{position:sticky;top:60px;z-index:9;background:var(--bg);border-bottom:1px solid var(--line)}
+.jumpbar .jump{margin:0 -20px;padding:8px 20px}
+.jumpbar .jump a{height:34px;padding:0 13px;border-radius:17px;font-size:13px;color:var(--soft)}
+.jumpbar .jump a[aria-current=true]{background:var(--text);border-color:var(--text);color:#000}
+.chain{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:4px}
+.chain li{position:relative;display:flex;flex-direction:column;gap:2px;padding:12px 14px 12px 40px;background:#101215;border-radius:4px}
+.chain li::before{content:"\2193";position:absolute;left:12px;top:12px;font:800 22px/1 var(--disp);color:var(--accent)}
+.chain li:first-child::before{content:none}
+.chain li:first-child{padding-left:14px}
+.chain b{font-family:var(--disp);font-size:clamp(44px,12vw,64px);line-height:.95;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+.chain span{font-size:14px;line-height:1.35;font-weight:600;color:var(--soft)}
+@media (min-width:760px){.chain{grid-template-columns:repeat(4,minmax(0,1fr))}.chain li{padding:16px 14px 14px}.chain li::before{content:"\2192";left:auto;right:-13px;top:22px;z-index:1}.chain li:first-child{padding-left:14px}.chain li:first-child::before{content:"\2192"}.chain li:last-child::before{content:none}.chain b{font-size:clamp(34px,3.4vw,46px);letter-spacing:-.03em}}

@@ -22,7 +22,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 CHEVRON = ('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
            '<path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
            'stroke-linecap="round" stroke-linejoin="round"/></svg>')
-NAV_FOR = {"home": "", "fear": "rankings", "org": "rankings", "feed": "feed",
+NAV_FOR = {"home": "", "fear": "", "org": "rankings", "feed": "feed",
            "rankings": "rankings", "method": "method"}
 
 
@@ -177,9 +177,10 @@ def card_specs(d):
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
             f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
-    top = d["fears"][:3]
-    yield "rankings", str(len(d["fears"])), "fears, ranked on the Fear Index", \
-        " · ".join(f"{f['name']} {f['score']}" for f in top)
+    top = d["beneficiaries"][:3]
+    yield "rankings", d.get("beneficiaries_total", str(len(d["beneficiaries"]))), \
+        "agencies and officials the bills would hand new power over AI", \
+        " · ".join(f"{b['name']} {b['score']}" for b in top)
 
 
 def make_url(preview, base):

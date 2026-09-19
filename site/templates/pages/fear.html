@@ -1,12 +1,11 @@
 {% from "macros.html" import org_row, benefit_row, feed_item, buying_row, quote_card %}
 <section class="block first"><div class="wrap">
-<a class="back" href="{{ url('rankings', anchor='fears') }}">{{ chevron|safe }}The Fear Index</a>
+<a class="back" href="{{ url('home', anchor='index') }}">{{ chevron|safe }}The Fear Index</a>
 <p class="kicker">Rank {{ f.rank }} of {{ f.of }}</p>
 <h1 class="title">{{ f.name }}</h1>
 <p class="hero-num sm">{{ f.score }}</p>
 <p class="hero-text sm">{{ f.score_text }}</p>
 {% if f.parts %}<div class="parts">{% for p in f.parts %}<div class="part"><span class="part-l">{{ p.name }}</span><span class="part-bar"><i class="{{ p.cls }}" style="width:{{ p.pct }}%"></i></span><span class="part-v">{{ p.value }}</span></div>{% endfor %}</div>{% endif %}
-{% if f.line %}<p class="lead">{{ f.line }}</p>{% endif %}
 {% if f.change %}<p class="move">{{ f.change }}</p>{% endif %}
 {% if f.receipt %}<button type="button" class="copy" data-copy="{{ f.receipt }}" data-goatcounter-click="copy-receipt">Copy the receipt</button>{% endif %}
 </div></section>

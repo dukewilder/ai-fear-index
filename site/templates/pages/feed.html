@@ -1,7 +1,7 @@
 {% from "macros.html" import feed_item %}
 <section class="block first"><div class="wrap">
 <h1 class="title">Feed</h1>
-<p class="sub">Every new bill, rule, filing, donation, and statement the index tracks, newest first</p>
+<p class="sub">Every new bill, rule, filing, donation and statement, newest first</p>
 <div class="filters" role="group" aria-label="Filter the feed" data-filter-group="feed-list">
 {% for key, label in d.feed_types %}<button type="button" class="filter" data-filter="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>{% endfor %}
 </div>

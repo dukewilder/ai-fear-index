@@ -1,4 +1,4 @@
-{% from "macros.html" import fear_row, org_row, benefit_row, control_row, feed_item, grid, state_row, quote_card, law_row %}
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row, feed_item, grid, state_row, quote_card, law_row, donor_row %}
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
 <p class="chyron">{{ d.exhibit.chyron }}</p>
@@ -105,9 +105,13 @@
 {% if d.election %}
 <section class="block band" id="election"><div class="wrap">
 <h2 class="h">Election money</h2>
-<p class="sub">Committees spending on AI politics this cycle, counted by committee.</p>
+<p class="sub">Committees spending on AI politics this cycle, and the names that put up the money.</p>
 <ol class="rank">{% for o in d.election[:5] %}{{ org_row(o) }}{% endfor %}</ol>
-{% if d.totals.election > 5 %}<a class="more" href="{{ url('rankings', anchor='election') }}">See all {{ d.election_total }}</a>{% endif %}
+{% if d.donors %}
+<p class="kicker">Where it came from</p>
+<ol class="rank">{% for o in d.donors[:6] %}{{ donor_row(o) }}{% endfor %}</ol>
+{% if d.donors_total > 6 %}<a class="more" href="{{ url('rankings', anchor='election') }}">See all {{ d.donors_total }}</a>{% endif %}
+{% endif %}
 </div></section>
 {% endif %}
 

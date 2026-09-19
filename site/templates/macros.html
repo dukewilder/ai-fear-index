@@ -21,8 +21,12 @@
 <li>{% if o.slug %}<a class="row" href="{{ url('org', o.slug) }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ o.rank }}</span><span><span class="row-name">{{ o.name }}</span><span class="meta"><span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}{% if stat == 'messages' %}{{ o.messages }} filings{% elif o.fears and o.fears != '0' %}mentions {{ o.fears }} fear{{ 's' if o.fears != '1' }}{% endif %}</span></span><span class="val">{{ o.amount }}</span>{% if o.slug %}</a>{% else %}</div>{% endif %}</li>
 {%- endmacro %}
 
+{% macro donor_row(o) -%}
+<li>{% if o.url %}<a class="row" href="{{ o.url }}" rel="noopener" target="_blank">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ o.rank }}</span><span><span class="row-name">{{ o.name }}</span><span class="meta"><span class="chip">{{ o.committee }}</span>{{ o.when }}</span></span><span class="val accent">{{ o.amount }}</span>{% if o.url %}</a>{% else %}</div>{% endif %}</li>
+{%- endmacro %}
+
 {% macro benefit_row(b) -%}
-<li class="row"><span class="rank-n">{{ b.rank }}</span><span><span class="row-name">{{ b.name }}</span><span class="meta"><span class="chip">{{ b.type }}</span>gains {{ b.gains }}</span></span><span class="val accent">{{ b.score }}<span class="unit">{{ b.unit or 'bills' }}</span></span></li>
+<li class="row"><span class="rank-n">{{ b.rank }}</span><span><span class="row-name">{{ b.name }}</span><span class="meta"><span class="chip">{{ b.type }}</span>handed {{ b.gains }}</span></span><span class="val accent">{{ b.score }}<span class="unit">{{ b.unit or 'bills' }}</span></span></li>
 {%- endmacro %}
 
 {% macro control_row(c) -%}

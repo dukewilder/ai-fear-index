@@ -1,7 +1,9 @@
 """Shared plumbing for every collector: config, database, HTTP, matching, status."""
+import calendar
 import contextlib
 import datetime as dt
 import hashlib
+import html
 import json
 import os
 import pathlib
@@ -61,6 +63,11 @@ def annotate(level, title, message):
 
 def log(*parts):
     print(*parts, flush=True)
+
+
+def iso_from_struct(stamp):
+    """A feedparser time tuple, which is UTC, as an ISO timestamp."""
+    return dt.datetime.fromtimestamp(calendar.timegm(stamp), tz=dt.timezone.utc).isoformat(timespec="seconds")
 
 
 def sha(*parts):
@@ -144,7 +151,7 @@ CREATE TABLE IF NOT EXISTS committees(
 CREATE TABLE IF NOT EXISTS fec(
   id TEXT PRIMARY KEY, kind TEXT, committee_id TEXT, committee_name TEXT, counterparty TEXT,
   counterparty_key TEXT, amount REAL, date TEXT, description TEXT, support_oppose TEXT,
-  candidate TEXT, url TEXT, first_seen TEXT);
+  candidate TEXT, url TEXT, first_seen TEXT, receipt_type TEXT);
 CREATE TABLE IF NOT EXISTS articles(
   id TEXT PRIMARY KEY, fear TEXT, title TEXT, url TEXT, domain TEXT, seen TEXT, entity TEXT);
 CREATE TABLE IF NOT EXISTS posts(
@@ -170,6 +177,16 @@ def congress_id(session, identifier):
     if not m or not str(session or "").isdigit():
         return None
     return f"us-{session}-{m.group(1).lower()}-{m.group(2)}"
+
+
+def add_columns(db):
+    """Columns added to a table after a database already exists. CREATE TABLE IF NOT EXISTS
+    will not add them, so they are added here once, in place."""
+    for table, column, kind in (("fec", "receipt_type", "TEXT"),):
+        have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
+        if column not in have:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+            db.commit()
 
 
 def repair(db):
@@ -206,6 +223,7 @@ def connect(path):
     db = sqlite3.connect(path, timeout=60)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    add_columns(db)
     repair(db)
     return db
 
@@ -337,10 +355,9 @@ def fears_mentioned(text, keywords=None):
 
 
 def strip_html(text):
-    text = re.sub(r"<[^>]+>", " ", text or "")
-    text = (text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"')
-            .replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">"))
-    return re.sub(r"\s+", " ", text).strip()
+    """Tags out, entities decoded. A feed that writes &#8217; means an apostrophe."""
+    text = html.unescape(re.sub(r"<[^>]+>", " ", text or ""))
+    return re.sub(r"\s+", " ", text.replace("\u00a0", " ")).strip()
 
 
 AI_TEXT = re.compile(

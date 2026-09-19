@@ -13,9 +13,10 @@ import time
 
 from .common import connect, kv_get, kv_set, log, now, retry_due, source_run
 
-HOURLY = ["gdelt", "rss", "fedreg"]
+HOURLY = ["gdelt", "news", "rss", "fedreg"]
 DAILY = ["congress", "openstates", "lda", "fec", "wikipedia"]
-MODULES = {"gdelt": "collect_gdelt", "rss": "collect_rss", "fedreg": "collect_fedreg", "congress": "collect_congress",
+MODULES = {"gdelt": "collect_gdelt", "news": "collect_news", "rss": "collect_rss",
+           "fedreg": "collect_fedreg", "congress": "collect_congress",
            "openstates": "collect_openstates", "lda": "collect_lda", "fec": "collect_fec",
            "wikipedia": "collect_wikipedia", "tag": "tag"}
 

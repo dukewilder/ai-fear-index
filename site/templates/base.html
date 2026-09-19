@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}{% if nav == '' and d.site and d.site.tagline %}: {{ d.site.tagline }}{% endif %}</title>
-<meta name="description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored hourly on how loud they are, who pays to lobby on them, and the government controls they are used to justify.' }}">
+<meta name="description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' }}">
 <meta property="og:title" content="{{ title }}">
 <meta property="og:type" content="website">
-<meta property="og:description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored hourly on how loud they are, who pays to lobby on them, and the government controls they are used to justify.' }}">
+<meta property="og:description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' }}">
 {% if og_image %}<meta property="og:image" content="{{ og_image }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -40,7 +40,7 @@
 <button type="button" class="theme" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
 </nav>
 </div></header>
-<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span></div></div>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Updated <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span></div></div>
 {% for page in pages %}
 <main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
 {{ page.html|safe }}
@@ -48,7 +48,7 @@
 {% endfor %}
 <footer class="site-foot"><div class="wrap">
 <a class="brand" href="{{ url('home') }}">{{ d.site.name if d.site and d.site.name else "AI Fear Report" }}</a>
-<p class="colophon">Compiled from public records. Every number links to its source. Rebuilt around the clock, unattended.</p>
+<p class="colophon">Compiled from public records. Every number links to its source. Updated around the clock, unattended.</p>
 <ul class="links">
 {% if nav != 'method' %}<li><a href="{{ url('method') }}">How the numbers work</a></li>{% endif %}
 {% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% elif d.site and d.site.donate_btc %}<li><a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}
@@ -56,7 +56,7 @@
 <li><a href="{{ d.links.code }}">Source code</a></li>
 <li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
 </ul>
-<p>Last rebuilt <span data-rel="{{ d.built_at }}">recently</span></p>
+<p>Last updated <span data-rel="{{ d.built_at }}">recently</span></p>
 </div></footer>
 <script>
 (function () {
@@ -125,29 +125,71 @@
   document.addEventListener("touchstart", showTip, {passive: true});
   document.addEventListener("mouseleave", function () { tip.hidden = true; });
 
-  // the jump bar follows the reader down the page
-  var jumps = document.querySelectorAll(".jumpbar a[data-jump]");
-  if (jumps.length && "IntersectionObserver" in window) {
-    var byId = {}, current = null;
+  // whatever is pinned at the top, an anchor has to clear it: measure rather than guess
+  var pinned = 112;
+  function measure() {
+    var head = document.querySelector(".masthead"), bar = document.querySelector(".jumpbar");
+    pinned = (head ? head.offsetHeight : 0) + (bar ? bar.offsetHeight : 0);
+    document.documentElement.style.setProperty("--stick", (pinned + 10) + "px");
+  }
+  measure();
+  window.addEventListener("resize", measure);
+
+  // the jump bar follows the reader, in both directions, and never parks off its own left end
+  var row = document.querySelector(".jumpbar .jump");
+  var jumps = row ? row.querySelectorAll("a[data-jump]") : [];
+  if (jumps.length) {
+    var byId = {}, stops = [], mark = null, queued = false;
     jumps.forEach(function (a) { byId[a.getAttribute("data-jump")] = a; });
-    var jo = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        if (!en.isIntersecting) return;
-        var a = byId[en.target.id];
-        if (!a || a === current) return;
-        if (current) current.removeAttribute("aria-current");
-        a.setAttribute("aria-current", "true"); current = a;
-        var row = a.parentNode;
-        row.scrollTo({left: a.offsetLeft - row.clientWidth / 2 + a.offsetWidth / 2, behavior: "smooth"});
-      });
-    }, {rootMargin: "-120px 0px -55% 0px"});
     // every section lights the chip of the last named stop the reader passed
     var last = null;
-    document.querySelectorAll("main section[id]").forEach(function (s) {
-      if (byId[s.id]) last = byId[s.id];
-      if (last) { if (!byId[s.id]) byId[s.id] = last; jo.observe(s); }
+    document.querySelectorAll("main section[id]").forEach(function (sec) {
+      if (byId[sec.id]) last = byId[sec.id];
+      if (last) stops.push({sec: sec, chip: last});
     });
+    var track = function () {
+      queued = false;
+      var line = window.scrollY + pinned + 30, pick = null;
+      for (var i = 0; i < stops.length; i++) {
+        if (stops[i].sec.getBoundingClientRect().top + window.scrollY <= line) pick = stops[i].chip;
+        else break;
+      }
+      if (pick === mark) return;
+      if (mark) mark.removeAttribute("aria-current");
+      mark = pick;
+      if (!mark) return;
+      mark.setAttribute("aria-current", "true");
+      var room = row.scrollWidth - row.clientWidth;   // zero once the row wraps instead of scrolling
+      if (room > 4) {
+        var want = mark.offsetLeft - row.clientWidth / 2 + mark.offsetWidth / 2;
+        row.scrollTo({left: Math.max(0, Math.min(room, want)), behavior: "smooth"});
+      }
+    };
+    window.addEventListener("scroll", function () {
+      if (!queued) { queued = true; requestAnimationFrame(track); }
+    }, {passive: true});
+    window.addEventListener("resize", function () { measure(); track(); });
+    track();
   }
+
+  // long lists open ten at a time
+  document.querySelectorAll("ol.rank, ul.rank, ul.list").forEach(function (list) {
+    var n = list.children.length;
+    if (n < 14) return;
+    list.classList.add("clip");
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "showall";
+    btn.setAttribute("aria-expanded", "false");
+    btn.textContent = "Show all " + n;
+    btn.addEventListener("click", function () {
+      var clipped = list.classList.toggle("clip");
+      btn.setAttribute("aria-expanded", clipped ? "false" : "true");
+      btn.textContent = clipped ? "Show all " + n : "Show the first ten";
+      if (clipped) list.scrollIntoView({block: "start"});
+    });
+    list.parentNode.insertBefore(btn, list.nextSibling);
+  });
 
   // light or dark, remembered on this device
   var root = document.documentElement, sw = document.querySelector("[data-theme-switch]");

@@ -2,6 +2,7 @@
   {
     "slug": "loss-of-control",
     "name": "Loss of control",
+    "short": "Loss of control",
     "definition": "AI becoming uncontrollable or escaping human oversight: superintelligence, catastrophic or existential risk, extinction, rogue or deceptive AI systems.",
     "keywords": [
       "loss of control",
@@ -17,15 +18,19 @@
       "agi"
     ],
     "gdelt": "\"artificial intelligence\" (extinction OR superintelligence OR \"existential risk\" OR \"loss of control\" OR \"catastrophic risk\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|\\bAGI\\b|superintelligen",
+      "extinction|superintelligen|existential risk|loss of control|catastrophic risk|destroy humanity|wipe out humanity|kill us all|doomsday"
+    ],
     "wikipedia": [
       "Existential_risk_from_artificial_intelligence",
       "AI_alignment"
-    ],
-    "short": "Loss of control"
+    ]
   },
   {
     "slug": "china-race",
     "name": "China race",
+    "short": "China race",
     "definition": "Losing an AI race to China or other foreign adversaries: national security competition, adversaries gaining AI or chip advantages, AI dominance.",
     "keywords": [
       "china",
@@ -39,14 +44,19 @@
       "ccp"
     ],
     "gdelt": "\"artificial intelligence\" China (race OR dominance OR \"national security\" OR \"export controls\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
+      "China|Chinese|Beijing",
+      "race|dominance|national security|export control|outcompete"
+    ],
     "wikipedia": [
       "Artificial_intelligence_arms_race"
-    ],
-    "short": "China race"
+    ]
   },
   {
     "slug": "job-loss",
     "name": "Job loss",
+    "short": "Job loss",
     "definition": "AI replacing workers: automation, layoffs, unemployment, displacement of jobs or wages.",
     "keywords": [
       "workforce",
@@ -60,14 +70,18 @@
       "automation"
     ],
     "gdelt": "\"artificial intelligence\" (layoffs OR unemployment OR \"job losses\" OR \"replace workers\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|automation",
+      "layoff|unemployment|job loss|jobs? cut|replace workers|replacing workers|white.collar jobs|entry.level jobs"
+    ],
     "wikipedia": [
       "Technological_unemployment"
-    ],
-    "short": "Job loss"
+    ]
   },
   {
     "slug": "power-bills",
     "name": "Power bills and data centers",
+    "short": "Power bills",
     "definition": "Data centers for AI raising electricity or water costs, straining the power grid, or harming the environment and communities.",
     "keywords": [
       "data center",
@@ -80,15 +94,19 @@
       "water use"
     ],
     "gdelt": "\"data centers\" (electricity OR \"power bills\" OR grid OR \"utility rates\" OR ratepayers)",
+    "match": [
+      "data cent(er|re)",
+      "electricity|power bill|grid\\b|utility rate|ratepayer|energy demand|megawatt|power demand"
+    ],
     "wikipedia": [
       "Environmental_impact_of_artificial_intelligence",
       "Data_center"
-    ],
-    "short": "Power bills"
+    ]
   },
   {
     "slug": "kids-chatbots",
     "name": "Kids and chatbots",
+    "short": "Kids and chatbots",
     "definition": "AI harming children or teens: companion chatbots, minors' safety or mental health, grooming, exploitation, age-inappropriate AI content.",
     "keywords": [
       "child",
@@ -102,14 +120,18 @@
       "kids"
     ],
     "gdelt": "chatbot (children OR teens OR minors OR kids)",
+    "match": [
+      "chat ?bot|companion app|Character\\.? ?AI",
+      "child|children|teen|minor\\b|\\bkids?\\b|student"
+    ],
     "wikipedia": [
       "Chatbot"
-    ],
-    "short": "Kids and chatbots"
+    ]
   },
   {
     "slug": "deepfakes",
     "name": "Deepfakes",
+    "short": "Deepfakes",
     "definition": "Synthetic or manipulated media: deepfakes, digital replicas, AI impersonation, election deepfakes, nonconsensual intimate imagery, AI-generated fraud.",
     "keywords": [
       "deepfake",
@@ -122,14 +144,17 @@
       "manipulated media"
     ],
     "gdelt": "(deepfake OR deepfakes OR \"synthetic media\")",
+    "match": [
+      "deep ?fake|synthetic media|digital replica|voice clon"
+    ],
     "wikipedia": [
       "Deepfake"
-    ],
-    "short": "Deepfakes"
+    ]
   },
   {
     "slug": "ai-cyberattacks",
     "name": "AI cyberattacks",
+    "short": "Cyberattacks",
     "definition": "AI-enabled hacking or cyberattacks, including attacks on critical infrastructure.",
     "keywords": [
       "cyber",
@@ -139,12 +164,16 @@
       "critical infrastructure"
     ],
     "gdelt": "\"artificial intelligence\" (cyberattack OR cyberattacks OR hackers OR ransomware)",
-    "wikipedia": [],
-    "short": "Cyberattacks"
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
+      "cyberattack|cyber attack|hacker|hacking|ransomware|malware|breach"
+    ],
+    "wikipedia": []
   },
   {
     "slug": "bioweapons",
     "name": "Bioweapons",
+    "short": "Bioweapons",
     "definition": "AI helping create biological, chemical, radiological, or nuclear weapons, or engineered pandemics.",
     "keywords": [
       "bioweapon",
@@ -156,12 +185,16 @@
       "pandemic"
     ],
     "gdelt": "\"artificial intelligence\" (bioweapon OR bioweapons OR \"biological weapons\" OR biosecurity)",
-    "wikipedia": [],
-    "short": "Bioweapons"
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
+      "bioweapon|biological weapon|biosecurity|pathogen|bioterror"
+    ],
+    "wikipedia": []
   },
   {
     "slug": "bias",
     "name": "Algorithmic bias",
+    "short": "Bias",
     "definition": "AI discriminating against people in decisions such as hiring, lending, housing, insurance, health care, or policing.",
     "keywords": [
       "bias",
@@ -173,9 +206,13 @@
       "high-risk"
     ],
     "gdelt": "\"artificial intelligence\" (bias OR discrimination) (hiring OR lending OR housing OR insurance)",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|algorithm",
+      "bias|discriminat",
+      "hiring|lending|housing|insurance|employment|credit"
+    ],
     "wikipedia": [
       "Algorithmic_bias"
-    ],
-    "short": "Bias"
+    ]
   }
 ]

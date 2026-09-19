@@ -1,0 +1,66 @@
+[
+  {
+    "name": "The Verge",
+    "url": "https://www.theverge.com/rss/index.xml"
+  },
+  {
+    "name": "Ars Technica",
+    "url": "https://feeds.arstechnica.com/arstechnica/index"
+  },
+  {
+    "name": "Wired",
+    "url": "https://www.wired.com/feed/rss"
+  },
+  {
+    "name": "TechCrunch",
+    "url": "https://techcrunch.com/feed/"
+  },
+  {
+    "name": "Politico Technology",
+    "url": "https://rss.politico.com/technology.xml"
+  },
+  {
+    "name": "The Register",
+    "url": "https://www.theregister.com/headlines.atom"
+  },
+  {
+    "name": "New York Times Technology",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+  },
+  {
+    "name": "Washington Post Technology",
+    "url": "https://feeds.washingtonpost.com/rss/business/technology"
+  },
+  {
+    "name": "CNBC Technology",
+    "url": "https://www.cnbc.com/id/19854910/device/rss/rss.html"
+  },
+  {
+    "name": "Axios",
+    "url": "https://api.axios.com/feed/"
+  },
+  {
+    "name": "Utility Dive",
+    "url": "https://www.utilitydive.com/feeds/news/"
+  },
+  {
+    "name": "MIT Technology Review",
+    "url": "https://www.technologyreview.com/feed/"
+  },
+  {
+    "name": "StateScoop",
+    "url": "https://statescoop.com/feed/"
+  },
+  {
+    "name": "Nextgov",
+    "url": "https://www.nextgov.com/rss/all/"
+  },
+  {
+    "name": "BBC Technology",
+    "url": "https://feeds.bbci.co.uk/news/technology/rss.xml"
+  },
+  {
+    "name": "The Guardian Technology",
+    "url": "https://www.theguardian.com/technology/rss"
+  }
+]

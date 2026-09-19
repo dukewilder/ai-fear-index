@@ -1,12 +1,12 @@
 """Institutional messaging: AI-related posts from tracked organizations' newsroom feeds."""
-import calendar
 import re
 import time
 import urllib.parse
 
 import feedparser
 
-from .common import Entities, Http, HttpError, iso, kv_get, kv_set, log, looks_ai, sha, strip_html, upsert
+from .common import (Entities, Http, HttpError, iso, iso_from_struct, kv_get, kv_set, log, looks_ai, sha,
+                     strip_html, upsert)
 
 DISCOVERY_BUDGET = 360  # seconds per run; unfinished sites are picked up next run
 LINK_TAG = re.compile(r"<link[^>]+>", re.I)
@@ -93,8 +93,3 @@ def drop_undated(db):
     """Remove posts stored before undated entries were skipped, which carry the time they were fetched."""
     cur = db.execute("DELETE FROM posts WHERE published = first_seen")
     return cur.rowcount
-
-
-def iso_from_struct(ts):
-    import datetime as dt
-    return dt.datetime.fromtimestamp(calendar.timegm(ts), tz=dt.timezone.utc).isoformat(timespec="seconds")

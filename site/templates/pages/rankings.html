@@ -1,15 +1,16 @@
-{% from "macros.html" import org_row, benefit_row, control_row, state_row %}
+{% from "macros.html" import org_row, benefit_row, control_row, state_row, donor_row %}
 <section class="block first"><div class="wrap">
 <h1 class="title">Every list, in full</h1>
-<nav class="jump" aria-label="Jump to a list">
-<a href="{{ url('rankings', anchor='controls') }}">Controls</a>
-<a href="{{ url('rankings', anchor='beneficiaries') }}">Beneficiaries</a>
-<a href="{{ url('rankings', anchor='states') }}">States</a>
-<a href="{{ url('rankings', anchor='funders') }}">Funders</a>
-<a href="{{ url('rankings', anchor='industry') }}">Industry</a>
-<a href="{{ url('rankings', anchor='election') }}">Election money</a>
-</nav>
 </div></section>
+
+<nav class="jumpbar" aria-label="On this page"><div class="wrap"><div class="jump">
+<a href="{{ url('rankings', anchor='controls') }}" data-jump="controls">Controls</a>
+<a href="{{ url('rankings', anchor='beneficiaries') }}" data-jump="beneficiaries">Beneficiaries</a>
+<a href="{{ url('rankings', anchor='states') }}" data-jump="states">States</a>
+<a href="{{ url('rankings', anchor='funders') }}" data-jump="funders">Funders</a>
+<a href="{{ url('rankings', anchor='industry') }}" data-jump="industry">Industry</a>
+<a href="{{ url('rankings', anchor='election') }}" data-jump="election">Election money</a>
+</div></div></nav>
 
 <section class="block band" id="controls"><div class="wrap">
 <h2 class="h">What the fear is buying</h2>
@@ -48,7 +49,11 @@
 {% if d.election %}
 <section class="block" id="election"><div class="wrap">
 <h2 class="h">Election money</h2>
-<p class="sub">Every committee spending on AI politics this cycle, counted by committee.</p>
+<p class="sub">Every committee spending on AI politics this cycle, and every name on their receipts.</p>
 <ol class="rank">{% for o in d.election %}{{ org_row(o) }}{% endfor %}</ol>
+{% if d.donors %}
+<p class="kicker">Where it came from</p>
+<ol class="rank">{% for o in d.donors %}{{ donor_row(o) }}{% endfor %}</ol>
+{% endif %}
 </div></section>
 {% endif %}

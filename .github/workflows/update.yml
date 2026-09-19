@@ -2,9 +2,10 @@ name: Update
 
 on:
   schedule:
-    # Three chances an hour. GitHub drops scheduled runs under load, so a single
-    # hourly entry loses whole hours; the run is idempotent, so a spare costs nothing.
-    - cron: "7,27,47 * * * *"
+    # Six chances an hour. GitHub fired 2 of the first day's 19 slots, so a sparse
+    # schedule loses whole hours. The concurrency group below keeps at most one run
+    # going and one queued, so the extra slots cost nothing when the scheduler is awake.
+    - cron: "*/10 * * * *"
   push:
     branches: [main]
   workflow_dispatch:

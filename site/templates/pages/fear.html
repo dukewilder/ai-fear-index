@@ -21,7 +21,7 @@
 <section class="block"><div class="wrap">
 <h2 class="h">In their own words</h2>
 <p class="sub">The fear as the bill states it, and the power the same bill hands out.</p>
-<ul class="quotes">{% for q in f.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
+<ul class="quotes">{% for q in f.quotes %}{{ quote_card(q, name_fear=false) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 

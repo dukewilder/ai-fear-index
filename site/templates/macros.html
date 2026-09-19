@@ -37,8 +37,8 @@
 <li class="row"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} with new controls, {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.bills }}<span class="unit">bills</span></span></li>
 {%- endmacro %}
 
-{% macro quote_card(q) -%}
-<li class="quote-card"><span class="chip">{{ q.fear }}</span><blockquote>“{{ q.quote }}”</blockquote><span class="q-src"><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="stamp">{{ q.status }}</span></span>{% if q.controls %}<span class="buys">{% for c in q.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% if q.agency %}<span class="arw" aria-hidden="true">→</span><span class="who">{{ q.agency }}</span>{% endif %}</span>{% endif %}</li>
+{% macro quote_card(q, name_fear=true) -%}
+<li class="quote-card">{% if name_fear %}<span class="chip">{{ q.fear }}</span>{% endif %}<blockquote>“{{ q.quote }}”</blockquote><span class="q-src"><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="stamp">{{ q.status }}</span></span>{% if q.controls %}<span class="buys">{% for c in q.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% if q.agency %}<span class="arw" aria-hidden="true">→</span><span class="who">{{ q.agency }}</span>{% endif %}</span>{% endif %}</li>
 {%- endmacro %}
 
 {% macro law_row(a) -%}

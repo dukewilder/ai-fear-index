@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title }}</title>
-<meta name="description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
+<title>{{ title }}{% if nav == '' and d.site and d.site.tagline %}: {{ d.site.tagline }}{% endif %}</title>
+<meta name="description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored hourly on how loud they are, who pays to lobby on them, and the government controls they are used to justify.' }}">
 <meta property="og:title" content="{{ title }}">
 <meta property="og:type" content="website">
-<meta property="og:description" content="{{ description or 'Nine AI fears, scored and tracked hourly: what people are afraid of, who is spending on it, and what the bills would build.' }}">
+<meta property="og:description" content="{{ description or 'Every fear about AI, and what it buys: nine fears scored hourly on how loud they are, who pays to lobby on them, and the government controls they are used to justify.' }}">
 {% if og_image %}<meta property="og:image" content="{{ og_image }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -35,7 +35,7 @@
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
 </nav>
 </div></header>
-<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Updated <span data-rel="{{ d.built_at }}">recently</span> from {{ d.sources_count }} sources</span></div></div>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Rebuilt <span data-rel="{{ d.built_at }}">recently</span>{% if d.runs_today %} · {{ d.runs_today }} update{{ 's' if d.runs_today != 1 }} today{% endif %}{% if d.tracked %} · {{ '{:,}'.format(d.tracked.measures) }} bills · {{ '{:,}'.format(d.tracked.filings) }} filings · {{ d.tracked.orgs }} organizations tracked{% endif %}</span></div></div>
 {% for page in pages %}
 <main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
 {{ page.html|safe }}
@@ -43,9 +43,10 @@
 {% endfor %}
 <footer class="site-foot"><div class="wrap">
 <a class="brand" href="{{ url('home') }}">AI Fear Index</a>
-<p>Built from public records. Every number links to its source. Rebuilt every hour.</p>
+<p>Built from public records. Every number links to its source. Rebuilds itself around the clock.</p>
 <ul class="links">
 <li><a href="{{ url('method') }}">How the numbers work</a></li>
+{% if d.site and d.site.donate_url %}<li><a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a></li>{% endif %}
 <li><a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a></li>
 <li><a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a></li>
 </ul>
@@ -71,6 +72,56 @@
   }
   tick();
   setInterval(tick, 60000);
+
+  // numbers count up on first sight, unless the reader asked for less motion
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var targets = document.querySelectorAll(".hero-num, .numbers b, .val.accent, .ev b, .polls b");
+  if (!reduce && "IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        io.unobserve(en.target);
+        var el = en.target, text = el.textContent, m = text.match(/^([^0-9]*)([0-9][0-9,]*)(\.[0-9]+)?(.*)$/);
+        if (!m) return;
+        var end = parseFloat(m[2].replace(/,/g, "") + (m[3] || "")), dec = m[3] ? m[3].length - 1 : 0;
+        if (!isFinite(end) || end === 0) return;
+        var t0 = null, dur = 900;
+        function step(ts) {
+          if (!t0) t0 = ts;
+          var p = Math.min(1, (ts - t0) / dur), v = end * (1 - Math.pow(1 - p, 3));
+          el.textContent = m[1] + v.toLocaleString(undefined, {minimumFractionDigits: dec, maximumFractionDigits: dec}) + m[4];
+          if (p < 1) requestAnimationFrame(step); else el.textContent = text;
+        }
+        requestAnimationFrame(step);
+      });
+    }, {threshold: 0.4});
+    targets.forEach(function (el) { io.observe(el); });
+  }
+
+  // one tooltip for every chart mark that carries data-tip
+  var tip = document.createElement("div");
+  tip.className = "tip"; tip.hidden = true; document.body.appendChild(tip);
+  function showTip(e) {
+    var el = e.target.closest("[data-tip]");
+    if (!el) { tip.hidden = true; return; }
+    tip.textContent = el.getAttribute("data-tip"); tip.hidden = false;
+    var x = (e.touches ? e.touches[0].clientX : e.clientX), y = (e.touches ? e.touches[0].clientY : e.clientY);
+    tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, x - tip.offsetWidth / 2)) + "px";
+    tip.style.top = (y - tip.offsetHeight - 14 + window.scrollY) + "px";
+  }
+  document.addEventListener("mousemove", showTip);
+  document.addEventListener("touchstart", showTip, {passive: true});
+  document.addEventListener("mouseleave", function () { tip.hidden = true; });
+
+  // copy the receipt
+  document.querySelectorAll("button[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy"), done = function () {
+        var was = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = was; }, 1600);
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done();
+    });
+  });
 
   document.querySelectorAll("[data-filter-group]").forEach(function (group) {
     var list = document.getElementById(group.getAttribute("data-filter-group"));

@@ -67,5 +67,10 @@
   {"slug": "att", "name": "AT&T", "type": "Telecom", "aliases": ["at t", "at t services", "at t services and its affiliates", "at&t"], "domains": ["att.com"], "homepage": ""},
   {"slug": "adobe", "name": "Adobe", "type": "AI company", "aliases": ["adobe", "adobe systems"], "domains": ["adobe.com"], "homepage": ""},
   {"slug": "aaj", "name": "American Association for Justice", "type": "Trade group", "aliases": ["american association for justice"], "domains": ["justice.org"], "homepage": ""},
-  {"slug": "verizon", "name": "Verizon", "type": "Telecom", "aliases": ["verizon", "verizon communications", "cellco partnership"], "domains": ["verizon.com"], "homepage": ""}
+  {"slug": "verizon", "name": "Verizon", "type": "Telecom", "aliases": ["verizon", "verizon communications", "cellco partnership"], "domains": ["verizon.com"], "homepage": ""},
+  {"slug": "samsung", "name": "Samsung", "type": "Chipmaker", "aliases": ["samsung", "samsung electronics", "samsung electronics america"], "domains": ["samsung.com"], "homepage": ""},
+  {"slug": "eei", "name": "Edison Electric Institute", "type": "Trade group", "aliases": ["edison electric institute"], "domains": ["eei.org"], "homepage": ""},
+  {"slug": "intel", "name": "Intel", "type": "Chipmaker", "aliases": ["intel", "intel corporation"], "domains": ["intel.com"], "homepage": ""},
+  {"slug": "oracle", "name": "Oracle", "type": "AI company", "aliases": ["oracle", "oracle america"], "domains": ["oracle.com"], "homepage": ""},
+  {"slug": "salesforce", "name": "Salesforce", "type": "AI company", "aliases": ["salesforce", "salesforce com"], "domains": ["salesforce.com"], "homepage": ""}
 ]

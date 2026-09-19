@@ -11,7 +11,8 @@ import math
 import pathlib
 import re
 
-from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, name_key, now, sha)
+from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, kv_get, kv_set,
+                     name_key, now, sha)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
@@ -230,7 +231,10 @@ def export(db, out_dir, base=""):
     control_rows = []
     for c in controls:
         ms = [m for m in measures if c["slug"] in m["controls"]]
+        fear_mix = collections.Counter(fs for m in ms for fs in m["fears"])
         control_rows.append({"slug": c["slug"], "name": c["name"], "bills": str(len(ms)),
+                             "definition": c["definition"],
+                             "fears": [fear_by[fs]["name"] for fs, _ in fear_mix.most_common(3)],
                              "passed": str(sum(m["status"] == "passed" for m in ms)),
                              "pending": str(sum(m["status"] == "pending" for m in ms)), "n": len(ms)})
     control_rows.sort(key=lambda r: -r["n"])
@@ -280,7 +284,8 @@ def export(db, out_dir, base=""):
             delta = prev["fear_rank"][f["slug"]] - i
             move = {"dir": "up", "text": str(delta)} if delta > 0 else {"dir": "down", "text": str(-delta)} if delta < 0 else None
         fear_rows.append({"rank": i, "name": f["name"], "slug": f["slug"], "score": str(st["index"]),
-                          "bar": max(3, st["index"]), "move": move, "line": fear_line(st)})
+                          "bar": max(3, st["index"]), "move": move, "line": fear_line(st),
+                          "new_week": st["new_week"], "segments": segments(st)})
     grid = build_grid(order, fear_stats)
 
     # ---------------- feed
@@ -294,6 +299,10 @@ def export(db, out_dir, base=""):
     cum = [sum(1 for m in measures if (m["introduced_date"] or "9999") <= c.isoformat()) for c in cutoffs]
     lo, hi = min(cum), max(cum)
     trend = [50 if hi == lo else round(15 + 70 * (v - lo) / (hi - lo)) for v in cum]
+    series = [[c.isoformat(), v] for c, v in zip(cutoffs, cum)]
+    runs_key = f"runs:{today.isoformat()}"
+    runs_today = (kv_get(db, runs_key, 0) or 0) + 1
+    kv_set(db, runs_key, runs_today)
     new_week = sum(1 for m in measures if (m["introduced_date"] or "") >= week_ago)
     jurisdictions = {m["jurisdiction"] for m in measures}
     n_states = len([j for j in jurisdictions if j not in ("us", "us-exec")])
@@ -303,13 +312,73 @@ def export(db, out_dir, base=""):
              "second": f"{len(controlled):,}",
              "second_text": "of them would put AI, the people building it or the people using it under new government control",
              "where": (f"{n_states} states" if n_states else "") + (" and Congress" if has_fed and n_states else "Congress" if has_fed else ""),
-             "change": f"▲ {new_week:,} new this week" if new_week else None, "trend": trend,
+             "change": f"▲ {new_week:,} new this week" if new_week else None, "trend": trend, "series": series,
+             "series_label": "Bills, rules and orders about AI, running total over the last 90 days",
              "total_measures": len(measures), "controlled": len(controlled)}
     polls = [p for p in config("polls") if p.get("figure") and p.get("url")]
+    site = config("site")
+
+    # ---------------- the wall of numbers
+    filings_naming = sum(1 for r in lob_recent if r["fears"])
+    advocacy_total = sum(o["lobbying"] for o in ranked)
+    election_total = sum(o["election"] for o in com_ranked)
+    wiki_total = sum(int(v) for v in wiki30.values())
+    news_total = sum(int(v) for v in news30.values())
+    all_filings = db.execute("SELECT COUNT(*) c FROM lobbying").fetchone()["c"]
+    all_measures = db.execute("SELECT COUNT(*) c FROM measures").fetchone()["c"]
+    numbers = [n for n in [
+        [f"{len(measures):,}", "bills, rules and orders about AI since January 2025"] if measures else None,
+        [f"{len(controlled):,}", "would put AI under new government control"] if controlled else None,
+        [index["where"], "with AI measures on the books or in motion"] if index["where"] else None,
+        [f"{filings_naming:,}", "federal lobbying filings naming one of the nine fears, past year"] if filings_naming else None,
+        [money(advocacy_total), "spent lobbying on the fears by advocacy groups, past year"] if advocacy_total else None,
+        [money(election_total), "raised and spent by AI super PACs this cycle"] if election_total else None,
+        [compact(wiki_total), "Wikipedia views on the nine fears in the last 30 days"] if wiki_total else None,
+        [f"{news_total:,}", "news articles on them in the last 30 days"] if news_total else None,
+        [f"{all_measures:,}", "bills collected and read so far"] if all_measures else None,
+        [f"{all_filings:,}", "lobbying filings in the database"] if all_filings else None,
+    ] if n]
+
+    # ---------------- in their own words: the quotes the labels rest on
+    quotes = own_words(db, measures, fear_by, suppressed)
+
+    # ---------------- already law
+    passed = sorted((m for m in controlled if m["status"] == "passed"),
+                    key=lambda m: (-len(m["controls"]), m["latest_action_date"] or ""))
+    already_law = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 140),
+                    "url": m["url"], "date": law_date(m, today),
+                    "controls": [control_by[c]["chip"] for c in m["controls"]],
+                    "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in passed[:8]]
+    law_total = len(passed)
+
+    # ---------------- where it is happening: every jurisdiction, ranked
+    by_state = collections.defaultdict(list)
+    for m in measures:
+        by_state[m["jurisdiction"]].append(m)
+    state_rows = []
+    for j, ms in by_state.items():
+        fear_mix = collections.Counter(fs for m in ms for fs in m["fears"])
+        state_rows.append({"code": j, "name": ms[0]["jurisdiction_name"], "n": len(ms),
+                           "bills": f"{len(ms):,}", "controlled": str(sum(1 for m in ms if m["controls"])),
+                           "passed": str(sum(1 for m in ms if m["status"] == "passed")),
+                           "top_fear": fear_by[fear_mix.most_common(1)[0][0]]["name"] if fear_mix else None})
+    state_rows.sort(key=lambda r: -r["n"])
+    for i, r in enumerate(state_rows, 1):
+        r["rank"] = i
 
     # ---------------- fear pages and org pages
     fear_pages = [fear_page(f, i + 1, len(fears), fear_stats, lob, feed, today, db, control_by, page_slugs, ents)
                   for i, f in enumerate(order)]
+    for fp in fear_pages:
+        st = fear_stats[fp["slug"]]
+        fp["quotes"] = own_words(db, st["measures"], fear_by, suppressed, per_fear=fp["slug"], limit=6)
+        fp["receipt"] = " ".join(x for x in [
+            f"{fp['name']}: {fp['score']} of 100 on the AI Fear Index.",
+            f"{len(st['measures']):,} bills since January 2025" + (f" in {len(st['states'])} states." if st["states"] else ".") if st["measures"] else "",
+            f"{st['controls']:,} new government controls written into them." if st["controls"] else "",
+            f"{st['filings']:,} federal lobbying filings name it." if st["filings"] else "",
+            f"{st['wiki30']:,} Wikipedia views this month." if st["wiki30"] else "",
+            f"{SITE_URL}/fear/{fp['slug']}/"] if x)
     org_pages = [org_page(o, len(ranked), lob, receipts, committees, feed, measures, control_by) for o in top]
     org_pages += [org_page(o, len(industry_ranked), lob, receipts, committees, feed, measures, control_by)
                   for o in industry_top]
@@ -334,7 +403,11 @@ def export(db, out_dir, base=""):
         "links": {"data": f"{REPO_URL}/tree/data", "code": REPO_URL,
                   "report": f"{REPO_URL}/issues/new?template=error.yml"},
         "analytics": {"goatcounter": "dukewilder"},
-        "exhibit": exhibit, "index": index, "grid": grid, "polls": polls,
+        "exhibit": exhibit, "index": index, "grid": grid, "polls": polls, "numbers": numbers, "site": site,
+        "quotes": quotes[:6], "already_law": already_law, "law_total": law_total,
+        "states": state_rows, "states_total": len(state_rows), "runs_today": runs_today,
+        "feed_today": sum(1 for i in feed if (i.get("time_iso") or "") >= (today - dt.timedelta(days=1)).isoformat()),
+        "tracked": {"measures": all_measures, "filings": all_filings, "orgs": len(ents.items)},
         "fears_tracked": [f["name"] if f["name"].startswith(("AI", "China")) else f["name"][0].lower() + f["name"][1:]
                           for f in fears],
         "fears": fear_rows, "feed_types": FEED_TYPES, "feed": feed[:80], "funders": funders,
@@ -388,15 +461,21 @@ def index_scores(fears, stats):
     out = {}
     for f in fears:
         st = stats[f["slug"]]
-        total, weight = 0.0, 0.0
+        parts, weight = {}, 0.0
         for key, w in INDEX_WEIGHTS.items():
             if key == "wiki30" and not st["has_wiki"]:
                 continue
             if not tops[key]:
                 continue
-            total += w * math.log1p(channel_value(st, key)) / math.log1p(tops[key])
+            parts[key] = w * math.log1p(channel_value(st, key)) / math.log1p(tops[key])
             weight += w
-        out[f["slug"]] = round(100 * total / weight) if weight else 0
+        score = round(100 * sum(parts.values()) / weight) if weight else 0
+        # how much of the score each channel supplies, so the bar can show it
+        contrib = {"bills": parts.get("bills", 0), "filings": parts.get("filings", 0),
+                   "attention": parts.get("news30", 0) + parts.get("wiki30", 0)}
+        scale = (score / (sum(contrib.values()) or 1)) if weight else 0
+        st["parts"] = {k: round(v * scale, 1) for k, v in contrib.items()}
+        out[f["slug"]] = score
     return out
 
 
@@ -429,6 +508,12 @@ def build_grid(order, stats):
     return {"channels": [label for _, label in GRID_CHANNELS], "rows": rows}
 
 
+def segments(st):
+    p = st.get("parts") or {}
+    return [{"cls": "k1", "pct": p.get("bills", 0)}, {"cls": "k2", "pct": p.get("filings", 0)},
+            {"cls": "k3", "pct": p.get("attention", 0)}]
+
+
 def fear_line(st):
     """One line of counts under a fear's name: the biggest three things true about it."""
     parts = []
@@ -443,6 +528,45 @@ def fear_line(st):
     if st["news30"] and len(parts) < 3:
         parts.append(f"{st['news30']:,} news articles this month")
     return " · ".join(parts[:3])
+
+
+def law_date(m, today):
+    """'Passed' with its date, or 'Effective' when the date on file is still ahead of us."""
+    d = (m["latest_action_date"] or m["introduced_date"] or "")[:10]
+    if not d:
+        return "Passed"
+    return f"Effective {d}" if d > today.isoformat() else f"Passed · {d}"
+
+
+def own_words(db, measures, fear_by, suppressed=(), per_fear=None, limit=40):
+    """The exact words, from the bills themselves, that each fear label rests on."""
+    ev = {}
+    for t in db.execute("SELECT target, value, evidence FROM tags WHERE kind='fear' AND target NOT LIKE 'post:%'"):
+        ev.setdefault(t["target"], []).append((t["value"], t["evidence"]))
+    out = []
+    for m in measures:
+        if m["url"] in suppressed:
+            continue
+        for slug, quote in ev.get(m["id"], []):
+            if slug not in fear_by or (per_fear and slug != per_fear):
+                continue
+            words = len((quote or "").split())
+            if words < 5:
+                continue
+            out.append({"fear": fear_by[slug]["name"], "slug": slug, "quote": quote.strip().strip('"'),
+                        "bill": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "url": m["url"],
+                        "status": STATUS_LABEL.get(m["status"], "Pending"), "words": words,
+                        "when": m["introduced_date"] or ""})
+    # newest first, then spread across fears so one loud topic does not take every slot
+    out.sort(key=lambda q: (q["when"], q["words"]), reverse=True)
+    spread, seen = [], collections.Counter()
+    for q in out:
+        if seen[q["slug"]] < (3 if per_fear is None else limit):
+            spread.append(q)
+            seen[q["slug"]] += 1
+        if len(spread) >= limit:
+            break
+    return spread
 
 
 def build_feed(db, ents, measures, lob, receipts, today):
@@ -577,10 +701,14 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
             wiki_q[idx[k]] += r["value"]
     top_w = max(wiki_q.values() or [0])
     concern = [[q, round(100 * v / top_w)] for q, v in sorted(wiki_q.items())] if top_w else []
-    lanes = ["Lobbying money", "Bills citing it", "Wikipedia views"]
+    lanes = ["Lobbying filings naming it", "Bills citing it", "Wikipedia views"]
+    quarters = [f"Q{q} {y}" for y, q in axis]
     timeline = {"aria": f"Lobbying money, bills, and public attention for {f['name']} by quarter",
                 "years": [str(axis[0][0]), str(axis[4][0]), str(axis[8][0])], "funding": funding,
-                "messages": dots, "concern": concern, "lanes": lanes,
+                "messages": dots, "concern": concern, "lanes": lanes, "quarters": quarters,
+                "funding_raw": {str(q): money(v) for q, v in money_q.items() if v > 0},
+                "bills_raw": {str(q): int(v) for q, v in bills_q.items() if v},
+                "wiki_raw": {str(q): f"{int(v):,}" for q, v in wiki_q.items()},
                 "first_label": compact(wiki_q[min(wiki_q)]) if wiki_q else "",
                 "last_label": compact(wiki_q[max(wiki_q)]) if wiki_q else "", "events": []}
     window = recent_quarters(4)
@@ -646,7 +774,11 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
         evidence.append([money(st["advocacy"]), "spent lobbying on it by advocacy groups, past year"])
     latest = [i for i in feed if f["slug"] in (i.get("fears") or [])][:6]
     return {"slug": f["slug"], "name": f["name"], "rank": str(rank), "of": str(of), "score": str(st["index"]),
-            "score_text": "on the Fear Index, out of 100",
+            "score_text": "on the Fear Index",
+            "parts": [{"name": "Bills", "cls": "k1", "pct": (st.get("parts") or {}).get("bills", 0), "value": f"{len(st['measures']):,}"},
+                      {"name": "Lobbying filings", "cls": "k2", "pct": (st.get("parts") or {}).get("filings", 0), "value": f"{st['filings']:,}"},
+                      {"name": "Attention", "cls": "k3", "pct": (st.get("parts") or {}).get("attention", 0),
+                       "value": (compact(st["wiki30"] + st["news30"]) if (st["wiki30"] or st["news30"]) else "0")}],
             "line": fear_line(st), "buying": buying_rows, "industry": industry_rows,
             "change": f"▲ {st['new_week']} new bills this week" if st["new_week"] else None, "dir": "up",
             "evidence": evidence, "timeline": timeline,

@@ -35,20 +35,33 @@ def qx(quarter):
     return round(24 + quarter * 27.45, 1)
 
 
-def sparkline_svg(values, label):
-    w, h = 350, 70
-    n = len(values)
-    points = []
-    for i, v in enumerate(values):
-        x = 4 + i * (w - 10) / (n - 1)
-        y = h - 8 - (max(0, min(100, v)) / 100) * (h - 16)
-        points.append((round(x, 1), round(y, 1)))
-    poly = " ".join(f"{x},{y}" for x, y in points)
-    ex, ey = points[-1]
-    return (f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{esc(label)}">'
-            f'<line class="sp-base" x1="0" y1="{h - 3}" x2="{w}" y2="{h - 3}"/>'
-            f'<polyline class="sp-line" points="{poly}"/>'
-            f'<circle class="sp-dot" cx="{ex}" cy="{ey}" r="4.5"/></svg>')
+def sparkline_svg(series, label):
+    """Running total over 13 weekly points, with the numbers on it and a value on hover."""
+    w, h = 350, 96
+    vals = [v for _, v in series]
+    lo, hi = min(vals), max(vals)
+    n = len(series)
+    pts = []
+    for i, (day, v) in enumerate(series):
+        x = 8 + i * (w - 16) / (n - 1)
+        y = h - 22 - (0.5 if hi == lo else (v - lo) / (hi - lo)) * (h - 46)
+        pts.append((round(x, 1), round(y, 1), day, v))
+    poly = " ".join(f"{x},{y}" for x, y, _, _ in pts)
+    out = [f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{esc(label)}">',
+           f'<line class="sp-base" x1="0" y1="{h - 20}" x2="{w}" y2="{h - 20}"/>',
+           f'<polyline class="sp-line" points="{poly}"/>']
+    for i, (x, y, day, v) in enumerate(pts):
+        nice = dt.date.fromisoformat(day).strftime("%b %-d")
+        out.append(f'<circle class="sp-pt" cx="{x}" cy="{y}" r="7" data-tip="{esc(nice)}: {v:,}"><title>{esc(nice)}: {v:,}</title></circle>')
+    fx, fy, fday, fv = pts[0]
+    lx, ly, lday, lv = pts[-1]
+    out.append(f'<text class="sp-val" x="{fx}" y="{fy - 9}" text-anchor="start">{fv:,}</text>')
+    out.append(f'<text class="sp-val sp-val-end" x="{lx}" y="{ly - 9}" text-anchor="end">{lv:,}</text>')
+    out.append(f'<circle class="sp-dot" cx="{lx}" cy="{ly}" r="4.5"/>')
+    out.append(f'<text class="sp-axis" x="{fx}" y="{h - 5}" text-anchor="start">{esc(dt.date.fromisoformat(fday).strftime("%b %-d"))}</text>')
+    out.append(f'<text class="sp-axis" x="{lx}" y="{h - 5}" text-anchor="end">today</text>')
+    out.append("</svg>")
+    return "".join(out)
 
 
 def timeline_svg(t):
@@ -74,16 +87,24 @@ def timeline_svg(t):
             p.append(f'<line class="tl-ev" x1="{x}" y1="{y1}" x2="{x}" y2="{y2}"/>')
         p.append(f'<circle class="tl-evc" cx="{x}" cy="12" r="8"/>')
         p.append(f'<text class="tl-evn" x="{x}" y="16" text-anchor="middle">{esc(ev["n"])}</text>')
+    quarters = t.get("quarters") or [f"Q{i}" for i in range(12)]
+    raw_f, raw_b, raw_w = t.get("funding_raw") or {}, t.get("bills_raw") or {}, t.get("wiki_raw") or {}
     for quarter, height in t.get("funding") or []:
-        p.append(f'<rect class="tl-money" x="{qx(quarter) - 8}" y="{86 - height}" width="16" height="{height}"/>')
+        tip = f"{quarters[quarter]}: {raw_f.get(str(quarter), '')} on lobbying filings naming this fear"
+        p.append(f'<rect class="tl-money" x="{qx(quarter) - 8}" y="{86 - height}" width="16" height="{height}" '
+                 f'data-tip="{esc(tip)}"><title>{esc(tip)}</title></rect>')
     for quarter, count in enumerate(t.get("messages") or []):
+        tip = f"{quarters[quarter]}: {raw_b.get(str(quarter), 0)} bills"
         for k in range(count):
-            p.append(f'<circle class="tl-msg" cx="{qx(quarter)}" cy="{155 - 11 * k}" r="5"/>')
-    pts = [(qx(q), round(240 - v * 0.5, 1)) for q, v in t.get("concern") or []]
+            p.append(f'<circle class="tl-msg" cx="{qx(quarter)}" cy="{155 - 11 * k}" r="5" data-tip="{esc(tip)}">'
+                     f'<title>{esc(tip)}</title></circle>')
+    pts = [(qx(q), round(240 - v * 0.5, 1), q) for q, v in t.get("concern") or []]
     if len(pts) > 1:
-        p.append('<polyline class="tl-line" points="' + " ".join(f"{x},{y}" for x, y in pts) + '"/>')
-    for x, y in pts:
-        p.append(f'<circle class="tl-pt" cx="{x}" cy="{y}" r="3.5"/>')
+        p.append('<polyline class="tl-line" points="' + " ".join(f"{x},{y}" for x, y, _ in pts) + '"/>')
+    for x, y, q in pts:
+        tip = f"{quarters[q]}: {raw_w.get(str(q), '')} Wikipedia views"
+        p.append(f'<circle class="tl-pt" cx="{x}" cy="{y}" r="6" data-tip="{esc(tip)}"><title>{esc(tip)}</title></circle>')
+    pts = [(x, y) for x, y, _ in pts]
     if pts:
         (fx, fy), (lx, ly) = pts[0], pts[-1]
         if t.get("first_label"):
@@ -155,7 +176,7 @@ def card_specs(d):
         f"{ix.get('second', '')} {ix.get('second_text', '')}".strip()
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
-            f"{f['score']} of 100 on the Fear Index" + (f" · {f['line']}" if f.get("line") else "")
+            f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
     top = d["fears"][:3]
     yield "rankings", str(len(d["fears"])), "fears, ranked on the Fear Index", \
         " · ".join(f"{f['name']} {f['score']}" for f in top)
@@ -212,8 +233,9 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     preview = preview_path is not None
     env = Environment(loader=FileSystemLoader(HERE / "templates"),
                       autoescape=select_autoescape(["html"]), trim_blocks=True, lstrip_blocks=True)
+    series = d["index"].get("series") or [[dt.date.today().isoformat(), v] for v in d["index"]["trend"]]
     env.globals.update(url=make_url(preview, base.rstrip("/")), d=d, chevron=CHEVRON,
-                       spark_svg=sparkline_svg(d["index"]["trend"], "Index over the last 90 days"))
+                       spark_svg=sparkline_svg(series, d["index"].get("series_label") or "Last 90 days"))
     pages = []
     for spec in page_specs(d):
         spec["html"] = env.get_template("pages/" + spec["template"]).render(**spec["ctx"])

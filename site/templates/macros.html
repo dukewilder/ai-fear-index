@@ -3,7 +3,7 @@
 {%- endmacro %}
 
 {% macro fear_row(f) -%}
-<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span>{% if f.line %}<span class="meta">{{ f.line }}</span>{% endif %}</span><span class="row-end"><span class="val accent">{{ f.score }}</span>{{ move(f.move) }}</span></a></li>
+<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="bar3">{% for seg in f.segments %}<i class="{{ seg.cls }}" style="width:{{ seg.pct }}%"></i>{% endfor %}</span>{% if f.line %}<span class="meta">{{ f.line }}{% if f.new_week %} · <b class="hot">▲ {{ f.new_week }} new this week</b>{% endif %}</span>{% endif %}</span><span class="row-end"><span class="val accent">{{ f.score }}</span>{{ move(f.move) }}</span></a></li>
 {%- endmacro %}
 
 {% macro grid(g) -%}
@@ -26,7 +26,19 @@
 {%- endmacro %}
 
 {% macro control_row(c) -%}
-<li class="row"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.pending }} pending</span></span><span class="val accent">{{ c.bills }}</span></li>
+<li class="row" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.pending }} pending{% if c.fears %} · justified by {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
+{%- endmacro %}
+
+{% macro state_row(s) -%}
+<li class="row"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} with new controls, {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.bills }}<span class="unit">bills</span></span></li>
+{%- endmacro %}
+
+{% macro quote_card(q) -%}
+<li class="quote-card"><span class="chip">{{ q.fear }}</span><blockquote>“{{ q.quote }}”</blockquote><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="time">{{ q.status }}</span></li>
+{%- endmacro %}
+
+{% macro law_row(a) -%}
+<li class="item"><span class="item-top"><a class="row-name" href="{{ a.url }}" rel="noopener" target="_blank">{{ a.name }}</a><span class="time">{{ a.date }}</span></span><span class="meta" style="margin-top:0">{{ a.title }}</span><span class="chips">{% for c in a.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% for f in a.fears %}<span class="chip">{{ f }}</span>{% endfor %}</span></li>
 {%- endmacro %}
 
 {% macro feed_item(i) -%}

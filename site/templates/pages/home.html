@@ -1,4 +1,4 @@
-{% from "macros.html" import fear_row, org_row, benefit_row, control_row, feed_item, grid %}
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row, feed_item, grid, state_row, quote_card, law_row %}
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
 <p class="chyron">{{ d.exhibit.chyron }}</p>
@@ -27,32 +27,54 @@
 <p class="hero-num sm">{{ d.index.second }}</p>
 <p class="hero-text">{{ d.index.second_text }}</p>
 {% if d.index.change %}<p class="move">{{ d.index.change }}</p>{% endif %}
-<figure class="spark">{{ spark_svg|safe }}<figcaption><span>90 days ago</span><span>Today</span></figcaption></figure>
+<figure class="spark">{{ spark_svg|safe }}<figcaption>{{ d.index.series_label }}</figcaption></figure>
 </div></section>
 
+{% if d.numbers %}
 <section class="block band"><div class="wrap">
+<h2 class="h">By the numbers</h2>
+<ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+<section class="block"><div class="wrap">
 <h2 class="h">The Fear Index</h2>
-<p class="sub">Nine fears, scored 0 to 100 on public attention, legislation and lobbying. Updated hourly.</p>
+<p class="sub">Scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
 <ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
 </div></section>
 
 {% if d.grid %}
-<section class="block"><div class="wrap">
+<section class="block band"><div class="wrap">
 <h2 class="h">The same fears, everywhere</h2>
-<p class="sub">Every fear, every channel, counted. The same nine fears run through the news, the statehouses, Congress and the lobbying filings.</p>
+<p class="sub">Every fear, every channel, counted.</p>
 {{ grid(d.grid) }}
-<p class="caption">Bills, states and Congress count measures citing the fear since January 2025. Lobbying filings are federal filings naming it in the past year. Statements are organization posts citing it. News and Wikipedia are the last 30 days.</p>
+</div></section>
+{% endif %}
+
+{% if d.quotes %}
+<section class="block"><div class="wrap">
+<h2 class="h">In their own words</h2>
+<p class="sub">The exact language in the bills.</p>
+<ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 
 <section class="block band"><div class="wrap">
 <h2 class="h">What the fear is buying</h2>
-<p class="sub">The government controls written into the bills that cite these fears, by how many bills carry each.</p>
+<p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
 <ol class="rank">{% for c in d.controls %}{{ control_row(c) }}{% endfor %}</ol>
 </div></section>
 
-{% if d.funders %}
+{% if d.already_law %}
 <section class="block"><div class="wrap">
+<h2 class="h">Already law</h2>
+<p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
+<ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if d.funders %}
+<section class="block band"><div class="wrap">
 <h2 class="h">Who's funding it</h2>
 <p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
 <ol class="rank">{% for o in d.funders[:6] %}{{ org_row(o) }}{% endfor %}</ol>
@@ -61,7 +83,7 @@
 {% endif %}
 
 {% if d.beneficiaries %}
-<section class="block band"><div class="wrap">
+<section class="block"><div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries[:5] %}{{ benefit_row(b) }}{% endfor %}</ol>
@@ -69,10 +91,19 @@
 </div></section>
 {% endif %}
 
+{% if d.states %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Where it's happening</h2>
+<p class="sub">Legislatures ranked by AI measures.</p>
+<ol class="rank">{% for s in d.states[:6] %}{{ state_row(s) }}{% endfor %}</ol>
+{% if d.states_total > 6 %}<a class="more" href="{{ url('rankings', anchor='states') }}">See all {{ d.states_total }}</a>{% endif %}
+</div></section>
+{% endif %}
+
 {% if d.industry %}
 <section class="block"><div class="wrap">
 <h2 class="h">Industry at the table</h2>
-<p class="sub">Companies and trade groups whose federal lobbying filings name these fears, past year, by number of filings.</p>
+<p class="sub">Companies and trade groups with lobbying filings naming these fears, past year.</p>
 <ol class="rank">{% for o in d.industry[:5] %}{{ org_row(o) }}{% endfor %}</ol>
 {% if d.totals.industry > 5 %}<a class="more" href="{{ url('rankings', anchor='industry') }}">See all {{ d.industry_total }}</a>{% endif %}
 </div></section>
@@ -87,10 +118,18 @@
 </div></section>
 {% endif %}
 
+{% if d.site.donate_url %}
+<section class="block band"><div class="wrap">
+<h2 class="h">Keep it running</h2>
+<p class="sub">{{ d.site.donate_text }}</p>
+<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
+</div></section>
+{% endif %}
+
 {% if d.feed %}
 <section class="block"><div class="wrap">
 <h2 class="h h-live"><span class="dot" aria-hidden="true"></span>Just in</h2>
-<p class="sub">New bills, rules, filings and statements, newest first.</p>
+<p class="sub">{% if d.feed_today %}{{ d.feed_today }} new in the last 24 hours. {% endif %}Bills, rules, filings and statements, newest first.</p>
 <ul class="list">{% for i in d.feed[:6] %}{{ feed_item(i) }}{% endfor %}</ul>
 <a class="more" href="{{ url('feed') }}">See the full feed</a>
 </div></section>

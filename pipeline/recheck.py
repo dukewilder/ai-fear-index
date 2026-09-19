@@ -98,7 +98,7 @@ def main():
         if url not in data["urls"]:
             data["urls"].append(url)
             path.write_text(json.dumps(data, indent=2) + "\n")
-            subprocess.run(["git", "-c", "user.name=ai-fear-index", "-c",
+            subprocess.run(["git", "-c", "user.name=ai-fear-report", "-c",
                             "user.email=41898282+github-actions[bot]@users.noreply.github.com",
                             "commit", "-am", f"Pull item reported in #{os.environ['ISSUE_NUMBER']}"], check=True)
             subprocess.run(["git", "push"], check=True)

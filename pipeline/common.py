@@ -19,7 +19,7 @@ import requests
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 SINCE = "2025-01-01"  # current legislative sessions
-REPO_URL = "https://github.com/dukewilder/ai-fear-index"
+REPO_URL = "https://github.com/dukewilder/ai-fear-report"
 SITE_URL = "https://aifearreport.com"
 
 

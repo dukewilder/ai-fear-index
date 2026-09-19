@@ -24,7 +24,7 @@ data_saved=0
 save() {  # push a folder as a fresh orphan branch; the old history is left to GitHub's gc
   local folder="$1" branch="$2" label="$3"
   ( cd "$folder" && rm -rf .git && git init -q && git checkout -q --orphan "$branch" && git add -A \
-    && git -c user.name="ai-fear-index" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+    && git -c user.name="ai-fear-report" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
            commit -qm "$label $(date -u +%Y-%m-%dT%H:%MZ)" \
     && git push -qf "$REMOTE" "$branch" ) || echo "::warning::could not save $branch"
   rm -rf "$folder/.git"

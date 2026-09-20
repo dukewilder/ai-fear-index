@@ -307,7 +307,7 @@ def check_post_needs_entries():
     already refused. So: rows for the day, or nothing goes out.
     """
     from pipeline import post
-    from pipeline.common import connect as _connect
+    from pipeline.common import connect as _connect, kv_get as _kv_get
     import tempfile as _tempfile
     room = pathlib.Path(_tempfile.mkdtemp())
     db = _connect(room / "post.db")
@@ -337,7 +337,38 @@ def check_post_needs_entries():
             raise AssertionError("the guard held an edition the database does have")
     finally:
         post.credentials = kept
-    print("the poster refuses a stale edition: ok")
+    # And when X refuses the post, the reason is written down where it can be read later
+    room2 = pathlib.Path(_tempfile.mkdtemp())
+    db2 = _connect(room2 / "post.db")
+    briefs2 = room2 / "brief"
+    briefs2.mkdir()
+    (briefs2 / f"{day}.json").write_text(json.dumps(
+        {"edition": day, "headline": "h", "text": "x" * 444, "alt": "", "lines": []}))
+    db2.execute("INSERT INTO brief(target, edition, sentence, evidence, office, controls, "
+                "written_at) VALUES(?,?,?,?,?,?,?)",
+                ("t1", day, "s", "", "", "", iso(dt.datetime.now())))
+    db2.commit()
+
+    def refuse_post(*a, **k):
+        raise RuntimeError("X refused the post: 403 Your account is not allowed to post this")
+
+    kept_creds, kept_pub = post.credentials, post.publish
+    post.credentials, post.publish = (lambda: {"key": "k", "secret": "s", "token": "t",
+                                               "token_secret": "ts"}), refuse_post
+    try:
+        try:
+            post.run(db2, str(briefs2), day)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("a refusal from X was swallowed instead of failing the run")
+    finally:
+        post.credentials, post.publish = kept_creds, kept_pub
+    noted = _kv_get(db2, f"post:refused:{day}")
+    assert noted, "X refused the post and nothing was written down"
+    assert noted["characters"] == 444, f"the length was not recorded: {noted}"
+    assert "403" in noted["why"], f"the reason was not recorded: {noted}"
+    print("the poster refuses a stale edition, and records a refusal: ok")
 
 
 def check_failed_source_retries():

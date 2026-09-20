@@ -22,7 +22,7 @@ import urllib.parse
 import requests
 
 from .brief import edition_date
-from .common import connect, env, kv_get, kv_set, log, now
+from .common import annotate, connect, env, kv_get, kv_set, log, now
 
 POST_URL = "https://api.x.com/2/tweets"
 MEDIA_V2 = "https://api.x.com/2/media/upload"
@@ -143,11 +143,24 @@ def run(db, brief_dir, date, dry_run=False, force=False, flag=""):
         log(f"[post] {date} has a file on disk but no entries in the database; nothing goes out")
         return None
     creds = credentials()
-    media_id = upload(creds, image) if image.exists() else None
-    if not media_id:
-        log("[post] going out without the plate")
-    post_id = publish(creds, text, media_id)
+    try:
+        media_id = upload(creds, image) if image.exists() else None
+        if not media_id:
+            log("[post] going out without the plate")
+        post_id = publish(creds, text, media_id)
+    except Exception as exc:
+        # The post is the only thing this site sends anywhere and it goes out unattended. A
+        # refusal printed into a workflow log is a refusal nobody sees, and the run that printed
+        # it is deleted in ninety days. The reason rides the database instead, with the length,
+        # because the length is what X refuses a post for when the account cannot send long ones.
+        kv_set(db, f"post:refused:{date}", {"at": now().isoformat(), "characters": len(text),
+                                            "why": f"{type(exc).__name__}: {exc}"[:400]})
+        db.commit()
+        annotate("error", "the brief was not posted",
+                 f"{len(text)} characters. {type(exc).__name__}: {exc}")
+        raise
     kv_set(db, f"posted:{date}", {"id": post_id, "at": now().isoformat()})
+    db.execute("DELETE FROM kv WHERE key=?", (f"post:refused:{date}",))
     db.commit()
     if flag:
         # The caller saves the database only when something actually went out, rather than

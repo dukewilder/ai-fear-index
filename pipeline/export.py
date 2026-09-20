@@ -405,11 +405,14 @@ def export(db, out_dir, base=""):
     news_total = sum(int(v) for v in news30.values())
     all_filings = db.execute("SELECT COUNT(*) c FROM lobbying").fetchone()["c"]
     all_measures = db.execute("SELECT COUNT(*) c FROM measures").fetchone()["c"]
-    # the money leads, largest first: it is the number that says most in one glance
-    # What the committees hold is money raised. Neither has made an independent expenditure yet,
-    # and the line says spent only once one of them has.
-    election_words = ("raised by AI super PACs this cycle" if not election_spent else
-                      f"raised by AI super PACs this cycle, {money(election_spent)} of it spent")
+    # The money leads, largest first: it is the number that says most in one glance. What the
+    # committees hold is money raised, and the line says spent only once one of them has spent.
+    # Two of them are super PACs and the rest are ordinary and hybrid PACs, so the line says
+    # committees: a number that is right to the dollar is still wrong if its label is.
+    election_words = ("raised by political committees working on AI policy this cycle"
+                      if not election_spent else
+                      "raised by political committees working on AI policy this cycle, "
+                      f"{money(election_spent)} of it spent")
     spent = sorted(((election_total, election_words),
                     (advocacy_total,
                      "reported by advocacy groups on lobbying filings that name a fear, past year")),
@@ -488,6 +491,7 @@ def export(db, out_dir, base=""):
 
     data = {
         "built_at": iso(), "sources_count": str(ok_count), "period": "past year", "site_url": SITE_URL,
+        "election_spent": money(election_spent) if election_spent else "",
         "funders_total": f"{len(ranked):,}", "beneficiaries_total": f"{len(agency_count):,}",
         "election_total": f"{len(com_ranked):,}", "election": election,
         "donors": donors[:80], "donors_total": len(donors),

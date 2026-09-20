@@ -259,7 +259,7 @@ OFFICIAL = re.compile(
     r"(?:\s+(?:of|for|on|and|the)\s+[A-Z][\w.'-]*|\s+[A-Z][\w.'-]*){0,5}")
 
 
-def without_names(text, office=""):
+def without_names(text, office="", loose=False):
     """The sentence minus the proper names of the bodies in it.
 
     The banned list is there to stop the sponsor's vocabulary getting in: protections, safeguards,
@@ -271,7 +271,15 @@ def without_names(text, office=""):
     out = text
     if office:
         out = re.sub(re.escape(office), " ", out, flags=re.I)
-    return OFFICIAL.sub(" ", out)
+    out = OFFICIAL.sub(" ", out)
+    if loose and office:
+        # A headline has nine words and drops "Department of", so the full name never survives it
+        # and neither does the pattern that looks for one. Every word of the office's own name
+        # comes out instead. Only for the headline: a sentence has room to write the name in full,
+        # and stripping single words there would let the sponsor's own use of one through.
+        for word in set(re.findall(r"[A-Za-z]{4,}", office)):
+            out = re.sub(rf"\b{re.escape(word)}\b", " ", out, flags=re.I)
+    return out
 
 
 def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction=""):
@@ -487,6 +495,8 @@ HEAD_SYSTEM = ("You shorten one sentence about a U.S. bill into a headline for a
 HEAD_RULES = (
     "Shorten the sentence to at most nine words.\n"
     "Keep the place it names and the thing it does. Drop everything else.\n"
+    "If the sentence says something is put under a body, or that a body decides or licenses or "
+    "refuses, that is the thing it does and it stays. A list of what a company has to do is not.\n"
     "It is a plain statement with a verb. Someone who reads only this line and nothing else "
     "should come away knowing one fact.\n"
     "Do not be clever, do not ask a question, and do not open with who, what, how, why, or when.\n"
@@ -533,10 +543,11 @@ def headline(key, lines, names, totals):
         line = ""
     # the headline is the largest text on the plate, so it answers for its tense like the rest
     source = set(NUMERAL.findall(text))
-    conditional = bool(CONDITIONAL.search(text))
-    if line and len(line.split()) <= 10 and not BANNED.search(line) \
+    place = lead.get("jurisdiction") or ""
+    conditional = bool(CONDITIONAL.search(tense_of(text, place)))
+    if line and len(line.split()) <= 10 and not BANNED.search(without_names(line, lead.get("office") or "", loose=True)) \
             and set(NUMERAL.findall(line)) <= source \
-            and bool(CONDITIONAL.search(line)) == conditional:
+            and bool(CONDITIONAL.search(tense_of(line, place))) == conditional:
         return line
     return plain(lead, names)
 

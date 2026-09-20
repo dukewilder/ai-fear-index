@@ -152,20 +152,32 @@ def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com"):
     mark = 44
     wordmark(d, 60, (band - mark * 1.14) / 2, mark, fill=VERMILLION, back=PAPER)
 
-    f_big = bfont("barlow-condensed-800", 210 if len(big) <= 5 else 160)
     f_lab = bfont("barlow-condensed-700", 52)
     f_sub = bfont("barlow-500", 30)
     f_foot = bfont("ibm-plex-mono-500", 24)
+
+    def block_for(big_size):
+        """The rows and their height at this size for the figure."""
+        f = bfont("barlow-condensed-800", big_size)
+        rows = [(big, f, INK, 30)]
+        rows += [(l, f_lab, INK, 16) for l in wrap_text(d, label, f_lab, CARD_W - 120)[:2]]
+        if sub:
+            rows[-1] = (*rows[-1][:3], 30)
+            rows += [(l, f_sub, "#5D584D", 14) for l in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]]
+        hs = [bink(d, t, ff)[3] for t, ff, _, _ in rows]
+        return rows, hs, sum(hs) + sum(g for *_, g in rows[:-1])
+
+    # The figure gives way to the words, rather than the block running through the rules at both
+    # ends. A two-line name with a two-line line of counts under it overflowed by sixty pixels and
+    # clipped the top of the figure against the rule under the mark.
+    room = CARD_H - 74 - band - 48
+    for big_size in (210 if len(big) <= 5 else 160, 180, 150, 120, 96):
+        rows, heights, block = block_for(big_size)
+        if block <= room:
+            break
     # Measured first, then set as one block in the middle of the space it has. Stacking downwards
     # from a fixed start left the figure high and a third of the card empty under it.
-    rows = [(big, f_big, INK, 30)]
-    rows += [(l, f_lab, INK, 16) for l in wrap_text(d, label, f_lab, CARD_W - 120)[:2]]
-    if sub:
-        rows[-1] = (*rows[-1][:3], 30)
-        rows += [(l, f_sub, "#5D584D", 14) for l in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]]
-    heights = [bink(d, t, f)[3] for t, f, _, _ in rows]
-    block = sum(heights) + sum(g for *_, g in rows[:-1])
-    y = band + (CARD_H - 74 - band - block) / 2
+    y = band + max(24, (CARD_H - 74 - band - block) / 2)
     for (text, f, colour, gap), h in zip(rows, heights):
         lx, ty, _, _ = bink(d, text, f)
         d.text((60 - lx, y - ty), text, font=f, fill=colour)

@@ -669,10 +669,54 @@ def check_mark_geometry():
     print("the mark is a square, centred on its letters and on the word: ok")
 
 
+def check_share_card_fits():
+    """The card gives way rather than running through its own rules.
+
+    A two-line name with a two-line line of counts under it overflowed by sixty pixels: the top
+    of the figure was cut off against the rule under the mark and the counts ran through the rule
+    above the address. The figure steps down until the block fits.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "site"))
+    from PIL import Image
+    import tempfile as _tempfile
+    import build as sitebuild
+    room = pathlib.Path(_tempfile.mkdtemp())
+    cases = {
+        "short": ("3", "AI therapists", "3 of 100"),
+        "long": ("1,420", "Bills, rules and orders about artificial intelligence since January 2025",
+                 "1,420 measures tracked across 51 jurisdictions, 513 of them carrying at least "
+                 "one new government control held by 180 named offices"),
+    }
+    for name, (big, label, sub) in cases.items():
+        path = room / f"{name}.png"
+        sitebuild.share_card(path, big, label, sub)
+        im = Image.open(path).convert("RGB")
+        px = im.load()
+        w, h = im.size
+        assert (w, h) == (1200, 630), f"{name}: card is {w} by {h}"
+
+        def inked(y):
+            return sum(1 for x in range(8, w - 8)
+                       if sum(abs(px[x, y][i] - c) for i, c in enumerate((241, 237, 227))) > 90)
+
+        # The content lives between the rule under the mark and the rule above the address. Find
+        # where it actually reaches, rather than probing rows and hoping the overflow lands on one.
+        band, foot = 118, 556
+        rows = [y for y in range(band + 3, foot - 2) if inked(y) > 3]
+        assert rows, f"{name}: the card came out empty between its rules"
+        assert rows[0] >= band + 18, \
+            f"{name}: content reaches y={rows[0]}, hard against the rule under the mark at {band}"
+        assert rows[-1] <= foot - 10, \
+            f"{name}: content reaches y={rows[-1]}, hard against the rule above the address at {foot}"
+    print("a share card gives way rather than running through its rules: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()
+    check_share_card_fits()
     check_headline_tidy()
     check_fears_config()
     check_no_euphemism()

@@ -186,8 +186,72 @@ EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit i
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
 
+# Where the tense of the sentence lives. The sentence has to start with the jurisdiction, so the
+# main verb is in the first clause; everything from the first comma or relative pronoun onward
+# describes the office. That matters because "may" is the natural word for a power the office
+# holds, and "decides who may operate" is a present-tense fact, not a measure that might pass.
+MAIN_CLAUSE = re.compile(r",|\b(which|who|whom|whose|that|whether)\b", re.I)
 
-def usable(text, quote, body_norm, passed=False):
+
+def tense_of(text):
+    """The first clause, which is the one carrying the tense."""
+    return MAIN_CLAUSE.split(text or "", 1)[0]
+
+
+OFFICIAL = re.compile(
+    r"\b(?:[A-Z][\w.'-]*\s+){0,4}"
+    r"(?:Department|Office|Bureau|Division|Board|Commission|Agency|Authority|Committee|Council)"
+    r"(?:\s+(?:of|for|on|and|the)\s+[A-Z][\w.'-]*|\s+[A-Z][\w.'-]*){0,5}")
+
+
+def without_names(text, office=""):
+    """The sentence minus the proper names of the bodies in it.
+
+    The banned list is there to stop the sponsor's vocabulary getting in: protections, safeguards,
+    oversight. A body actually called the Department of Environmental Protection carries one of
+    those words in its own name, and naming the body is the point of the sentence. Eight of the
+    195 offices on file are in this position, the New York Office for AI Model Developer Oversight
+    among them, and without this the edition throws away its best line and falls back to a count.
+    """
+    out = text
+    if office:
+        out = re.sub(re.escape(office), " ", out, flags=re.I)
+    return OFFICIAL.sub(" ", out)
+
+
+def why_not(text, quote, body_norm, passed=False, office=""):
+    """The reason a sentence was rejected, or an empty string if it holds up.
+
+    Named rather than returned as a bare False, so a run that throws every candidate away says
+    which gate did it instead of leaving the next person to guess.
+    """
+    if not text:
+        return "no sentence"
+    if not quote:
+        return "no quote"
+    head = tense_of(text)
+    if passed and CONDITIONAL.search(head):
+        return f"passed but says {CONDITIONAL.search(head).group(0)!r}"
+    if not passed and not CONDITIONAL.search(head):
+        return "pending but written as though it binds"
+    if len(text) > MAX_SENTENCE:
+        return f"{len(text)} characters, over {MAX_SENTENCE}"
+    if not text.endswith("."):
+        return "no full stop"
+    banned = BANNED.search(without_names(text, office))
+    if banned:
+        return f"sponsor's word {banned.group(0)!r}"
+    if EXPLAINING.search(text):
+        return "explains rather than reports"
+    loose = re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I)
+    if loose:
+        return f"says {loose.group(0)!r} instead of naming who is bound"
+    if not agreed({"controls": {"line": quote}}, body_norm, "controls"):
+        return "the quote it leaned on is not in the measure"
+    return ""
+
+
+def usable(text, quote, body_norm, passed=False, office=""):
     """The sentence has to rest on words in the text, not borrow the sponsor's vocabulary, and not
     describe a bill sitting in committee as though it already bound anyone.
 
@@ -195,19 +259,7 @@ def usable(text, quote, body_norm, passed=False):
     than trusted to the instruction above: a measure that has not passed says would, and one that
     has does not.
     """
-    if not text or not quote:
-        return False
-    if passed and CONDITIONAL.search(text):
-        return False
-    if not passed and not CONDITIONAL.search(text):
-        return False
-    if len(text) > MAX_SENTENCE or not text.endswith("."):
-        return False
-    if BANNED.search(text) or EXPLAINING.search(text):
-        return False
-    if re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I):
-        return False
-    return bool(agreed({"controls": {"line": quote}}, body_norm, "controls"))
+    return not why_not(text, quote, body_norm, passed, office)
 
 
 def write_lines(key, rows, want=WANT):
@@ -225,8 +277,9 @@ def write_lines(key, rows, want=WANT):
         except Exception as exc:  # one bad row must not cost the edition
             log(f"[brief] {row['id']}: {exc}")
             continue
-        if not usable(text, quote, body, (row["status"] or "") == "passed"):
-            log(f"[brief] {row['id']}: sentence did not hold up, skipped")
+        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "")
+        if reason:
+            log(f"[brief] {row['jurisdiction_name']} {row['identifier']}: skipped, {reason}")
             continue
         places.add(row["jurisdiction_name"])
         lines.append({"target": row["id"], "sentence": text, "quote": quote,

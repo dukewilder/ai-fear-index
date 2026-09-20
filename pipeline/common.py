@@ -313,24 +313,29 @@ def redo_briefs(db):
     return n
 
 
-def redo_today(db):
-    """Write today's edition again, because the one on file was written in the old shape.
+# Bump this when an edition already written needs writing again, and say why in the comment.
+# 2: the first rewrite fell through to a pattern because every candidate sentence was rejected,
+#    and the rejections did not say which gate did it. They do now.
+REDO_EDITION = ("2026-09-20", 2)
 
-    The edition for 20 September was composed before the arrows and the three-beat entries came
-    out, and it is the one that went to X. Clearing the row and the record of the post has the
-    next pass write it properly and the nine o'clock pass send it. The entries it used go back in
-    the pool, as they do for any edition that is thrown away.
+
+def redo_today(db):
+    """Write one edition again, because the one on file was written by code since changed.
+
+    The entries an edition used are marked spent so they never come round twice. Clearing the rows
+    puts them back in the pool, and clearing the record of the post lets the day go out once more.
     """
-    day = "2026-09-20"
-    if kv_get(db, f"redo:{day}"):
+    day, version = REDO_EDITION
+    key = f"redo:{day}:{version}" if version > 1 else f"redo:{day}"
+    if kv_get(db, key):
         return 0
     n = db.execute("SELECT COUNT(*) FROM brief WHERE edition=?", (day,)).fetchone()[0]
     db.execute("DELETE FROM brief WHERE edition=?", (day,))
     db.execute("DELETE FROM kv WHERE key=?", (f"posted:{day}",))
-    kv_set(db, f"redo:{day}", True)
+    kv_set(db, key, True)
     db.commit()
     if n:
-        log(f"[repair] the {day} edition is cleared, to be written again in the shape that replaced it")
+        log(f"[repair] the {day} edition is cleared again, to be written by the code that replaced it")
     return n
 
 

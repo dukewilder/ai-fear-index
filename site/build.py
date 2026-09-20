@@ -14,6 +14,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import hashlib
 import pathlib
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -291,13 +292,26 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
         import sys
         sys.path.insert(0, str(HERE))
         from brand import share as share_image
+        def stamped(name):
+            """The card's address, with a stamp of what is in it.
+
+            The file keeps its name so nothing that already points at it breaks, but the address
+            in the page changes the moment the picture does. Without that, every cache between a
+            reader and the file is free to keep serving the card that was there first, and the
+            first one is the one that gets kept longest.
+            """
+            if not site_url:
+                return None
+            body = (pathlib.Path(out_dir) / "og" / name).read_bytes()
+            return f"{site_url}/og/{name}?v={hashlib.sha1(body).hexdigest()[:8]}"
+
         share_image(pathlib.Path(out_dir) / "og" / "share.png",
                     (d.get("site") or {}).get("tagline") or "Every fear about AI, and what it buys.")
-        cards["share"] = f"{site_url}/og/share.png" if site_url else None
+        cards["share"] = stamped("share.png")
         for card, big, label, sub in card_specs(d):
             share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
                        kicker=name.upper(), foot=site_url.replace("https://", "") or name)
-            cards[card] = f"{site_url}/og/{card}.png" if site_url else None
+            cards[card] = stamped(f"{card}.png")
         # A real icon file, because a bookmark, a home screen and a link preview all want one
         # and none of them read the inline SVG in the head.
         from brand import avatar as mark_image

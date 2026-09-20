@@ -669,6 +669,59 @@ def check_mark_geometry():
     print("the mark is a square, centred on its letters and on the word: ok")
 
 
+def check_icon_centred():
+    """The tab icon is one mark, centred, at every size a browser asks for.
+
+    What shipped was the avatar shrunk: a red field, a cream square inset in it, then the letters
+    inside that. Three shapes inside sixteen pixels, and the letters landed 1.5px right and 1px
+    low of the cream square, which is 7.5% of a 20px box and plainly wrong in a tab. The head
+    also carried an inline SVG drawn in Arial Narrow, so the icon changed face depending on which
+    file the browser picked. One renderer, one face, measured off the pixels at each size.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "site"))
+    from PIL import Image
+    import brand
+
+    VERM, PAPER = (179, 50, 31), (241, 237, 227)
+    with tempfile.TemporaryDirectory() as tmp:
+        for px in (16, 32, 180, 512):
+            path = pathlib.Path(tmp) / f"{px}.png"
+            brand.icon(path, size=px)
+            im = Image.open(path).convert("RGB")
+            assert im.size == (px, px), f"{px}: {im.size}"
+            a = im.load()
+            xs, ys = [], []
+            for y in range(px):
+                for x in range(px):
+                    if sum(abs(a[x, y][i] - VERM[i]) for i in range(3)) > 80:
+                        xs.append(x); ys.append(y)
+            assert xs, f"{px}: nothing drawn on the field"
+            x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            # The field is solid to the edge: no square inset inside another square.
+            assert sum(abs(a[0, 0][i] - VERM[i]) for i in range(3)) < 30, \
+                f"{px}: the corner is not the field colour, so something is inset"
+            assert x0 > 0 and y0 > 0 and x1 < px - 1 and y1 < px - 1, \
+                f"{px}: the letters touch the edge"
+            off_h = (x0 - (px - 1 - x1)) / 2
+            off_v = (y0 - (px - 1 - y1)) / 2
+            # Never more than a pixel out, and what slack there is goes up and to the left,
+            # which is the same optical offset the badge uses. The upper bound is 0, not 0.5:
+            # at 16 pixels the only choices are half a pixel high or half a pixel low, and a
+            # bound of 0.5 accepts both, which is how the first version of this check passed
+            # over the very arithmetic it was written for.
+            assert -0.02 * px - 1 <= off_h <= 0, f"{px}: letters {off_h:+.1f}px off across"
+            assert -0.02 * px - 1 <= off_v <= 0, f"{px}: letters {off_v:+.1f}px off down"
+            cap = (y1 - y0 + 1) / px
+            assert 0.5 <= cap <= 0.68, f"{px}: the letters are {cap:.0%} of the frame"
+    # and the head must not offer a second icon drawn by some other means
+    head = (ROOT / "site" / "templates" / "base.html").read_text()
+    assert "data:image/svg+xml" not in head, "the head still carries an inline SVG icon"
+    for px in (16, 32):
+        assert f"/icon/{px}.png" in head, f"the head does not offer the {px}px icon"
+    print("the tab icon is one centred mark at every size: ok")
+
+
 def check_share_card_fits():
     """The card gives way rather than running through its own rules.
 
@@ -716,6 +769,7 @@ def main():
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()
+    check_icon_centred()
     check_share_card_fits()
     check_headline_tidy()
     check_fears_config()

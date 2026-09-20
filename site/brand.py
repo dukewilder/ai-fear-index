@@ -6,6 +6,7 @@ every run. The card is the same mark at 1600 by 900, which is the size X shows a
     python -m site.brand --out site/static/brand
 """
 import argparse
+import math
 import pathlib
 
 from PIL import Image, ImageDraw, ImageFont
@@ -152,6 +153,56 @@ def badge(d, x, y, size, fg=VERMILLION, bg=PAPER):
     d.text((x0 + (s - iw) / 2 - left + iw * nx, y0 + (s - ih) / 2 - top + ih * ny),
            "AI", font=f, fill=fg)
     return s, s
+
+
+# The tab icon is not the avatar. The avatar is the mark inset in a field, drawn to be cut to a
+# circle at profile size, and using it in a tab stacks three shapes inside sixteen pixels: a red
+# border, a cream square, then the letters. At that size it reads as a smudge with a hole in it.
+# The tab gets the letters on a solid field and nothing else.
+#
+# 0.62 of the frame, not more: the 512 goes in the manifest, where Android may mask it to a
+# circle, and the inscribed circle is 0.707 of the square. At 0.62 the letters clear the cut.
+ICON_IMAGE_HEIGHT = 0.62
+
+
+def icon(path, size=512, bg=VERMILLION, fg=PAPER):
+    """The mark at tab size: AI on a solid field, centred on the ink it actually leaves.
+
+    Centred through compose(), which paints first and measures the result, rather than through
+    the square's own arithmetic. That arithmetic is fine at 800 pixels and wrong at 32: the
+    nudge rounds away to nothing, the halving lands on a half pixel, and the 32 that shipped sat
+    1.5 pixels right of centre, which is 7.5% of its box and plainly visible in a tab.
+    """
+    d = ImageDraw.Draw(Image.new("RGB", (size, size)))
+    want = size * ICON_IMAGE_HEIGHT
+    pt = max(1, int(round(size * 1.35)))
+    for _ in range(6):   # point size is not cap height; converge on the ink instead of guessing
+        _, _, _, ih = ink(d, "AI", font("barlow-condensed-800", pt))
+        if not ih or abs(ih - want) <= 0.5:
+            break
+        pt = max(1, int(round(pt * want / ih)))
+    f = font("barlow-condensed-800", pt)
+    _, _, iw, ih = ink(d, "AI", f)
+
+    def paint(g):
+        left, top, _, _ = ink(g, "AI", f)
+        g.text((-left, -top), "AI", font=f, fill=fg)
+
+    # Where the ink should start, worked out here rather than left to compose's rounding. The
+    # nudge is a fraction of the ink, so at 16 pixels it is worth a sixth of one and rounds away
+    # to nothing; what survives at every size is which way the odd pixel goes when the leftover
+    # room will not halve. ceil(x - 0.5) rounds a tie down, which spends that pixel on the side
+    # the nudge points away from, so a 9-pixel-tall AI in a 16-pixel frame sits 3 above and 4
+    # below rather than the other way round. The shipped 32 had it 1.5 pixels off, 7.5% of its
+    # box, because the same arithmetic that is harmless at 800 pixels is not at 32.
+    nx, ny = BADGE_NUDGE
+    want_x = math.ceil((size - iw) / 2 + iw * nx - 0.5)
+    want_y = math.ceil((size - ih) / 2 + ih * ny - 0.5)
+    im = compose(size, size, bg, paint,
+                 dx=want_x - (size - iw) / 2, dy=want_y - (size - ih) / 2)
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+    im.save(path, "PNG", optimize=True)
+    return path
 
 
 def wordmark(d, x, y, size, fill=PAPER, back=VERMILLION):

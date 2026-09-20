@@ -288,6 +288,7 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     written = []
     site_url = (d.get("site_url") or "").rstrip("/")
     cards = {}
+    icons = {}
     try:
         import sys
         sys.path.insert(0, str(HERE))
@@ -312,11 +313,17 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
                        kicker=name.upper(), foot=site_url.replace("https://", "") or name)
             cards[card] = stamped(f"{card}.png")
-        # A real icon file, because a bookmark, a home screen and a link preview all want one
-        # and none of them read the inline SVG in the head.
-        from brand import avatar as mark_image
-        for px in (32, 180, 512):
-            mark_image(pathlib.Path(out_dir) / "icon" / f"{px}.png", size=px, label=False)
+        # The tab, the bookmark, the home screen and the manifest all want a real file, and
+        # they want the same mark. 16 because that is what a tab is at 1x, and a browser handed
+        # only a 32 downsamples it itself and smears the letters.
+        from brand import icon as mark_image
+        for px in (16, 32, 180, 512):
+            icon_file = pathlib.Path(out_dir) / "icon" / f"{px}.png"
+            mark_image(icon_file, size=px)
+            # Stamped like the cards, and for a sharper reason: a browser holds a favicon harder
+            # than anything else it caches, so a reader who has seen the site once keeps the old
+            # tab icon until something changes the address.
+            icons[px] = f"/icon/{px}.png?v={hashlib.sha1(icon_file.read_bytes()).hexdigest()[:8]}"
     except Exception as exc:  # cards are a nicety; the pages must still build
         print("share cards skipped:", exc)
     for page in pages:
@@ -326,6 +333,7 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
         target.write_text(shell.render(
             pages=[page], preview=False, title=page["title"], nav=page["nav"],
             home=page["kind"] == "home", og_image=cards.get(page.get("card")) or cards.get("share"),
+            icons=icons,
             canonical=f"{site_url}/{route}{'/' if route else ''}" if site_url else None,
             description=page.get("description")))
         written.append(str(target))
@@ -337,7 +345,7 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     gone["html"] = env.get_template("pages/notfound.html").render()
     target = pathlib.Path(out_dir) / gone["out"]
     target.write_text(shell.render(pages=[gone], preview=False, title=gone["title"], nav="",
-                                   home=False, og_image=cards.get("share"),
+                                   home=False, og_image=cards.get("share"), icons=icons,
                                    canonical=None, description=gone["description"]))
     written.append(str(target))
     if site_url:

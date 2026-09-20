@@ -10,6 +10,7 @@ import json
 import math
 import pathlib
 import re
+import urllib.parse
 
 from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, kv_get, kv_set,
                      name_key, now, sha, spell, tidy_headline)
@@ -469,9 +470,14 @@ def export(db, out_dir, base=""):
 
     # ---------------- sources and status
     status = {r["source"]: dict(r) for r in db.execute("SELECT * FROM status")}
+    feeds = ", ".join(sorted(src["name"] for src in config("news")))
     source_rows = []
     for key, what, where in SOURCES:
         s = status.get(key)
+        # The headline row names the publishers rather than describing them, because the rule for
+        # the front page headline says it comes from one of these and a reader should see which.
+        if where == "NEWS_FEEDS":
+            where = f"Read in full: {feeds}"
         source_rows.append([what, where, (s or {}).get("last_ok"), bool(s and s["ok"])])
     ok_count = sum(1 for s in status.values() if s["ok"])
 
@@ -498,6 +504,7 @@ def export(db, out_dir, base=""):
                           for f in fears],
         "fears": fear_rows, "feed_types": feed_types, "feed": feed[:80], "funders": funders,
         "beneficiaries": beneficiaries, "controls": control_rows, "sources": source_rows,
+        "publishers": feeds,
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
         "fear_word": spell(len(fears)),
     }
@@ -522,7 +529,7 @@ SOURCES = [
     ("lda", "Lobbying", "LDA.gov federal lobbying disclosures"),
     ("fec", "Donations and election spending", "Federal Election Commission"),
     ("gdelt", "News volume", "GDELT, daily article counts per fear"),
-    ("news", "Headlines", "Publisher feeds, matched to a fear by its own words"),
+    ("news", "Headlines", "NEWS_FEEDS"),   # filled in from config/news.json, so the page cannot drift from it
     ("wikipedia", "Public attention", "Wikipedia pageviews"),
     ("rss", "Organization statements", "Newsroom feeds of tracked organizations"),
     ("tag", "Fear and control labels", "Claude, two passes that must agree on a quoted line"),
@@ -786,6 +793,29 @@ def bill_headline(title):
     return head.strip().strip('"').strip("\u201c\u201d").strip()
 
 
+FEED_HOST = re.compile(r"^(?:www|rss|feeds?|api)\.")
+
+
+def read_directly():
+    """The publishers this report subscribes to, by the domain their articles carry.
+
+    GDELT sweeps the whole web, which is what makes it a fair measure of volume and a poor one of
+    who to quote: for a fear with a dozen stories in a week, the most typical headline can land on
+    any site that ran the wire copy, and it moved between three of them in an hour. These sixteen
+    are the ones config/news.json already reads in full, and the method page already says the
+    headlines come from them.
+    """
+    hosts = set()
+    for src in config("news"):
+        host = urllib.parse.urlparse(src["url"]).netloc.lower()
+        hosts.add(FEED_HOST.sub("", host))
+    return hosts
+
+
+def our_domain(domain, hosts):
+    return FEED_HOST.sub("", (domain or "").lower()) in hosts
+
+
 def build_exhibit(db, order, fear_stats, today, suppressed=()):
     """The top of the front page: the fear leading the index, its loudest headline, the receipt.
 
@@ -801,6 +831,8 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         "SELECT * FROM articles WHERE fear=? AND seen > ? AND length(title) > 25 ORDER BY seen DESC LIMIT 120",
         (best["slug"], d7)) if a["url"] not in suppressed]
     line, line_url, source, source_label = None, None, None, "Headline from"
+    ours = [a for a in arts if our_domain(a["domain"], read_directly())]
+    arts = ours or arts   # nothing from them on this fear this week: take what there is, and say so
     if arts:
         for a in arts:
             a["title"] = tidy_headline(a["title"], a["domain"])

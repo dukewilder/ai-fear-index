@@ -84,10 +84,8 @@
 <p class="colophon">Compiled from public records. Every number links to its source. Updated around the clock, unattended.</p>
 </div>
 <nav class="foot-links" aria-label="Elsewhere">
-{% if nav != 'method' %}<a href="{{ url('method') }}">How the numbers work</a>{% endif %}
 {% if d.site and d.site.donate_url %}<a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% elif d.site and d.site.donate_btc %}<a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% endif %}
 {% if d.site and d.site.x_handle %}<a href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="x-footer">Daily brief on X</a>{% endif %}
-<a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a>
 <a href="{{ d.links.code }}">Source code</a>
 <a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a>
 </nav>

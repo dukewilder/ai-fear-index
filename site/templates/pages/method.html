@@ -25,6 +25,9 @@
 {% for what, where, when, ok in d.sources %}<li class="row norank"><span><span class="row-name">{{ what }}</span><span class="meta">{{ where }}{% if when %}. Updated <span data-rel="{{ when }}">recently</span>{% else %}. Not yet connected{% endif %}</span></span></li>
 {% endfor %}
 </ul>
+<p class="sub" style="margin-top:18px">Every measure, every lobbying filing and every receipt on
+this site is in four CSV files, rebuilt with the rest of it.
+<a href="{{ d.links.data }}" data-goatcounter-click="download-data">Download the data</a>.</p>
 </div></section>
 
 <section class="block" id="schedule"><div class="wrap">

@@ -18,6 +18,13 @@ API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
 LIMITS = {"hourly": 400, "daily": 1200, "backfill": 3500, "auto": 400}
 DAY_CAP = 4000  # items per day: a first backfill clears in a day, then steady state is a trickle
+# Whatever the item limit allows, the run gets a quarter of an hour. The queue is picked up again
+# on the next pass, and a job that runs out of time saves nothing at all.
+SECONDS = 900
+
+
+class TimedOut(Exception):
+    """Not an error to count: the queue simply outlasted the time this run had."""
 _lock = threading.Lock()
 
 
@@ -188,8 +195,11 @@ def run(db, state, mode):
     dropped = prune_tags(db)
     work, backlog = targets(db, limit)
     done, errors = 0, 0
+    started = time.time()
 
     def one(item):
+        if time.time() - started > SECONDS:
+            raise TimedOut()
         kind, target, doc, h, body = item
         is_measure = kind == "measure"
         proposal = propose(key, fears, controls, doc, is_measure)
@@ -205,6 +215,8 @@ def run(db, state, mode):
             try:
                 target, h, ai, verdict, doc_norm = fut.result()
                 err = None
+            except TimedOut:
+                continue
             except Exception as exc:
                 ai, verdict, doc_norm, err = None, {}, "", str(exc)[:300]
                 errors += 1
@@ -233,8 +245,10 @@ def run(db, state, mode):
     kv_set(db, "tag_spend", {"date": day, "n": used_today + done})
     db.commit()
     state["added"] = done
+    ran_out = time.time() - started > SECONDS
     state["message"] = (f"{done} tagged, {errors} errors, {max(0, backlog - done)} still queued, "
                         f"{used_today + done} of {DAY_CAP} today"
-                        + (f"; dropped {dropped} unsupported labels" if dropped else ""))
+                        + (f"; dropped {dropped} unsupported labels" if dropped else "")
+                        + (f"; stopped at {SECONDS}s" if ran_out else ""))
     if work and errors == len(work):
         raise RuntimeError(f"every tagging call failed; last error shown in logs")

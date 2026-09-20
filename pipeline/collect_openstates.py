@@ -4,6 +4,8 @@ Open States searches bill text, so it also finds federal bills whose titles neve
 and Congress.gov's title match therefore misses. Those land on the same row Congress.gov
 would write, and Congress.gov's own record wins wherever both have one.
 """
+import time
+
 from .common import (SINCE, Http, HttpError, congress_id, env, iso, kv_get, kv_set, log, retry_at, retry_clear,
                      status_from_action, upsert)
 
@@ -13,6 +15,10 @@ QUERIES = ["artificial intelligence", "deepfake", "chatbot", "data center", "aut
 MAX_REQUESTS = 240  # per run
 DAY_BUDGET = 240    # the free tier allows 250 a day, so stop short of it and resume tomorrow
 RETRY_HOURS = 3     # a refusal is their rolling day, not ours, so wait it out and go again
+# Their rate limit puts six and a half seconds between calls, so a full budget is twenty-six
+# minutes of one run's hour spent waiting. The cursors already make this resumable, so it stops
+# at the clock and picks up where it left off rather than running the job out of time.
+SECONDS = 780
 
 
 def jurisdiction_code(j):
@@ -26,6 +32,7 @@ def jurisdiction_code(j):
 
 
 def run(db, state, mode):
+    started = time.time()
     key = env("OPENSTATES_API_KEY")
     http = Http(min_interval=6.5, headers={"X-API-KEY": key})
     cursors = kv_get(db, "openstates_cursors", {})
@@ -36,7 +43,7 @@ def run(db, state, mode):
     if not budget:
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
         return
-    requests_used, added, seen, capped = 0, 0, 0, False
+    requests_used, added, seen, capped, ran_out = 0, 0, 0, False, False
     # Start where the last run stopped. Without this the first query spends the whole
     # allowance every day and the last ones are never searched at all.
     offset = kv_get(db, "openstates_offset", 0) % len(QUERIES)
@@ -48,6 +55,9 @@ def run(db, state, mode):
         since = None if cursor.get("backfilling", True) else cursor.get("since")
         run_started = iso()[:10]
         while requests_used < budget:
+            if time.time() - started > SECONDS:
+                ran_out = True
+                break
             params = {"q": query, "sort": "updated_desc", "per_page": 20, "page": page,
                       "include": ["abstracts", "sponsorships"], "created_since": SINCE}
             if since:
@@ -75,6 +85,10 @@ def run(db, state, mode):
                 break
             page += 1
             cursors[query] = {"backfilling": True, "page": page} if cursor.get("backfilling", True) else cursor
+        if ran_out:
+            stopped_at = (offset + i) % len(QUERIES)
+            log(f"[openstates] out of time at '{query}'; the cursor keeps the place")
+            break
         if capped:
             stopped_at = (offset + i) % len(QUERIES)
             log("[openstates] allowance refused the run; backing off")
@@ -97,7 +111,8 @@ def run(db, state, mode):
     state["added"] = added
     backlog = [q for q, c in cursors.items() if c.get("backfilling")] + [q for q in QUERIES if q not in cursors]
     state["message"] = (f"{seen} bills read in {requests_used} requests"
-                        + ("; daily allowance reached" if capped else "")) + (
+                        + ("; daily allowance reached" if capped else "")
+                        + (f"; stopped at {SECONDS}s" if ran_out else "")) + (
         f"; still backfilling: {', '.join(backlog)}" if backlog else "")
 
 

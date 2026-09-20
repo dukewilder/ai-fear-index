@@ -54,7 +54,7 @@ jobs:
   # One pass, published. Short, so the site is current a few minutes into every run.
   pass:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,7 +93,9 @@ jobs:
   # The rest of the run: a pass every twenty minutes until the job's time is up.
   keep:
     needs: pass
-    if: ${{ (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
+    # always(), because keep restores the data branch for itself. A first pass that runs out of
+    # time or errors should cost one pass, not the five hours of passes behind it.
+    if: ${{ always() && (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:

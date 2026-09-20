@@ -808,18 +808,25 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
 
         def score(i):
             return sum(len(words[i] & w) / (len(words[i] | w) or 1) for j, w in enumerate(words) if j != i)
-        # The headline that shares most words with the rest is the one the coverage is converging
-        # on. That alone can land on a site that ran the story once, so it is weighed against how
-        # many of the nine fears the outlet writes about at all: a newsroom that covers the whole
-        # subject speaks for the coverage better than one that touched it a single time.
+        # Two questions, answered separately, because blending them into one number made the
+        # answer turn on a margin of two percent and flip between outlets as articles arrived.
+        #
+        # First, which story is the coverage converging on: the headline sharing most words with
+        # the rest of them. Second, who to quote it from. Outlets word the same event differently,
+        # so the ones running it cluster at a similarity well clear of the ones running something
+        # else, and inside that cluster every candidate says the same thing. The choice there goes
+        # to the outlet that writes about most of the fears at all, because a newsroom covering
+        # the whole subject speaks for the coverage better than one that touched it once.
         breadth = collections.Counter()
         for r in db.execute("SELECT DISTINCT domain, fear FROM articles"):
             breadth[r["domain"]] += 1
-        span = len(order) or 1
+        seed = max(range(len(arts)), key=score)
 
-        def standing(i):
-            return score(i) * (1 + breadth[arts[i]["domain"]] / span)
-        pick = arts[max(range(len(arts)), key=standing)]
+        def alike(i):
+            return len(words[seed] & words[i]) / (len(words[seed] | words[i]) or 1)
+        closest = max((alike(i) for i in range(len(arts)) if i != seed), default=0)
+        story = [i for i in range(len(arts)) if i == seed or alike(i) >= closest * 0.6]
+        pick = arts[max(story, key=lambda i: (breadth[arts[i]["domain"]], score(i)))]
         line, line_url, source = cut(pick["title"], 110), pick["url"], pick["domain"]
     if not line:
         # no fresh headline on file for the leader: its newest bill speaks for it.

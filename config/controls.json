@@ -35,7 +35,7 @@
     "slug": "mandatory-reporting",
     "name": "Mandatory reporting to government",
     "chip": "Mandatory reporting",
-    "definition": "Requires developers or deployers to report, disclose, register, or submit safety plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand.",
+    "definition": "Requires developers or deployers to report, disclose, register, or submit plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand.",
     "pattern": "require a company to file reports with a government body, or hand them over on demand",
     "head": "reports companies must file with the state"
   },
@@ -51,7 +51,7 @@
     "slug": "new-agency-powers",
     "name": "New powers for government agencies",
     "chip": "New agency powers",
-    "definition": "Creates a new government office or agency for AI, or gives an existing agency or attorney general new rulemaking, oversight, or enforcement authority over AI.",
+    "definition": "Creates a new government office or agency for AI, or gives an existing agency or attorney general new authority over AI to make rules, inspect, license, or enforce.",
     "pattern": "create an AI office, or hand an existing one new authority over AI",
     "head": "new authority over AI for a government body"
   },

@@ -103,6 +103,43 @@ def spell(n):
     return WORDS[n] if 0 <= n < len(WORDS) else f"{n:,}"
 
 
+# The vocabulary a sponsor reaches for so a power sounds like a courtesy. It is the tactic this
+# report exists to undo, so the site never writes one in its own voice: not in the daily sentence,
+# not on the card, not in the copy. A measure's own title and any line quoted from one keep every
+# word the legislature chose, because the gap between how it is sold and what it does is the whole
+# exhibit, and editing a quote would destroy it.
+#
+# Grouped by the move each one makes.
+EUPHEMISM = re.compile(r"""\b(?:
+    # the power is for your own good
+      safeguard\w* | guardrail\w* | protections? | protects? | protecting | protective
+    | safety | safety[\s-]net | duty[\s-]of[\s-]care | harm[\s-]reduction
+    | wellbeing | well[\s-]being | welfare | bad[\s-]actors?
+    | mitigat\w* | minimi[sz]\w*[\s-]harm | uphold\w*
+    | (?:child(?:ren)?(?:'s)?|kids?(?:'s)?|minors?(?:'s)?|user|public|online|consumer)[\s-]+safety
+    | safety[\s-]+(?:audit|review|standard|requirement|measure|protocol|practice|assessment)s?
+    | trust[\s-]and[\s-]safety | trustworthy | trusted
+    # the power is a virtue
+    | responsib\w* | accountab\w* | ethical | ethics | integrity | assurances?
+    # the power is just an update
+    | modern\w* | future[\s-]proof | streamlin\w* | twenty[\s-]first[\s-]century
+    # the power is merely a process
+    | framework\w* | oversight | governance | guidance | guidelines
+    | best[\s-]practices? | common[\s-]?sense | sensible | balanced?
+    | thoughtful\w* | pragmatic | prudent | proportionate | appropriate
+    | measured[\s-]+(?:approach|response|steps?) | reasonable[\s-]steps?
+    | necessary[\s-]and[\s-]appropriate
+    # the power is a conversation
+    | stakeholder\w* | public[\s-]private | voluntary[\s-]commitments?
+    # the power is a gift
+    | empower\w* | ensur\w* | innovation | responsible[\s-]innovation | promote[\s-]innovation
+    # the power is fair. Not bare "fair", which is ordinary English for accurate.
+    | fairness | equitabl\w*
+    # the power is sunlight
+    | transparency | visibility[\s-]into
+)\b""", re.I | re.X)
+
+
 def annotate(level, title, message):
     """Surface a message in the GitHub Actions UI (error, warning, notice)."""
     msg = str(message).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")

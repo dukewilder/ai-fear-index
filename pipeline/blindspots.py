@@ -23,7 +23,7 @@ import json
 import pathlib
 import re
 
-from .common import config, connect, iso, kv_get, kv_set
+from .common import EUPHEMISM, config, connect, iso, kv_get, kv_set
 
 MIN_TEXT = 200      # characters of summary; below this the tagger had nothing to read
 MIN_DOCS = 5        # a phrase in fewer measures than this is noise, not a subject
@@ -130,6 +130,35 @@ def condense(counts):
     return kept
 
 
+SOFT = re.compile(r"\b(?:safe\w*|protect\w*|secure|security|responsib\w*|account\w*|trust\w*|"
+                 r"ethic\w*|transparen\w*|modern\w*|framework\w*|govern\w*|guid\w*|standard\w*|"
+                 r"assur\w*|integrity|wellbeing|welfare|harm|risk|oversight|balanc\w*|reasonab\w*|"
+                 r"appropriat\w*|sensib\w*|empower\w*|ensur\w*|innovat\w*|fair\w*|equitab\w*|"
+                 r"consumer|common[\s-]?sense)\b", re.I)
+
+
+def sponsor_words(db):
+    """Words sponsors put in their own bill titles that the euphemism list does not yet refuse.
+
+    A list of euphemisms written from memory is a list of the ones already thought of. The bills
+    arrive every day carrying the real vocabulary, so this reads the titles rather than guessing:
+    every soft word a sponsor chose to name a bill, minus the ones already refused, by how many
+    bills and how many legislatures use it. Adding one is a decision, not an automatic thing.
+    """
+    counts, places = collections.Counter(), collections.defaultdict(set)
+    for r in db.execute("SELECT m.title, m.jurisdiction_name j FROM measures m "
+                        "JOIN tag_runs t ON t.target = m.id WHERE t.ai_related = 1"):
+        title = r["title"] or ""
+        for m in SOFT.finditer(title):
+            word = m.group(0).lower()
+            if EUPHEMISM.search(word):
+                continue   # already refused
+            counts[word] += 1
+            places[word].add(r["j"])
+    return [{"word": w, "titles": n, "places": len(places[w])}
+            for w, n in counts.most_common(30) if n >= 5 and len(places[w]) >= 3]
+
+
 def run(db, state, mode):
     fears = config("fears")
     patterns, named = fear_patterns(fears), fear_names(fears)
@@ -163,6 +192,7 @@ def run(db, state, mode):
                        if n >= MIN_DOCS and len(places[p]) >= MIN_PLACES})
     top = sorted(counts.items(), key=lambda kv: (-len(places[kv[0]]), -kv[1]))[:TOP]
 
+    soft = sponsor_words(db)
     was = kv_get(db, "blindspots:last", {})
     report = {
         "at": iso(), "read": len(rows), "uncovered_measures": uncovered_rows, "floor": MIN_TEXT,
@@ -170,6 +200,7 @@ def run(db, state, mode):
                        "change": (n - was[p]) if p in was else None} for p, n in top],
         "missed": [{"fear": slug, "measures": n, "examples": examples[slug]}
                    for slug, n in sorted(missed.items(), key=lambda kv: -kv[1])],
+        "sponsor_words": soft,
     }
     kv_set(db, "blindspots:last", {p: n for p, n in top})
     kv_set(db, "blindspots:report", report)
@@ -182,7 +213,8 @@ def run(db, state, mode):
         f"{len(top)} subjects the nine do not name"
         + (f"; growing: {', '.join(u['phrase'] + ' +' + str(u['change']) for u in risers)}" if risers else "")
         + (f"; recall gaps: {', '.join(m['fear'] + ' ' + str(m['measures']) for m in report['missed'][:3])}"
-           if report["missed"] else ""))
+           if report["missed"] else "")
+        + (f"; sponsors' words not yet refused: {', '.join(w['word'] for w in soft[:6])}" if soft else ""))
     return report
 
 
@@ -203,6 +235,10 @@ def main():
         print(f"\n  {'a fear its text matches, with no tag on it':<44}{'measures':>9}")
         for m in report["missed"]:
             print(f"  {m['fear']:<44}{m['measures']:>9}   e.g. {', '.join(m['examples'][:3])}")
+    if report["sponsor_words"]:
+        print(f"\n  {'a soft word in bill titles, not yet refused':<44}{'titles':>9}{'places':>8}")
+        for w in report["sponsor_words"]:
+            print(f"  {w['word']:<44}{w['titles']:>9}{w['places']:>8}")
     if args.json:
         pathlib.Path(args.json).write_text(json.dumps(report, indent=1) + "\n")
         print(f"\nwritten to {args.json}")

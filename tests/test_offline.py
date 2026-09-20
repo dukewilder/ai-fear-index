@@ -191,11 +191,72 @@ def check_fears_config():
     print(f"{len(fears)} fears, all well formed: ok")
 
 
+def check_no_euphemism():
+    """Nothing the site says in its own voice may use the vocabulary the report exists to undo.
+
+    Every string here is one somebody wrote by hand: the control taxonomy, the fear names and the
+    lines that follow "It cites the fear that", the brief's opener, the tagline, and the headings
+    and captions in the templates. A measure's own title and anything quoted from one are not in
+    this list and never will be, because the gap between how a power is sold and what it does is
+    the exhibit, and editing a quote would destroy it.
+
+    The same list gates the sentence and the card the model writes each morning, so the check on
+    the copy and the check on the writing are one definition in one place.
+    """
+    import json as _json, re as _re
+    from pipeline.common import EUPHEMISM
+    found = []
+
+    def scan(where, text):
+        for m in EUPHEMISM.finditer(text or ""):
+            found.append((where, m.group(0), (text or "")[:90]))
+
+    for c in _json.loads((ROOT / "config" / "controls.json").read_text()):
+        for k in ("name", "chip", "head", "pattern", "definition"):
+            scan(f"controls/{c['slug']}/{k}", c.get(k))
+    # A fear's definition is the one string here the reader never sees. It goes to the tagger, and
+    # the tagger has to speak the sponsor's language to find the sponsor's bills: a fear about
+    # children and chatbots is written in bills that say "minors' safety". Control definitions are
+    # not exempt, because the site prints those on the row they label.
+    for f in _json.loads((ROOT / "config" / "fears.json").read_text()):
+        for k in ("name", "short", "because"):
+            scan(f"fears/{f['slug']}/{k}", f.get(k))
+    for name in ("brief", "site"):
+        blob = _json.loads((ROOT / "config" / f"{name}.json").read_text())
+        for k, v in (blob.items() if isinstance(blob, dict) else []):
+            if isinstance(v, str):
+                scan(f"{name}/{k}", v)
+    for t in sorted((ROOT / "site" / "templates").rglob("*.html")):
+        text = _re.sub(r"\{[%{].*?[%}]\}", " ", t.read_text(), flags=_re.S)
+        scan(f"template {t.name}", " ".join(_re.sub(r"<[^>]+>", " ", text).split()))
+
+    # and the copy written straight into the code, which is neither config nor template: the tile
+    # captions, the section labels, the words around every figure.
+    import ast as _ast
+    PROSE = _re.compile(r"^[A-Za-z][A-Za-z0-9 ,.:;'\u2019()%$-]{12,}$")
+    SQLISH = _re.compile(r"\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|GROUP BY|ORDER BY|JOIN|VALUES)\b")
+    for src in ("pipeline/export.py", "pipeline/brief.py", "site/build.py", "site/brand.py"):
+        path = ROOT / src
+        for node in _ast.walk(_ast.parse(path.read_text())):
+            if not isinstance(node, _ast.Constant) or not isinstance(node.value, str):
+                continue
+            text = node.value
+            if not PROSE.match(text) or SQLISH.search(text) or "\\" in text:
+                continue
+            scan(f"{path.name}:{node.lineno}", text)
+
+    if found:
+        lines = "\n".join(f"    {w}: {word!r} in {ctx}" for w, word, ctx in found)
+        raise AssertionError(f"the site writes the sponsor's vocabulary in its own voice:\n{lines}")
+    print("no euphemism in anything the site says itself: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
     check_headline_tidy()
     check_fears_config()
+    check_no_euphemism()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

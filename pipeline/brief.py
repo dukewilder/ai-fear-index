@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-from .common import Entities, annotate, config, connect, env, kv_set, log, now
+from .common import EUPHEMISM, Entities, annotate, config, connect, env, kv_set, log, now
 from .export import gave
 from .tag import agreed, call, norm
 
@@ -158,9 +158,12 @@ RULES = (
     "safety audits, safety standards, trust and safety, transparency requirements, consumer "
     "protection. Name the act and who it lands on. An audit of whether a service is safe for "
     "children is an audit of the service, and everyone using it is inside it.\n"
-    "Never use a word the sponsor chose to make the measure sound smaller than it is. Do not write "
-    "safeguards, guardrails, protections, safety net, common sense, modernize, framework, or "
-    "oversight. Name the power.\n"
+    "Never use a word a sponsor chose to make a power sound like a courtesy. Not safeguards, "
+    "guardrails, protections, safety net, duty of care. Not responsible, accountable, ethical. "
+    "Not modernize, streamline, future-proof. Not framework, oversight, governance, guidance, "
+    "guidelines, best practices, common sense, sensible, balanced, appropriate, proportionate. "
+    "Not stakeholders, public-private, voluntary commitments. Not empower, ensure, transparency. "
+    "Name the power and who now holds it.\n"
     "Use the measure's own words for what it does. Do not reach for a near neighbour of one: a "
     "supply a data centre diminishes is a diminished supply, never a diminutive one.\n"
     "Report it. Do not argue it, do not say what it shows or reveals or highlights, and do not "
@@ -190,19 +193,23 @@ def sentence(key, row):
 
 
 BANNED = re.compile(
-    r"\b(safeguard\w*|guardrail\w*|protections?|safety net|common ?sense|modern\w*|framework\w*|"
-    r"oversight|responsib\w*|thoughtful\w*|balanced?|sensible|reasonable steps|bad actors?|"
-    # the measured ones: vocabulary that marks a machine wrote it, and the puffery under it
-    r"robust|comprehensive|sweeping|landscape|pivotal|crucial|vital|significant|"
+    # the machine's own tells, and the puffery under them
+    r"\b(robust|comprehensive|sweeping|landscape|pivotal|crucial|vital|significant|"
     r"underscor\w*|highlight\w*|showcas\w*|delv\w*|intricate|nuanced|holistic|seamless|"
-    r"transformative|groundbreaking|far-reaching|unprecedented)\b"
-    # compounds built to name the reason rather than the act. "Child safety audits" is an audit of
-    # a service everybody uses, and the words in front of it are why, not what.
-    r"|\b(?:child(?:ren)?(?:'s)?|kids?(?:'s)?|minors?(?:'s)?|user|public|online|consumer)[\s-]+safety\b"
-    r"|\bsafety[\s-]+(?:audit|review|standard|requirement|measure|protocol|assessment|practice)s?\b"
-    r"|\btrust and safety\b"
-    r"|\baccountability measures?\b"
-    r"|\btransparency[\s-]+(?:requirement|obligation|measure|standard)s?\b", re.I)
+    r"transformative|groundbreaking|far-reaching|unprecedented)\b", re.I)
+
+
+def sponsors_word(text, office="", loose=False):
+    """The first word in a sentence that a sponsor would have chosen, or an empty string.
+
+    Two lists, one check. EUPHEMISM is the vocabulary that makes a power sound like a courtesy and
+    lives in common.py because the site is held to it everywhere, not only here. BANNED is the
+    separate problem of a sentence that reads as though a machine wrote it.
+    """
+    clean = without_names(text, office, loose)
+    m = EUPHEMISM.search(clean) or BANNED.search(clean)
+    return m.group(0) if m else ""
+
 
 # a sentence that stops reporting and starts explaining what it means
 EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit is not\b", re.I)
@@ -320,9 +327,9 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
         return f"{len(text)} characters, over {MAX_SENTENCE}"
     if not text.endswith("."):
         return "no full stop"
-    banned = BANNED.search(without_names(text, office))
-    if banned:
-        return f"sponsor's word {banned.group(0)!r}"
+    word = sponsors_word(text, office)
+    if word:
+        return f"sponsor's word {word!r}"
     if EXPLAINING.search(text):
         return "explains rather than reports"
     loose = re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I)
@@ -564,7 +571,7 @@ def headline(key, lines, names, totals):
     source = set(NUMERAL.findall(text))
     place = lead.get("jurisdiction") or ""
     conditional = bool(CONDITIONAL.search(tense_of(text, place)))
-    if line and len(line.split()) <= 10 and not BANNED.search(without_names(line, lead.get("office") or "", loose=True)) \
+    if line and len(line.split()) <= 10 and not sponsors_word(line, lead.get("office") or "", loose=True) \
             and set(NUMERAL.findall(line)) <= source \
             and bool(CONDITIONAL.search(tense_of(line, place))) == conditional:
         return line

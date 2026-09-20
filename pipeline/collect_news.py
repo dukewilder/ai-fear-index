@@ -15,6 +15,7 @@ import urllib.parse
 import feedparser
 
 from .common import (Entities, Http, config, iso, iso_from_struct, kv_get, kv_set, sha, strip_html,
+                     tidy_headline,
                      upsert)
 
 BUDGET = 150   # seconds for the whole source; a feed left over is read on the next pass
@@ -60,7 +61,8 @@ def run(db, state, mode):
                 if all(p.search(text) for p in pats):
                     hit = True
                     added += upsert(db, "articles", {
-                        "id": sha(slug, link), "fear": slug, "title": title[:300], "url": link,
+                        "id": sha(slug, link), "fear": slug,
+                        "title": tidy_headline(title, domain)[:300], "url": link,
                         "domain": domain, "seen": seen, "entity": ents.match_domain(domain)})
             matched += hit
         db.commit()

@@ -25,6 +25,9 @@
 {% if d.site and d.site.x_handle %}<meta name="twitter:site" content="@{{ d.site.x_handle }}">
 {% endif %}
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23B3321F%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2245%22%20font-family%3D%22Helvetica%2CArial%2Csans-serif%22%20font-size%3D%2238%22%20font-weight%3D%22700%22%20text-anchor%3D%22middle%22%20fill%3D%22%23F1EDE3%22%3EAI%3C%2Ftext%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ base }}/icon/32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ base }}/icon/180.png">
+<link rel="manifest" href="{{ base }}/site.webmanifest">
 {% if canonical and nav == '' %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org",
@@ -57,7 +60,7 @@
 {% include "style.css" %}
 </style>
 {% if not preview and d.analytics and d.analytics.goatcounter %}
-<script data-goatcounter="https://{{ d.analytics.goatcounter }}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+<script data-goatcounter="https://{{ d.analytics.goatcounter }}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 {% endif %}
 </head>
 <body>

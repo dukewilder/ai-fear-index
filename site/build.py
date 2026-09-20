@@ -252,7 +252,7 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     env = Environment(loader=FileSystemLoader(HERE / "templates"),
                       autoescape=select_autoescape(["html"]), trim_blocks=True, lstrip_blocks=True)
     series = d["index"].get("series") or [[dt.date.today().isoformat(), v] for v in d["index"]["trend"]]
-    env.globals.update(url=make_url(preview, base.rstrip("/")), d=d, chevron=CHEVRON,
+    env.globals.update(url=make_url(preview, base.rstrip("/")), d=d, chevron=CHEVRON, base=base.rstrip("/"),
                        spark_svg=sparkline_svg(series, d["index"].get("series_label") or "Last 90 days"))
     pages = []
     for spec in page_specs(d):
@@ -277,6 +277,11 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
                        kicker=name.upper(), foot=site_url.replace("https://", "") or name)
             cards[card] = f"{site_url}/og/{card}.png" if site_url else None
+        # A real icon file, because a bookmark, a home screen and a link preview all want one
+        # and none of them read the inline SVG in the head.
+        from brand import avatar as mark_image
+        for px in (32, 180, 512):
+            mark_image(pathlib.Path(out_dir) / "icon" / f"{px}.png", size=px, label=False)
     except Exception as exc:  # cards are a nicety; the pages must still build
         print("share cards skipped:", exc)
     for page in pages:
@@ -289,6 +294,17 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             canonical=f"{site_url}/{route}{'/' if route else ''}" if site_url else None,
             description=page.get("description")))
         written.append(str(target))
+    # What GitHub Pages serves for a path that does not exist. It is built last and kept out of
+    # the sitemap, so nothing points a crawler at it.
+    gone = {"kind": "method", "route": "404", "out": "404.html", "template": "notfound.html",
+            "title": f"Page not found, {name}", "ctx": {}, "nav": "", "card": None,
+            "description": "That page is not on the AI Fear Report."}
+    gone["html"] = env.get_template("pages/notfound.html").render()
+    target = pathlib.Path(out_dir) / gone["out"]
+    target.write_text(shell.render(pages=[gone], preview=False, title=gone["title"], nav="",
+                                   home=False, og_image=cards.get("share"),
+                                   canonical=None, description=gone["description"]))
+    written.append(str(target))
     if site_url:
         written += write_index_files(out_dir, site_url, pages, d)
     return written
@@ -316,7 +332,15 @@ def write_index_files(out_dir, site_url, pages, d):
         + "\n".join(urls) + "\n</urlset>\n")
     (out / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\n\nSitemap: {site_url}/sitemap.xml\n")
-    return [str(out / "sitemap.xml"), str(out / "robots.txt")]
+    (out / "site.webmanifest").write_text(json.dumps({
+        "name": site_name(d), "short_name": site_name(d),
+        "description": (d.get("site") or {}).get("tagline") or "",
+        "start_url": "/", "display": "standalone",
+        "background_color": "#F1EDE3", "theme_color": "#B3321F",
+        "icons": [{"src": "/icon/180.png", "sizes": "180x180", "type": "image/png"},
+                  {"src": "/icon/512.png", "sizes": "512x512", "type": "image/png"}],
+    }, indent=1) + "\n")
+    return [str(out / "sitemap.xml"), str(out / "robots.txt"), str(out / "site.webmanifest")]
 
 
 if __name__ == "__main__":

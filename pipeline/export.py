@@ -12,7 +12,7 @@ import pathlib
 import re
 
 from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, kv_get, kv_set,
-                     name_key, now, sha)
+                     name_key, now, sha, tidy_headline)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
@@ -424,7 +424,7 @@ def export(db, out_dir, base=""):
     already_law = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 140),
                     "url": m["url"], "date": law_date(m, today),
                     "controls": [control_by[c]["chip"] for c in m["controls"]],
-                    "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in passed[:8]]
+                    "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in passed[:40]]
     law_total = len(passed)
 
     # ---------------- where it is happening: every jurisdiction, ranked
@@ -606,6 +606,10 @@ def build_grid(order, stats, ends=None, today=None):
         st = stats[f["slug"]]
         cells = []
         for key, _ in GRID_CHANNELS:
+            if key == "wiki30" and not st["has_wiki"]:
+                # No article on this fear to count, which is not the same as nobody reading one.
+                cells.append({"n": "\u2013", "level": 0, "note": "No Wikipedia article on this fear"})
+                continue
             v = channel_value(st, key)
             level = 0 if not v or not tops[key] else min(4, 1 + int(3.99 * math.log1p(v) / math.log1p(tops[key])))
             if v < 3:
@@ -787,11 +791,24 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         (best["slug"], d7)) if a["url"] not in suppressed]
     line, line_url, source, source_label = None, None, None, "Headline from"
     if arts:
+        for a in arts:
+            a["title"] = tidy_headline(a["title"], a["domain"])
         words = [set(w for w in re.findall(r"[a-z]{4,}", a["title"].lower())) for a in arts]
 
         def score(i):
             return sum(len(words[i] & w) / (len(words[i] | w) or 1) for j, w in enumerate(words) if j != i)
-        pick = arts[max(range(len(arts)), key=score)]
+        # The headline that shares most words with the rest is the one the coverage is converging
+        # on. That alone can land on a site that ran the story once, so it is weighed against how
+        # many of the nine fears the outlet writes about at all: a newsroom that covers the whole
+        # subject speaks for the coverage better than one that touched it a single time.
+        breadth = collections.Counter()
+        for r in db.execute("SELECT DISTINCT domain, fear FROM articles"):
+            breadth[r["domain"]] += 1
+        span = len(order) or 1
+
+        def standing(i):
+            return score(i) * (1 + breadth[arts[i]["domain"]] / span)
+        pick = arts[max(range(len(arts)), key=standing)]
         line, line_url, source = cut(pick["title"], 110), pick["url"], pick["domain"]
     if not line:
         # no fresh headline on file for the leader: its newest bill speaks for it.

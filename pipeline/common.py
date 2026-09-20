@@ -52,7 +52,46 @@ def config(name):
 
 def user_agent():
     contact = os.environ.get("CONTACT_EMAIL", "").strip()
-    return f"AIFearIndex/1.0 (+{REPO_URL}{'; ' + contact if contact else ''})"
+    return f"AIFearReport/1.0 (+{REPO_URL}{'; ' + contact if contact else ''})"
+
+
+TLD = r"(?:com|org|net|gov|edu|io|co|uk|ca|au|news|tv)"
+SPACED_TLD = re.compile(r"\s+\.\s+(" + TLD + r")\b", re.I)
+SPACED_PUNCT = re.compile(r"\s+([,;:.!?%](?:\s|$))")
+INITIALS = re.compile(r"\b([A-Z])\.\s+(?=[A-Z]\.)")
+SPACED_BRACKET = re.compile(r"\(\s+|\s+\)")
+CONTRACTION = re.compile(r"\s+'\s*(s|t|re|ve|ll|d|m)\b")
+CREDIT = re.compile(r"\s*[\u2013\u2014|-]\s*([^|\u2013\u2014-]{2,40})\s*$")
+
+
+def domain_key(text):
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def tidy_headline(title, domain=""):
+    """Undo what a headline feed does to punctuation, and drop the publisher stamped on the end.
+
+    GDELT stores a tokenized title, so every comma and full stop arrives with a space in front of
+    it and the site would print the space. The publisher's own name is often appended as well, and
+    the site already shows that beside the headline. Only a tail matching the domain the headline
+    came from is cut, so a headline that genuinely ends in a dash and a few words keeps them. No
+    word is ever changed: this moves punctuation and removes a repeat of the source, nothing else.
+    """
+    t = " ".join((title or "").split())
+    t = SPACED_TLD.sub(r".\1", t)
+    t = SPACED_PUNCT.sub(r"\1", t)
+    t = INITIALS.sub(r"\1.", t)
+    t = SPACED_BRACKET.sub(lambda m: "(" if m.group(0).startswith("(") else ")", t)
+    t = CONTRACTION.sub(r"'\1", t)
+    host = domain_key(re.sub(r"^www\.", "", domain or "").split("/")[0])
+    if host:
+        m = CREDIT.search(t)
+        if m:
+            tail = domain_key(m.group(1))
+            bare = re.sub(r"(com|org|net|gov|edu|io|co|news|tv)$", "", host)
+            if tail and (tail == host or tail == bare or host.startswith(tail) or tail.startswith(host)):
+                t = t[:m.start()].rstrip()
+    return t.strip()
 
 
 def annotate(level, title, message):

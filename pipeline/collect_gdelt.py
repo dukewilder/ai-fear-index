@@ -9,7 +9,8 @@ import datetime as dt
 import time
 import urllib.parse
 
-from .common import Entities, Http, HttpError, config, iso, kv_get, kv_set, log, sha, upsert
+from .common import (Entities, Http, HttpError, config, iso, kv_get, kv_set, log, sha,
+                     tidy_headline, upsert)
 
 BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
 SPACING = 11.0   # seconds between calls, double what GDELT asks for
@@ -77,7 +78,8 @@ def run(db, state, mode):
             seen_iso = (f"{seen[0:4]}-{seen[4:6]}-{seen[6:8]}T{seen[9:11]}:{seen[11:13]}:00"
                         if len(seen) >= 13 else iso())
             added += upsert(db, "articles", {
-                "id": sha(fear["slug"], url), "fear": fear["slug"], "title": (a.get("title") or "").strip(),
+                "id": sha(fear["slug"], url), "fear": fear["slug"],
+                "title": tidy_headline(a.get("title"), domain),
                 "url": url, "domain": domain, "seen": seen_iso, "entity": ents.match_domain(domain)})
 
         db.commit()

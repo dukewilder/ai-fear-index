@@ -118,7 +118,7 @@ def edition_for(brief_dir, date):
     return json.loads(path.read_text()), path.with_suffix(".png")
 
 
-def run(db, brief_dir, date, dry_run=False, force=False):
+def run(db, brief_dir, date, dry_run=False, force=False, flag=""):
     """One edition, once. The database remembers which, so a second run says so and stops."""
     done = kv_get(db, f"posted:{date}")
     if done and not force:
@@ -141,6 +141,10 @@ def run(db, brief_dir, date, dry_run=False, force=False):
     post_id = publish(creds, text, media_id)
     kv_set(db, f"posted:{date}", {"id": post_id, "at": now().isoformat()})
     db.commit()
+    if flag:
+        # The caller saves the database only when something actually went out, rather than
+        # on every pass of the hours the window is open.
+        pathlib.Path(flag).write_text(post_id or "posted")
     log(f"[post] {date} is up: https://x.com/aiFearReport/status/{post_id}")
     return post_id
 
@@ -152,9 +156,10 @@ def main():
     ap.add_argument("--date", default="")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true", help="post again even if this date already went")
+    ap.add_argument("--flag", default="", help="a file to write only if a post actually goes out")
     args = ap.parse_args()
     db = connect(args.db)
-    run(db, args.brief, args.date or edition_date(), args.dry_run, args.force)
+    run(db, args.brief, args.date or edition_date(), args.dry_run, args.force, args.flag)
 
 
 if __name__ == "__main__":

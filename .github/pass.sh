@@ -44,13 +44,19 @@ one_pass() {
     save state data Data
     data_saved=$(date +%s)
   fi
-  # One post a day, at POST_HOUR in New York, and once: the database remembers the date it went.
+  # One post a day, from POST_HOUR in New York onward, and once: the database remembers the
+  # date it went. The window stays open for the rest of the day rather than closing at the end
+  # of the hour, so an hour GitHub does not serve delays the edition instead of losing it.
   # Unset POST_HOUR and nothing is ever posted, which is the state this ships in.
-  if [ -n "${POST_HOUR:-}" ] && [ -n "${X_API_KEY:-}" ] && [ "$(TZ=America/New_York date +%-H)" = "$POST_HOUR" ]; then
-    python -m pipeline.post --db state/index.db --brief state/brief \
+  if [ -n "${POST_HOUR:-}" ] && [ -n "${X_API_KEY:-}" ] \
+     && [ "$(TZ=America/New_York date +%-H)" -ge "$POST_HOUR" ]; then
+    rm -f posted.flag
+    python -m pipeline.post --db state/index.db --brief state/brief --flag posted.flag \
       || echo "::warning::pass $1 could not post the brief"
-    save state data Data   # so the next pass knows it already went
-    data_saved=$(date +%s)
+    if [ -f posted.flag ]; then
+      save state data Data   # so the next pass knows it already went
+      data_saved=$(date +%s)
+    fi
   fi
   if [ -f state/site_data.json ]; then
     rm -rf dist

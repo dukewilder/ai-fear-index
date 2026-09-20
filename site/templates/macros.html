@@ -9,7 +9,7 @@
 {% macro grid(g) -%}
 <div class="gridwrap"><table class="grid">
 <thead><tr><th scope="col">Fear</th>{% for c in g.channels %}<th scope="col">{{ c.label }}{% if c.note %}<i>{{ c.note }}</i>{% endif %}</th>{% endfor %}</tr></thead>
-<tbody>{% for r in g.rows %}<tr><th scope="row"><a href="{{ url('fear', r.slug) }}">{{ r.name }}</a></th>{% for c in r.cells %}<td class="l{{ c.level }}">{{ c.n }}</td>{% endfor %}</tr>
+<tbody>{% for r in g.rows %}<tr><th scope="row"><a href="{{ url('fear', r.slug) }}">{{ r.name }}</a></th>{% for c in r.cells %}<td class="l{{ c.level }}{% if c.note %} off{% endif %}"{% if c.note %} title="{{ c.note }}"{% endif %}>{{ c.n }}</td>{% endfor %}</tr>
 {% endfor %}</tbody></table></div>
 {%- endmacro %}
 

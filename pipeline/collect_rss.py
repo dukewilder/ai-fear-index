@@ -36,10 +36,12 @@ def discover(http, homepage):
 
 
 def run(db, state, mode):
-    http = Http(min_interval=1.0, timeout=12)
+    http = Http(min_interval=1.0, timeout=12, headers={
+        "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5",
+        "Accept-Language": "en-US,en;q=0.9"})
     ents = Entities()
     feeds = kv_get(db, "feeds", {})
-    added, found, failed, deferred, undated = 0, 0, [], 0, 0
+    added, found, nofeed, broke, deferred, undated = 0, 0, [], [], 0, 0
     started = time.time()
     for ent in ents.items:
         home = ent.get("homepage")
@@ -47,19 +49,21 @@ def run(db, state, mode):
         if not home and not known:
             continue
         feed_url = known or feeds.get(ent["slug"])
-        if not known and (feed_url is None or (feed_url == "" and mode == "backfill")):
+        # A site that published no feed when we last looked is asked again on the daily pass,
+        # so one bad afternoon does not write an organization off for good.
+        if not known and (feed_url is None or (feed_url == "" and mode in ("daily", "backfill"))):
             if time.time() - started > DISCOVERY_BUDGET:
                 deferred += 1  # leave it unrecorded so the next run tries again
                 continue
             feed_url = discover(http, home) or ""
             feeds[ent["slug"]] = feed_url
         if not feed_url:
-            failed.append(ent["name"])
+            nofeed.append(ent["name"])
             continue
         try:
             body = http.get(feed_url, tries=2).content
         except Exception as exc:
-            failed.append(ent["name"])
+            broke.append(f"{ent['name']} ({type(exc).__name__})")
             continue
         parsed = feedparser.parse(body)
         found += 1
@@ -86,7 +90,8 @@ def run(db, state, mode):
                         + (f"; {deferred} sites left for the next run" if deferred else "")
                         + (f"; skipped {undated} undated entries" if undated else "")
                         + (f"; removed {stale} wrongly dated" if stale else "")
-                        + (f"; no feed found for {len(failed)}: {', '.join(failed[:12])}" if failed else ""))
+                        + (f"; no feed published by {len(nofeed)}: {', '.join(nofeed[:12])}" if nofeed else "")
+                        + (f"; feed would not load for {len(broke)}: {', '.join(broke[:8])}" if broke else ""))
 
 
 def drop_undated(db):

@@ -75,8 +75,14 @@ def english(row):
     return bool(text) and len(OTHER_TONGUE.findall(text)) < 3
 
 
-def score(row, today):
-    """How well one measure would carry an edition."""
+def score(row, today, recent=()):
+    """How well one measure would carry an edition.
+
+    recent is the jurisdictions the last few editions led with. A state that files the most bills
+    would otherwise lead most mornings, and a week of California reads as one state's problem
+    rather than the same thing happening in thirty. The penalty is small enough that a measure
+    that actually matters more still wins.
+    """
     controls = (row["controls"] or "").split("|")
     points = max((WEIGHT.get(c, 1) for c in controls), default=0)
     if (row["status"] or "") == "passed":
@@ -88,6 +94,7 @@ def score(row, today):
     moved = row["moved"] or ""
     if moved >= (dt.date.fromisoformat(today) - dt.timedelta(days=14)).isoformat():
         points += 1
+    points -= 2 * list(recent).count(row["jurisdiction_name"])
     return points
 
 
@@ -112,8 +119,10 @@ def pool(db, today, days=POOL_DAYS, limit=12):
         "  AND moved >= ? AND moved <= ? "
         "ORDER BY moved DESC", (since, today)).fetchall()
     rows = [r for r in rows if english(r)]
-    rows.sort(key=lambda r: (-score(r, today), r["moved"] or ""), reverse=False)
-    rows.sort(key=lambda r: -score(r, today))
+    recent = [r["jurisdiction"] for r in db.execute(
+        "SELECT b.edition, m.jurisdiction_name AS jurisdiction FROM brief b JOIN measures m ON m.id = b.target "
+        "ORDER BY b.edition DESC LIMIT 4")]
+    rows.sort(key=lambda r: (-score(r, today, recent), r["moved"] or ""))
     return rows[:limit]
 
 

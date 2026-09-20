@@ -78,8 +78,35 @@ def check_brief_prompt():
     print("brief prompt and gates: ok")
 
 
+def check_plate_fits():
+    """The card must carry the whole headline, at whatever size that takes.
+
+    It used to set three lines at one size and drop the rest, so an eleven word headline went out
+    reading "...UNDER ENVIRONMENTAL" and stopping. A smaller headline is a headline. Half of one
+    is a different claim.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "site"))
+    try:
+        import brand
+    except Exception as exc:  # the fonts are not always present, and the pages matter more
+        print("plate check skipped:", exc)
+        return
+    from PIL import Image, ImageDraw
+    d = ImageDraw.Draw(Image.new("RGB", (1600, 900)))
+    room = (900 - 92 - 30) - 34 - (92 + 24 + 120 * 1.62 + 132)
+    for head in ("California puts companion chatbots under child safety audits",
+                 "Pennsylvania would put commercial data center water supplies under Environmental Protection",
+                 "New York puts every frontier model developer under an office that decides who may release one"):
+        _, lines, step = brand.fit_headline(d, head, 1600 - 184, room)
+        assert " ".join(lines).split() == head.upper().split(), f"the card would drop words from: {head}"
+        assert len(lines) * step <= room, f"the card would run into its own footer: {head}"
+    print("plate fits the whole headline: ok")
+
+
 def main():
     check_brief_prompt()
+    check_plate_fits()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

@@ -231,6 +231,25 @@ def share(path, tagline="Every fear about AI, and what it buys.", w=1200, h=630)
     return path
 
 
+HEAD_SIZES = (100, 92, 84, 76, 68, 60)
+
+
+def fit_headline(d, headline, room_across, room_down, track=1.6):
+    """The largest size at which the whole headline fits the space, and how it breaks.
+
+    The card used to set three lines at one size and drop whatever did not fit, so an eleven word
+    headline went out reading "...UNDER ENVIRONMENTAL" and stopping. A smaller headline is still
+    the headline. Half of one is a different claim.
+    """
+    for size in HEAD_SIZES:
+        f = font("barlow-condensed-800", size)
+        lines = wrap(d, headline.upper(), f, room_across, track)
+        step = round(size * 1.04)
+        if len(lines) * step <= room_down:
+            return f, lines, step
+    return f, lines, step  # smaller than this is unreadable; it runs long rather than losing words
+
+
 def plate(path, date, headline="", w=1600, h=900):
     """The image a brief goes out on: the mark, the date, one line, the address.
 
@@ -247,14 +266,14 @@ def plate(path, date, headline="", w=1600, h=900):
     f_date = font("ibm-plex-mono-600", 30)
     spaced(d, (pad + 4, pad + 24 + mark * 1.62), date.upper(), f_date, PAPER, 4.0)
 
+    y = pad + 24 + mark * 1.62 + 132
+    room = (h - pad - 30) - 34 - y   # down to the address, with a line's clearance above it
     if headline:
-        f_head = font("barlow-condensed-800", 100)
-        lines = wrap(d, headline.upper(), f_head, w - pad * 2, 1.6)[:3]
-        y = pad + 24 + mark * 1.62 + 132
+        f_head, lines, step = fit_headline(d, headline, w - pad * 2, room)
         d.line([(pad, y - 56), (pad + 170, y - 56)], fill=PAPER, width=5)
         for line in lines:
             spaced(d, (pad, y), line, f_head, PAPER, 1.6)
-            y += 104
+            y += step
 
     f_url = font("ibm-plex-mono-600", 34)
     url = "aifearreport.com"

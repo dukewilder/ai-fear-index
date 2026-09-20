@@ -714,6 +714,38 @@ def check_every_page_asks(dist, db, day):
             # watching every reader of a site about who is watching, and has to be argued for.
             assert m.group(1) in ALLOWED_HOSTS, \
                 f"{where} loads from {m.group(1)}; this site ships self-contained"
+    # The pitch-in carries money, so three more things about it are held here rather than hoped.
+    site_cfg = json.loads((ROOT / "config" / "site.json").read_text())
+    addr = site_cfg.get("donate_btc", "")
+    if addr:
+        # The code was drawn from an address and committed. Change the address without redrawing
+        # it and the page shows one address in text and sends the camera to another. The title
+        # is written by the same call that encodes the code, from the same string. It proves the
+        # drawing is current, not that the modules are right; that was checked once with an
+        # independent decoder when it was drawn, and btc_qr.py reproduces it byte for byte.
+        qr = (ROOT / "site" / "templates" / "btc-qr.svg").read_text()
+        drawn = re.search(r"<title>(.*?)</title>", qr)
+        assert drawn and drawn.group(1) == addr, (
+            f"btc-qr.svg was drawn for {drawn.group(1) if drawn else 'nothing'} and the config "
+            f"says {addr}. Run: pip install segno && python site/btc_qr.py")
+    home = (dist / "index.html").read_text()
+    if site_cfg.get("donate_url"):
+        # On the button, not anywhere: the footer links to the same checkout, and a check for the
+        # address on the page passed with the button pointing nowhere.
+        assert re.search(r'<a class="pay-go" href="' + re.escape(site_cfg["donate_url"]) + '"', home), \
+            "the card button does not go to the checkout"
+    if addr:
+        assert f'href="bitcoin:{addr}"' in home, "the Bitcoin address is not a wallet link"
+        assert f'data-copy="{addr}"' in home, "the copy button copies something other than the address"
+    # The copy button said Copied on success, on failure, and where no clipboard exists at all.
+    # For an address that sends the reader to paste whatever was there before. It may only say
+    # so on the path where the write resolved.
+    js = (ROOT / "site" / "templates" / "base.html").read_text()
+    assert "then(done, done)" not in js and "else done()" not in js, \
+        "the copy button claims success when the copy failed"
+    assert 'then(function () { say("Copied"); }, failed)' in js, \
+        "the copy button no longer separates success from failure"
+
     # Three states, because the card comes from two places. With the key, the headline is known.
     # Without it, the table still knows which days were published, which is every edition written
     # before the key existed. With neither, the section has to render without a card rather than

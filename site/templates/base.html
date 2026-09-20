@@ -100,10 +100,33 @@
 {% if d.site and (d.site.donate_url or d.site.donate_btc) %}
 <section class="block" id="keep"><div class="wrap">
 <h2 class="h">Pitch in to keep the report running</h2>
-{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
-{% if d.site.donate_url %}<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
-{% endif %}{% if d.site.donate_btc %}<div class="btc"><span class="btc-k">Bitcoin</span><a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc">{{ d.site.donate_btc }}</a><button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy</button></div>
-{% endif %}</div></section>
+<p class="sub">{{ d.site.donate_text or "No ads and no paywall." }}</p>
+{# Two ways to pay, side by side where there is room and stacked where there is not. Card first:
+   it is how most people will do it, so it gets the filled button and the other gets an outline. #}
+<div class="pay{% if d.site.donate_url and d.site.donate_btc %} two{% endif %}">
+{% if d.site.donate_url %}
+<div class="pay-way">
+<span class="pay-k">Card</span>
+<p class="pay-t">Through Square. Opens its own checkout.</p>
+<a class="pay-go" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}<span aria-hidden="true"> &rarr;</span></a>
+</div>
+{% endif %}
+{% if d.site.donate_btc %}
+<div class="pay-way">
+<span class="pay-k">Bitcoin</span>
+<div class="pay-btc">
+{# A code to scan from a phone wallet, which is how most people send it from a desktop. On a phone
+   it is gone: the address below opens the wallet directly, and nobody scans their own screen. #}
+<div class="pay-qr" aria-hidden="true">{% include "btc-qr.svg" %}</div>
+<div class="pay-addr">
+<a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc" data-addr>{{ d.site.donate_btc }}</a>
+<button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy address</button>
+</div>
+</div>
+</div>
+{% endif %}
+</div>
+</div></section>
 {% endif %}
 <footer class="site-foot"><div class="wrap">
 <div class="foot-top">
@@ -277,12 +300,27 @@
   });
 
   // copy the receipt
+  // It only says Copied when it did copy. This used to say so on success, on failure, and in a
+  // browser with no clipboard at all, and for a Bitcoin address that is the worst possible lie:
+  // the reader pastes whatever was on their clipboard before, and if that was another address the
+  // money goes there. On failure the text is selected instead, so a press-and-hold or Ctrl+C works.
   document.querySelectorAll("button[data-copy]").forEach(function (btn) {
+    var was = btn.textContent;
+    function say(word) { btn.textContent = word; setTimeout(function () { btn.textContent = was; }, 1800); }
+    function pick() {
+      var near = btn.parentNode && btn.parentNode.querySelector("[data-addr]"), sel = window.getSelection();
+      if (!near || !sel || !document.createRange) return false;
+      var r = document.createRange(); r.selectNodeContents(near); sel.removeAllRanges(); sel.addRange(r);
+      return true;
+    }
     btn.addEventListener("click", function () {
-      var text = btn.getAttribute("data-copy"), done = function () {
-        var was = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = was; }, 1600);
-      };
-      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done();
+      var text = btn.getAttribute("data-copy");
+      var failed = function () { say(pick() ? "Selected, copy it" : "Could not copy"); };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function () { say("Copied"); }, failed);
+      } else {
+        failed();
+      }
     });
   });
 

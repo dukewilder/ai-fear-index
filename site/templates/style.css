@@ -282,9 +282,34 @@ a.copy.donate{text-decoration:none}
    what arrives, not the thing the page is for. */
 .brief-card{display:block;max-width:520px;margin-top:16px;border:1px solid var(--ink);line-height:0}
 .brief-card img{display:block;width:100%;height:auto;aspect-ratio:16/9}
-.btc{display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px;padding:12px 14px;border:1px solid var(--ink);background:var(--panel);max-width:100%}
-.btc-k{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.btc-a{font-family:var(--mono);font-size:13px;word-break:break-all;color:var(--ink)}
+/* Pitch in: two ways to pay, each in its own panel. Stacked below 700px, side by side above it.
+   The split is measured, not picked. A 34-character address in 13px Plex Mono is 265px wide, and
+   it sits beside a 104px code with 16px between them inside 18px of padding a side. At 5:7 from
+   640px it had 253px and broke mid-string, "...aiguynY / mNe", which is the one string on this
+   page nobody should have to reassemble. 4:8 from 700px leaves 272px at the narrowest width that
+   gets two columns, and more above it. */
+.pay{display:grid;gap:12px;margin-top:16px}
+@media (min-width:700px){.pay.two{grid-template-columns:minmax(0,4fr) minmax(0,8fr)}}
+.pay-way{display:flex;flex-direction:column;gap:10px;padding:16px 18px 18px;border:1px solid var(--ink);background:var(--panel)}
+.pay-k{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pay-t{margin:0;font-size:14px;line-height:1.45;color:var(--soft)}
+/* The one filled button on the site, because it is the one thing on it that costs the reader
+   something. heat4 and heat4t are the accent and the text colour already paired for it: cream on
+   the light theme's vermillion, and dark on the dark theme's brighter one, where cream falls to
+   3.6 to 1 against it and dark text clears 4.9. */
+.pay-go{display:inline-flex;align-items:center;justify-content:center;gap:6px;align-self:flex-start;
+  min-height:48px;margin-top:auto;padding:0 22px;border:1.5px solid var(--heat4);background:var(--heat4);
+  color:var(--heat4t);font:600 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
+.pay-go:hover{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.pay-btc{display:flex;align-items:center;gap:16px}
+.pay-qr{flex:none;width:104px;line-height:0;border:1px solid var(--ink)}
+.pay-qr svg{display:block;width:100%;height:auto}
+.pay-addr{display:flex;flex:1;flex-direction:column;gap:10px;min-width:0}
+.pay-addr .copy{margin-top:0;align-self:flex-start}
+.btc-a{font-family:var(--mono);font-size:13px;line-height:1.5;word-break:break-all;color:var(--ink)}
+/* A phone: nobody scans their own screen, and the address opens the wallet when tapped. Both
+   buttons go full width, which is where a thumb lands. */
+@media (max-width:559px){.pay-qr{display:none}.pay-go,.pay-addr .copy{align-self:stretch;justify-content:center}}
 .tip{position:absolute;z-index:30;padding:5px 9px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);font:500 12px var(--mono);white-space:nowrap;pointer-events:none}
 
 @media (min-width:760px){

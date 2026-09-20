@@ -396,11 +396,16 @@ def export(db, out_dir, base=""):
     filings_naming = sum(1 for r in lob_recent if r["fears"])
     advocacy_total = sum(o["lobbying"] for o in ranked)
     election_total = sum(o["election"] for o in com_ranked)
+    election_spent = sum(c["independent_expenditures"] or 0 for c in committees)
     news_total = sum(int(v) for v in news30.values())
     all_filings = db.execute("SELECT COUNT(*) c FROM lobbying").fetchone()["c"]
     all_measures = db.execute("SELECT COUNT(*) c FROM measures").fetchone()["c"]
     # the money leads, largest first: it is the number that says most in one glance
-    spent = sorted(((election_total, "raised and spent by AI super PACs this cycle"),
+    # What the committees hold is money raised. Neither has made an independent expenditure yet,
+    # and the line says spent only once one of them has.
+    election_words = ("raised by AI super PACs this cycle" if not election_spent else
+                      f"raised by AI super PACs this cycle, {money(election_spent)} of it spent")
+    spent = sorted(((election_total, election_words),
                     (advocacy_total, "spent lobbying on the fears by advocacy groups, past year")),
                    reverse=True)
     numbers = [n for n in [
@@ -492,6 +497,7 @@ def export(db, out_dir, base=""):
         "fears_tracked": [f["name"] if f["name"].startswith(("AI", "China")) else f["name"][0].lower() + f["name"][1:]
                           for f in fears],
         "fears": fear_rows, "feed_types": feed_types, "feed": feed[:80], "funders": funders,
+        "feed_quiet": feed_quiet(feed, today),
         "beneficiaries": beneficiaries, "controls": control_rows, "sources": source_rows,
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
     }
@@ -773,6 +779,25 @@ def bill_headline(title):
     head = re.split(r"\s*;", (title or "").strip(), 1)[0]
     head = re.sub(r"^(an?\s+act\s+(relating to|providing for|concerning|to)\s+)", "", head, flags=re.I)
     return head.strip().strip('"').strip("\u201c\u201d").strip()
+
+
+def feed_quiet(feed, today):
+    """How long since the last thing was filed, once that is more than a day.
+
+    Legislatures, the lobbying registrar and corporate newsrooms all keep office hours, so a feed
+    whose newest item is Friday is a normal Sunday rather than a broken pipeline. Saying the date
+    outright is the difference between the two, and the reader should not have to work it out.
+    """
+    if not feed:
+        return None
+    newest = feed[0].get("time_iso", "")[:10]
+    if not newest:
+        return None
+    gap = (today - dt.date.fromisoformat(newest)).days
+    if gap < 2:
+        return None
+    day = dt.date.fromisoformat(newest)
+    return f"Nothing filed since {day:%A} {day.day} {day:%B}. Weekends are quiet."
 
 
 def build_exhibit(db, order, fear_stats, today, suppressed=()):

@@ -1,4 +1,6 @@
-"""Election money from the FEC API for AI-focused committees in the entity list."""
+"""Election money from the FEC API: the committees on the entity list, and the register itself."""
+import re
+
 from .common import Entities, Http, env, iso, log, name_key, now, upsert
 
 BASE = "https://api.open.fec.gov/v1"
@@ -7,6 +9,58 @@ BASE = "https://api.open.fec.gov/v1"
 def cycle_now():
     year = now().year
     return year + (year % 2)
+
+
+# Committees nobody has put on the entity list yet. Searching the register by name is the only way
+# to find a PAC that formed last week, and the match has to be tight: "AI" appears inside hundreds
+# of ordinary committee names, so it counts only as a word of its own.
+SWEEP = ["artificial intelligence", "AI policy", "AI PAC", "AI super PAC",
+         "machine learning", "data center", "deepfake", "tech policy"]
+AI_NAME = re.compile(r"(?:\bA\.?I\.?\b|artificial intelligence|machine learning|deepfake|"
+                     r"algorithm|data cent(?:er|re))", re.I)
+POLITICAL = ("O", "U", "V", "W", "N", "Q", "I")  # super PAC, hybrid, electioneering, and the PAC types
+
+
+def sweep(db, http, key, ents, cycle, notes):
+    """Search the register itself, so a committee that formed this month is not missed.
+
+    Anything found here is stored without an entity attached: it is a committee the report knows
+    about because the FEC lists it, not because somebody added it to a file.
+    """
+    known = {r["id"] for r in db.execute("SELECT id FROM committees")}
+    added, new = 0, []
+    for query in SWEEP:
+        try:
+            found = http.json(f"{BASE}/committees/", params={
+                "api_key": key, "q": query, "per_page": 30, "sort": "-last_file_date"}).get("results", [])
+        except Exception as exc:
+            notes.append(f"sweep '{query}': {str(exc)[:60]}")
+            continue
+        for c in found:
+            cid, cname = c.get("committee_id"), c.get("name") or ""
+            if not cid or cid in known or not AI_NAME.search(cname):
+                continue
+            if (c.get("committee_type") or "") not in POLITICAL:
+                continue
+            totals = http.json(f"{BASE}/committee/{cid}/totals/",
+                               params={"api_key": key, "cycle": cycle}).get("results", [])
+            t = totals[0] if totals else {}
+            if not (t.get("receipts") or t.get("independent_expenditures")):
+                continue  # registered but has raised and spent nothing; it is not money yet
+            known.add(cid)
+            new.append(f"{cname} ({cid})")
+            upsert(db, "committees", {
+                "id": cid, "name": cname, "entity": None, "query": f"sweep:{query}",
+                "committee_type": c.get("committee_type_full") or c.get("committee_type"),
+                "receipts": t.get("receipts"), "disbursements": t.get("disbursements"),
+                "independent_expenditures": t.get("independent_expenditures"),
+                "cycle": cycle, "updated": iso()})
+            added += 1
+            added += receipts(db, http, key, cid, cname, cycle)
+            added += spending(db, http, key, cid, cname, cycle)
+            db.commit()
+    notes.append(f"swept the register: {len(new)} not on the list" + (f" ({'; '.join(new[:4])})" if new else ""))
+    return added
 
 
 def run(db, state, mode):
@@ -37,6 +91,7 @@ def run(db, state, mode):
                 added += receipts(db, http, key, cid, c.get("name"), cycle)
                 added += spending(db, http, key, cid, c.get("name"), cycle)
                 db.commit()
+    added += sweep(db, http, key, ents, cycle, notes)
     state["added"] = added
     state["message"] = "; ".join(notes)[:700]
 

@@ -45,13 +45,29 @@ def check_brief_prompt():
     # the gates that decide whether a sentence is reporting or repeating the sponsor
     FDA = "Health and Human Services Department, Food and Drug Administration"
     SHAPES = [
+        # the sponsor's grammar, including the ways it can look like the other kind
         ("California requires operators of companion chatbots to perform risk assessments and submit "
          "to independent audits reported to the Attorney General.", "California", False),
         (FDA + " requires operators to file reports and keep records.", FDA, False),
+        ("California requires operators to certify compliance under penalty of perjury.", "California", False),
+        ("California requires operators to file reports that may be audited later.", "California", False),
+        ("Michigan would require utilities to file forecasts under the Clean Energy Act.", "Michigan", False),
+        ("Texas requires a developer to give notice to every user of the system.", "Texas", False),
+        ("Michigan would require utilities to file data center load forecasts with the Public "
+         "Service Commission.", "Michigan", False),
+        # and sentences that do name a power
         ("California puts AI auditors under registration with the Government Operations Agency, "
          "which licenses them and investigates violations.", "California", True),
         ("New York would require every frontier developer to register with the Office for AI Model "
          "Developer Oversight, which decides who may release one.", "New York", True),
+        ("California puts companion chatbots under independent child safety audits reported to the "
+         "Attorney General beginning July 1, 2027.", "California", True),
+        ("Michigan would put every data center's load forecast under the Public Service Commission.",
+         "Michigan", True),
+        ("California requires every companion chatbot to be certified by an auditor the Attorney "
+         "General approves.", "California", True),
+        ("Ohio prohibits a person from deploying an artificial intelligence that represents itself "
+         "as a therapist.", "Ohio", True),
     ]
     for text, place, keep in SHAPES:
         head = brief.tense_of(text, place)

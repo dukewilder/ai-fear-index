@@ -197,17 +197,23 @@ EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit i
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
 
-# A sentence that names the power has a shape. Something is put under a body, or a body is given
-# something, or a body does the deciding. A sentence that only lists what a company has to do is
-# the sponsor's framing however many offices it mentions in passing: "submit to audits reported to
-# the Attorney General" names the Attorney General and hands it nothing.
+# A sentence that names the power has a shape: something is put under a body, a body is handed
+# something, or a body does the deciding. The words alone are not enough. "Under penalty of
+# perjury", "under the Clean Energy Act" and "gives notice to every user" all contain the shape
+# and none of them hands anybody anything, so what follows has to be a body.
+BODY = (r"(?:the\s+|an?\s+)?(?:[A-Z][\w.'-]*\s+){0,4}"
+        r"(?:Department|Office|Bureau|Division|Board|Commission|Agency|Authority|Council|Registry|"
+        r"Attorney\s+General|Secretary|Director|Administrator|Comptroller|Inspector|Auditor|Regulator)"
+        r"|(?:an?|the)\s+(?:independent\s+|outside\s+|third[- ]party\s+|state\s+)?"
+        r"(?:auditor|inspector|regulator|registry|register|licence|license|permit|moratorium|"
+        r"inventory|review|registration|certification|audit|approval)")
 POWER = re.compile(
-    r"\bunder\b"
-    r"|\b(?:which|who|that)\s+(?:\w+\s+){0,2}"
-    r"(?:decid\w+|licens\w+|approv\w+|inspect\w+|certif\w+|investigat\w+|revok\w+|issu\w+|"
-    r"registers?|determin\w+|audits?|enforc\w+|permits?|refus\w+|withhold\w+|bars?|blocks?|"
-    r"may|must|can|holds?|keeps?|orders?|sets?|names?)\b"
-    r"|\b(?:gives?|hands?|grants?|leaves?)\s+(?:the\s+)?\w+"
+    rf"\bunder\s+(?:{BODY})"
+    r"|\b(?:which|who|whom|that)\s+(?:\w+\s+){0,2}"
+    r"(?:decid\w+|licens\w+|approv\w+|inspect\w+|certif\w+|investigat\w+|revok\w+|"
+    r"registers?|determin\w+|enforc\w+|permits?|refus\w+|withhold\w+|bars?|blocks?|"
+    r"suspends?|suspend|suspending|issu\w+|audits?|holds?|keeps?)\b"
+    rf"|\b(?:gives?|hands?|grants?|leaves?)\s+(?:{BODY})"
     r"|\b(?:licen[sc]ed|approved|certified|registered|inspected|authoris?zed|vetted)\s+by\b", re.I)
 DUTY_FRAMED = "written as a duty on a company, not the power it creates"
 # Looked for in the main clause rather than the first few words, because "Health and Human Services

@@ -1,7 +1,7 @@
 """Election money from the FEC API: the committees on the entity list, and the register itself."""
 import re
 
-from .common import Entities, Http, env, iso, log, name_key, now, upsert
+from .common import Entities, Http, HttpError, env, iso, log, name_key, now, upsert
 
 BASE = "https://api.open.fec.gov/v1"
 
@@ -19,6 +19,23 @@ SWEEP = ["artificial intelligence", "AI policy", "AI PAC", "AI super PAC",
 AI_NAME = re.compile(r"(?:\bA\.?I\.?\b|artificial intelligence|machine learning|deepfake|"
                      r"algorithm|data cent(?:er|re))", re.I)
 POLITICAL = ("O", "U", "V", "W", "N", "Q", "I")  # super PAC, hybrid, electioneering, and the PAC types
+
+
+def totals_for(http, key, cid, cycle):
+    """This cycle's totals for one committee, or None where the register has no filing for it.
+
+    The register lists committees the totals endpoint answers 404 for: registered, never filed, or
+    filed under a different cycle. Sweeping the register turned that into a source-wide failure,
+    which is a great deal louder than the fact deserves.
+    """
+    try:
+        rows = http.json(f"{BASE}/committee/{cid}/totals/",
+                         params={"api_key": key, "cycle": cycle}).get("results", [])
+    except HttpError as exc:
+        if exc.status == 404:
+            return None
+        raise
+    return rows[0] if rows else None
 
 
 def sweep(db, http, key, ents, cycle, notes):
@@ -42,9 +59,9 @@ def sweep(db, http, key, ents, cycle, notes):
                 continue
             if (c.get("committee_type") or "") not in POLITICAL:
                 continue
-            totals = http.json(f"{BASE}/committee/{cid}/totals/",
-                               params={"api_key": key, "cycle": cycle}).get("results", [])
-            t = totals[0] if totals else {}
+            t = totals_for(http, key, cid, cycle)
+            if t is None:
+                continue  # the register lists it and the totals endpoint does not; not ours to fix
             if not (t.get("receipts") or t.get("independent_expenditures")):
                 continue  # registered but has raised and spent nothing; it is not money yet
             known.add(cid)
@@ -81,8 +98,10 @@ def run(db, state, mode):
             for c in picks:
                 cid = c["committee_id"]
                 notes.append(f"{ent['name']} -> {c.get('name')} ({cid})")
-                totals = http.json(f"{BASE}/committee/{cid}/totals/", params={"api_key": key, "cycle": cycle}).get("results", [])
-                t = totals[0] if totals else {}
+                # A committee on the entity list stays on the site whether or not the totals
+                # endpoint answers for this cycle. Its receipts are read separately and they are
+                # what the figures rest on; dropping the row would take it off the page.
+                t = totals_for(http, key, cid, cycle) or {}
                 upsert(db, "committees", {
                     "id": cid, "name": c.get("name"), "entity": ent["slug"], "query": query,
                     "committee_type": c.get("committee_type_full") or c.get("committee_type"),

@@ -585,6 +585,40 @@ def check_position_carries_no_control():
     print("a measure that only takes a position carries no control: ok")
 
 
+def check_overdue_daily_source():
+    """A daily source that has not succeeded today is due, flag or no flag.
+
+    The pass sets one done flag for itself whatever happened inside it. On 20 September the FEC
+    register threw a 404 at 07:21, the flag went up anyway, and the fix pushed at noon could not
+    run until the next morning: twenty-two hours with the whole election register missing and the
+    site saying so in red. Success is recorded per source, so that is what decides.
+    """
+    from pipeline import run as runner
+    from pipeline.common import connect as _connect, kv_set as _kv_set
+    import tempfile as _tempfile
+    import datetime as _dt
+    db = _connect(pathlib.Path(_tempfile.mkdtemp()) / "due.db")
+    today = _dt.date.today().isoformat()
+    for name, last_ok in (("congress", today + "T07:17:09+00:00"),
+                          ("openstates", today + "T07:20:50+00:00"),
+                          ("lda", today + "T07:21:18+00:00"),
+                          ("wikipedia", today + "T07:21:46+00:00"),
+                          ("fec", "2000-01-01T00:00:00+00:00")):
+        db.execute("INSERT INTO status(source,last_run,ok,added,message,last_ok) "
+                   "VALUES(?,?,?,?,?,?)", (name, iso(), 1, 0, "", last_ok))
+    db.commit()
+    assert runner.overdue(db, today) == ["fec"], runner.overdue(db, today)
+    # one that keeps failing is held off until the hour it asked for, rather than every pass
+    _kv_set(db, "retry:fec", (_dt.datetime.now(_dt.timezone.utc)
+                              + _dt.timedelta(hours=3)).isoformat(timespec="seconds"))
+    db.commit()
+    assert runner.overdue(db, today) == [], "a source that asked to be left alone was run anyway"
+    _kv_set(db, "retry:fec", "2000-01-01T00:00:00")
+    db.commit()
+    assert runner.overdue(db, today) == ["fec"], "the hour it asked for came and it was not run"
+    print("a daily source that has not succeeded today is due: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -594,6 +628,7 @@ def main():
     check_fec_sweep()
     check_post_needs_entries()
     check_failed_source_retries()
+    check_overdue_daily_source()
     check_places_word()
     check_headline_keeps_the_power()
     check_lobbying_keywords()

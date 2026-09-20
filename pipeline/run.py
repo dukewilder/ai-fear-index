@@ -27,6 +27,22 @@ MODULES = {"gdelt": "collect_gdelt", "news": "collect_news", "rss": "collect_rss
            "wikipedia": "collect_wikipedia", "tag": "tag"}
 
 
+def overdue(db, today):
+    """Daily sources that have not succeeded today.
+
+    The daily pass sets one flag for itself when it finishes, whatever happened inside it. That
+    flag marks the pass, not the source: the register errored at 07:21 one morning and the flag
+    kept it out of every run for the next twenty-two hours, fix pushed at noon or not. Success is
+    already recorded per source, so that is what decides. A source that keeps failing is held off
+    by the retry it asks for when it fails, so this cannot become one source running every twenty
+    minutes all day.
+    """
+    ok_today = {r["source"] for r in db.execute(
+        "SELECT source FROM status WHERE last_ok >= ?", (today,))}
+    return [s for s in DAILY if s not in ok_today
+            and (not kv_get(db, f"retry:{s}") or retry_due(db, s))]
+
+
 def ask_again(db, sources, asked):
     """A daily source that errored is tried again later today rather than tomorrow.
 
@@ -68,6 +84,7 @@ def main():
         sources += [s for s in DAILY if s not in done]  # first run of a source catches it up
     # a source that asked to be tried again later today, having been refused for nothing
     sources += [s for s in DAILY if s not in sources and retry_due(db, s)]
+    sources += [s for s in overdue(db, today) if s not in sources]
     # A fear added after the day's reading has no readership until tomorrow's, and the index
     # scores it on fewer channels than it actually has for a day. Wikipedia backfills a fear the
     # first time it sees one, so asking again costs one pass and settles it. Once a day, though:

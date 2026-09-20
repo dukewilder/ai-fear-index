@@ -66,7 +66,6 @@
 <a class="brand" href="{{ url('home') }}"><span class="badge">{{ bits[0] }}</span>{{ bits[1] if bits|length > 1 else "" }}</a>
 <nav class="nav" aria-label="Main">
 <a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
-<a href="{{ url('rankings') }}" data-nav="rankings"{% if nav == 'rankings' %} aria-current="page"{% endif %}>Rankings</a>
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
 <button type="button" class="theme" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
 </nav>
@@ -209,10 +208,10 @@
     track();
   }
 
-  // long lists open ten at a time
+  // every list shows five until asked, and goes back to five when asked again
   document.querySelectorAll("ol.rank, ul.rank, ul.list").forEach(function (list) {
     var n = list.children.length;
-    if (n < 14) return;
+    if (n <= 5) return;
     if (list.id && document.querySelector('[data-filter-group="' + list.id + '"]')) return;
     list.classList.add("clip");
     var btn = document.createElement("button");
@@ -223,8 +222,9 @@
     btn.addEventListener("click", function () {
       var clipped = list.classList.toggle("clip");
       btn.setAttribute("aria-expanded", clipped ? "false" : "true");
-      btn.textContent = clipped ? "Show all " + n : "Show the first ten";
-      if (clipped) list.scrollIntoView({block: "start"});
+      btn.textContent = clipped ? "Show all " + n : "Show fewer";
+      // collapsing from the bottom of a long list leaves you somewhere you did not choose
+      if (clipped) btn.scrollIntoView({block: "center"});
     });
     list.parentNode.insertBefore(btn, list.nextSibling);
   });
@@ -274,7 +274,7 @@
 {% if preview %}
 
   var pages = Array.prototype.slice.call(document.querySelectorAll("main[data-route]"));
-  var navFor = { fear: "rankings", org: "rankings", feed: "feed", rankings: "rankings", method: "method" };
+  var navFor = { fear: "", org: "", feed: "feed", method: "method" };
   function has(route) {
     return pages.some(function (p) { return p.getAttribute("data-route") === route; });
   }

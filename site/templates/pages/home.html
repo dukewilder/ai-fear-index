@@ -58,14 +58,12 @@
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">The government controls written into the bills that cite these fears, by number of bills.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
-{% if d.controls|length > d.controls|selectattr('n')|list|length %}<a class="more" href="{{ url('rankings', anchor='controls') }}">All {{ d.controls|length }} controls tracked</a>{% endif %}
 </div></section>
 {% if d.beneficiaries %}
 <section class="block band" id="benefits"><div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials the bills would hand new power over AI, by number of bills.</p>
-<ol class="rank">{% for b in d.beneficiaries[:6] %}{{ benefit_row(b) }}{% endfor %}</ol>
-{% if d.totals.beneficiaries > 6 %}<a class="more" href="{{ url('rankings', anchor='beneficiaries') }}">See all {{ d.beneficiaries_total }}</a>{% endif %}
+<ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.quotes %}
@@ -79,42 +77,38 @@
 <section class="block band" id="states"><div class="wrap">
 <h2 class="h">Where it's happening</h2>
 <p class="sub">Legislatures ranked by AI measures.</p>
-<ol class="rank">{% for s in d.states[:6] %}{{ state_row(s) }}{% endfor %}</ol>
-{% if d.states_total > 6 %}<a class="more" href="{{ url('rankings', anchor='states') }}">See all {{ d.states_total }}</a>{% endif %}
+<ol class="rank">{% for s in d.states %}{{ state_row(s) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.already_law %}
 <section class="block" id="law"><div class="wrap">
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_total }} passed, with the controls they carry.</p>
-<ul class="list">{% for a in d.already_law[:5] %}{{ law_row(a) }}{% endfor %}</ul>
+<ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
 {% if d.funders %}
 <section class="block band" id="funding"><div class="wrap">
 <h2 class="h">Who's funding it</h2>
 <p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
-<ol class="rank">{% for o in d.funders[:6] %}{{ org_row(o) }}{% endfor %}</ol>
-{% if d.totals.funders > 6 %}<a class="more" href="{{ url('rankings', anchor='funders') }}">See all {{ d.funders_total }}</a>{% endif %}
+<ol class="rank">{% for o in d.funders %}{{ org_row(o) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.industry %}
 <section class="block" id="industry"><div class="wrap">
 <h2 class="h">Industry at the table</h2>
 <p class="sub">Companies and trade groups with lobbying filings naming these fears, past year.</p>
-<ol class="rank">{% for o in d.industry[:5] %}{{ org_row(o) }}{% endfor %}</ol>
-{% if d.totals.industry > 5 %}<a class="more" href="{{ url('rankings', anchor='industry') }}">See all {{ d.industry_total }}</a>{% endif %}
+<ol class="rank">{% for o in d.industry %}{{ org_row(o) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.election %}
 <section class="block band" id="election"><div class="wrap">
 <h2 class="h">Election money</h2>
 <p class="sub">Committees spending on AI politics this cycle, and the names that put up the money.</p>
-<ol class="rank">{% for o in d.election[:5] %}{{ org_row(o) }}{% endfor %}</ol>
+<ol class="rank">{% for o in d.election %}{{ org_row(o) }}{% endfor %}</ol>
 {% if d.donors %}
 <p class="kicker">Where it came from</p>
-<ol class="rank">{% for o in d.donors[:6] %}{{ donor_row(o) }}{% endfor %}</ol>
-{% if d.donors_total > 6 %}<a class="more" href="{{ url('rankings', anchor='election') }}">See all {{ d.donors_total }}</a>{% endif %}
+<ol class="rank">{% for o in d.donors %}{{ donor_row(o) }}{% endfor %}</ol>
 {% endif %}
 </div></section>
 {% endif %}

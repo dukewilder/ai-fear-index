@@ -22,8 +22,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 CHEVRON = ('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
            '<path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
            'stroke-linecap="round" stroke-linejoin="round"/></svg>')
-NAV_FOR = {"home": "", "fear": "", "org": "rankings", "feed": "feed",
-           "rankings": "rankings", "method": "method"}
+NAV_FOR = {"home": "", "fear": "", "org": "", "feed": "feed", "method": "method"}
 
 
 def esc(value):
@@ -170,19 +169,15 @@ def share_card(path, big, label, sub="", kicker="AI FEAR REPORT", foot="aifearre
 
 
 def card_specs(d):
-    """Which cards to draw: one for the front page, one per fear, one for the rankings."""
+    """Which cards to draw: one per fear. The front page has the standing one."""
     ix = d["index"]
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
             f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
-    top = d["beneficiaries"][:3]
-    yield "rankings", d.get("beneficiaries_total", str(len(d["beneficiaries"]))), \
-        "agencies and officials the bills would hand new power over AI", \
-        " · ".join(f"{b['name']} {b['score']}" for b in top)
 
 
 def make_url(preview, base):
-    routes = {"home": "", "feed": "feed", "rankings": "rankings", "method": "method"}
+    routes = {"home": "", "feed": "feed", "method": "method"}
 
     def url(kind, slug=None, anchor=None):
         if kind in ("fear", "org"):
@@ -218,13 +213,12 @@ def page_specs(d):
                       "title": f"{o['name']}: AI lobbying, {name}",
                       "ctx": {"o": o}})
     for kind, title in (("feed", "Feed: every AI bill and rule as it arrives"),
-                        ("rankings", "Rankings: who gains power over AI"),
                         ("method", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
                       "title": f"{title}, {name}", "ctx": {}})
     for s in specs:
         s["nav"] = NAV_FOR[s["kind"]]
-        s["card"] = {"home": "home", "rankings": "rankings"}.get(s["kind"]) or \
+        s["card"] = \
             (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else None)
         s["description"] = None
         if s["kind"] == "fear":
@@ -243,9 +237,6 @@ def page_specs(d):
         elif s["kind"] == "feed":
             s["description"] = ("Every AI bill, rule, and public statement as it arrives, tagged with "
                                 "the fear it cites and the control it would impose.")
-        elif s["kind"] == "rankings":
-            s["description"] = (f"The {d.get('beneficiaries_total', '')} agencies and officials that AI "
-                                f"bills would hand new power to, ranked by how often they are named.").replace("  ", " ")
         elif s["kind"] == "method":
             s["description"] = ("Where every number on this site comes from: the government sources, "
                                 "how measures are tagged, and what each label means.")

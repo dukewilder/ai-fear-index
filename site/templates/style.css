@@ -32,7 +32,7 @@ a:hover{color:var(--accent)}
 [id]{scroll-margin-top:var(--stick,112px)}
 .showall{display:inline-flex;align-items:center;min-height:40px;margin-top:12px;padding:0 13px;border:1px solid var(--edge);background:transparent;color:var(--muted);font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .showall:hover{border-color:var(--ink);color:var(--ink)}
-.rank.clip>li:nth-child(n+11),.list.clip>li:nth-child(n+11){display:none}
+.rank.clip>li:nth-child(n+6),.list.clip>li:nth-child(n+6){display:none}
 .wrap{max-width:760px;margin:0 auto;padding:0 20px}
 
 /* masthead: the top of a record, not a banner */

@@ -6,6 +6,7 @@ Nothing here touches the network or the real data.
 import datetime as dt
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -611,6 +612,9 @@ def main():
         body = page.read_text()
         for stray in ("</span> filings", "> filings<", "mentions  fear"):
             assert stray not in body, f"{page.name} renders a unit with no number: {stray!r}"
+        # One h1 per page. The front page had none at all, which is the page that matters most.
+        heads = re.findall(r"<h1[^>]*>", body)
+        assert len(heads) == 1, f"{page.relative_to(tmp / 'dist')} has {len(heads)} h1 headings"
         # Election receipts run the length of a two-year cycle, not the last four quarters
         assert "election money, past year" not in body and "election money this year" not in body, \
             f"{page.name} dates cycle-to-date election money as a year"

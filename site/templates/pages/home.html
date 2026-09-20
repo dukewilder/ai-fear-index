@@ -1,7 +1,9 @@
 {% from "macros.html" import fear_row, org_row, benefit_row, control_row, grid, state_row, quote_card, law_row, donor_row %}
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
-<p class="chyron">{{ d.exhibit.chyron }}</p>
+<!-- the page's one h1. A masthead is a logo, not a heading; the lead is what the page is
+     about today, and the class carries every rule that styles it, so nothing moves. -->
+<h1 class="chyron">{{ d.exhibit.chyron }}</h1>
 {% if d.exhibit.bought %}{% if d.exhibit.said %}
 <blockquote class="said">{% if d.exhibit.line_url %}<a href="{{ d.exhibit.line_url }}" rel="noopener" target="_blank">{{ d.exhibit.said }}</a>{% else %}{{ d.exhibit.said }}{% endif %}{% if d.exhibit.said_from %}<cite>{{ d.exhibit.said_from }}</cite>{% endif %}</blockquote>
 {% endif %}<p class="scare">{{ d.exhibit.bought }}</p>

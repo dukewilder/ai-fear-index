@@ -538,6 +538,53 @@ def check_lobbying_keywords():
     print("lobbying keywords name a fear rather than matching letters: ok")
 
 
+def check_position_carries_no_control():
+    """A measure that opposes a thing was being counted among the measures that do it.
+
+    Kansas HR 6023 is titled "Opposing the federal preemption of state laws that regulate
+    artificial intelligence" and carried the preemption control. So did a Pennsylvania resolution
+    urging Congress to drop federal legislation. Two of the five measures the site said would
+    override state AI law were measures against doing that. A title that asks, urges or objects
+    imposes nothing, so it carries no control; it can still name the fear it is worried about.
+    """
+    from pipeline.common import connect as _connect, states_a_position
+    import tempfile as _tempfile
+    for title, want in (
+            ("Opposing the federal preemption of state laws that regulate artificial intelligence.", True),
+            ("A Resolution urging the United States Congress to suspend any and all efforts", True),
+            ("REQUESTING THE HAWAII STATE COMMISSION TO ESTABLISH A WORKING GROUP", True),
+            ("A resolution condemning and calling for the reversal of the decision", True),
+            ("Artificial intelligence: auditors: registration.", False),
+            ("Data Center Moratorium", False),
+            ("Companion chatbots.", False)):
+        assert states_a_position(title) is want, f"{title[:50]!r} judged wrong"
+
+    room = pathlib.Path(_tempfile.mkdtemp())
+    db = _connect(room / "pos.db")
+    day = iso()[:10]
+    for mid, title in (("m-against", "Opposing the federal preemption of state AI laws."),
+                       ("m-acts", "Artificial intelligence: auditors: registration.")):
+        upsert(db, "measures", {"id": mid, "kind": "resolution" if "against" in mid else "bill",
+                                "jurisdiction": "ks", "jurisdiction_name": "Kansas", "session": "2025",
+                                "identifier": "HR 1", "title": title, "summary": "s",
+                                "status": "pending", "url": f"u{mid}", "introduced_date": day,
+                                "source": "test", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        for kind, value in (("control", "preemption"), ("fear", "china-race")):
+            db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, kind, value, "q", "t", iso()))
+    db.commit()
+    from pipeline.common import drop_position_controls
+    db.execute("DELETE FROM kv WHERE key LIKE 'repair:position-controls%'")
+    db.commit()
+    assert drop_position_controls(db) == 1, "the repair did not find the measure that takes a position"
+    left = {(r["target"], r["kind"]) for r in db.execute("SELECT target, kind FROM tags")}
+    assert ("m-against", "control") not in left, "a measure that opposes a thing still carries it"
+    assert ("m-against", "fear") in left, "the fear it names was thrown out with the control"
+    assert ("m-acts", "control") in left, "a measure that actually does something lost its control"
+    assert drop_position_controls(db) == 0, "the repair ran twice"
+    print("a measure that only takes a position carries no control: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -550,6 +597,7 @@ def main():
     check_places_word()
     check_headline_keeps_the_power()
     check_lobbying_keywords()
+    check_position_carries_no_control()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

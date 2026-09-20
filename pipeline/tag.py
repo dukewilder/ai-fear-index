@@ -12,7 +12,7 @@ import time
 
 import requests
 
-from .common import SINCE, config, env, iso, kv_get, kv_set, log, sha
+from .common import SINCE, config, env, iso, kv_get, kv_set, log, sha, states_a_position
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
@@ -210,6 +210,10 @@ def run(db, state, mode):
     with cf.ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(one, w): w for w in work}
         jurisdictions = {w[1]: w[2].split("\n", 1)[0].removeprefix("Jurisdiction: ") for w in work}
+        # A measure that asks, urges or objects imposes nothing, so it carries no control. It can
+        # still name a fear: what it is worried about is the point of saying it at all.
+        positions = {w[1] for w in work
+                     if states_a_position(next((l[7:] for l in w[2].split("\n") if l.startswith("Title: ")), ""))}
         for fut in cf.as_completed(futures):
             _, target, _, h, _ = futures[fut]
             try:
@@ -227,6 +231,8 @@ def run(db, state, mode):
                     try:
                         db.execute("DELETE FROM tags WHERE target=?", (target,))
                         for kind in ("fears", "controls", "agencies"):
+                            if kind == "controls" and target in positions:
+                                continue
                             for label, quote in agreed(verdict, doc_norm, kind, jurisdictions.get(target, "")).items():
                                 db.execute("INSERT OR REPLACE INTO tags(target,kind,value,evidence,model,tagged_at) "
                                            "VALUES(?,?,?,?,?,?)",

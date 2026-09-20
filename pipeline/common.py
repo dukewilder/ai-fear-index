@@ -140,6 +140,22 @@ EUPHEMISM = re.compile(r"""\b(?:
 )\b""", re.I | re.X)
 
 
+# A measure whose title opens this way asks, urges or objects. It imposes nothing on anybody, so
+# it carries no control. Two of the five it was giving one to were the inverse of the label: Kansas
+# HR 6023 opposes federal preemption and was counted as preemption, and so was a Pennsylvania
+# resolution urging Congress to drop the idea.
+POSITION = re.compile(
+    r"^\s*(?:an?\s+)?(?:\w+\s+)?resolution\s+(?P<a>opposing|urging|supporting|condemning|"
+    r"memorializ\w*|recognizing|encouraging|commending|requesting|expressing|congratulating)\b"
+    r"|^\s*(?P<b>opposing|urging|supporting|condemning|memorializ\w*|recognizing|encouraging|"
+    r"commending|requesting|expressing|congratulating)\b", re.I)
+
+
+def states_a_position(title):
+    """True when the title takes a side rather than doing something."""
+    return bool(POSITION.search(title or ""))
+
+
 def annotate(level, title, message):
     """Surface a message in the GitHub Actions UI (error, warning, notice)."""
     msg = str(message).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
@@ -390,6 +406,29 @@ def redo_today(db):
     return n
 
 
+# Bump to clear control tags from measures whose titles only take a position. The tagger refuses
+# them now; these are the ones it agreed to before it did.
+DROP_POSITION_CONTROLS = 1
+
+
+def drop_position_controls(db):
+    """A resolution opposing preemption was counted among the measures that would preempt."""
+    key = f"repair:position-controls:{DROP_POSITION_CONTROLS}"
+    if kv_get(db, key):
+        return 0
+    gone = 0
+    for r in db.execute("SELECT DISTINCT m.id, m.title FROM measures m "
+                        "JOIN tags t ON t.target = m.id AND t.kind = 'control'").fetchall():
+        if states_a_position(r["title"]):
+            db.execute("DELETE FROM tags WHERE target=? AND kind='control'", (r["id"],))
+            gone += 1
+    kv_set(db, key, True)
+    db.commit()
+    if gone:
+        log(f"[repair] {gone} measures that only take a position no longer carry a control")
+    return gone
+
+
 # Bump when a change to config/fears.json needs the whole record read again. Adding a fear does
 # not change a single measure's text, and the tagger only re-reads a measure whose text has
 # changed, so without this a new fear would only ever be applied to bills filed after it.
@@ -425,6 +464,7 @@ def connect(path):
     redo_briefs(db)
     redo_today(db)
     retag_for_fears(db)
+    drop_position_controls(db)
     return db
 
 

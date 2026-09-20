@@ -606,6 +606,11 @@ def main():
                     "--base", ""], check=True)
     subprocess.run([sys.executable, str(site), "--data", str(tmp / "site_data.json"), "--preview", str(tmp / "p.html")],
                    check=True)
+    # A row whose count is empty rendered its unit on its own: "Lobbying client  filings"
+    for page in (tmp / "dist").rglob("index.html"):
+        body = page.read_text()
+        for stray in ("</span> filings", "> filings<", "mentions  fear"):
+            assert stray not in body, f"{page.name} renders a unit with no number: {stray!r}"
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

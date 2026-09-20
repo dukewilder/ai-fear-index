@@ -440,6 +440,10 @@ def export(db, out_dir, base=""):
                     "controls": [control_by[c]["chip"] for c in m["controls"]],
                     "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in passed[:40]]
     law_total = len(passed)
+    # How many measures passed in all, so the section's own number reads as the share it is. A
+    # reader who sees "34 passed" takes it for every AI measure that has passed; it is the ones
+    # carrying a control, out of a larger number that did not.
+    law_passed = sum(1 for m in measures if m["status"] == "passed")
 
     # ---------------- where it is happening: every jurisdiction, ranked
     by_state = collections.defaultdict(list)
@@ -506,6 +510,7 @@ def export(db, out_dir, base=""):
         "analytics": {"goatcounter": "dukewilder"},
         "exhibit": exhibit, "index": index, "grid": grid, "polls": polls, "numbers": numbers, "site": site,
         "quotes": quotes[:5], "already_law": already_law, "law_total": law_total,
+        "law_passed": law_passed,
         "states": state_rows, "states_total": len(state_rows), "runs_today": runs_today,
         "feed_today": sum(1 for i in feed if (i.get("time_iso") or "") >= (today - dt.timedelta(days=1)).isoformat()),
         "tracked": {"measures": all_measures, "filings": all_filings, "orgs": len(ents.items)},
@@ -1054,8 +1059,12 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
             "score_text": "on the Fear Index",
             "parts": [{"name": "Bills", "cls": "k1", "pct": (st.get("parts") or {}).get("bills", 0), "value": f"{len(st['measures']):,}"},
                       {"name": "Lobbying filings", "cls": "k2", "pct": (st.get("parts") or {}).get("filings", 0), "value": f"{st['filings']:,}"},
+                      # A nought here says nobody is reading about it. What is true is that
+                      # nothing has been counted: a fear added today has no readership until the
+                      # next daily reading, and the grid already says so with the same mark.
                       {"name": "Attention", "cls": "k3", "pct": (st.get("parts") or {}).get("attention", 0),
-                       "value": (compact(st["wiki30"] + st["news30"]) if (st["wiki30"] or st["news30"]) else "0")}],
+                       "value": (compact(st["wiki30"] + st["news30"])
+                                 if (st["wiki30"] or st["news30"]) else "\u2013")}],
             "line": fear_line(st), "buying": buying_rows, "industry": industry_rows,
             "change": f"▲ {st['new_week']} new bills this week" if st["new_week"] else None, "dir": "up",
             "evidence": evidence, "timeline": timeline,

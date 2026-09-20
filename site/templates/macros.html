@@ -18,7 +18,7 @@
 {%- endmacro %}
 
 {% macro org_row(o, stat='fears') -%}
-<li>{% if o.slug %}<a class="row" href="{{ url('org', o.slug) }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ o.rank }}</span><span><span class="row-name">{{ o.name }}</span><span class="meta"><span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}{% if stat == 'messages' %}{{ o.messages }} filings{% elif o.fears and o.fears != '0' %}mentions {{ o.fears }} fear{{ 's' if o.fears != '1' }}{% endif %}</span></span><span class="val">{{ o.amount }}</span>{% if o.slug %}</a>{% else %}</div>{% endif %}</li>
+<li>{% if o.slug %}<a class="row" href="{{ url('org', o.slug) }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ o.rank }}</span><span><span class="row-name">{{ o.name }}</span><span class="meta"><span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}{% if stat == 'messages' and o.messages %}{{ o.messages }} filings{% elif o.fears and o.fears != '0' %}mentions {{ o.fears }} fear{{ 's' if o.fears != '1' }}{% endif %}</span></span><span class="val">{{ o.amount }}</span>{% if o.slug %}</a>{% else %}</div>{% endif %}</li>
 {%- endmacro %}
 
 {% macro donor_row(o) -%}

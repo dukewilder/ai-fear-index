@@ -114,7 +114,7 @@
 {% if d.already_law %}
 <section class="block" id="law"><div class="wrap">
 <h2 class="h">Already law</h2>
-<p class="sub">{{ d.law_total }} passed, with the controls they carry.{% if d.law_total > d.already_law|length %} The {{ d.already_law|length }} carrying the most are shown.{% endif %}</p>
+<p class="sub">{{ d.law_passed }} measures have passed. These {{ d.law_total }} carry a control.{% if d.law_total > d.already_law|length %} The {{ d.already_law|length }} carrying the most are shown.{% endif %}</p>
 <ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>
 </div></section>
 {% endif %}

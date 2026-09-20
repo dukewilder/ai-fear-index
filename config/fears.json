@@ -6,11 +6,11 @@
     "definition": "AI becoming uncontrollable or escaping the control of the people running it: superintelligence, catastrophic or existential risk, extinction, rogue or deceptive AI systems.",
     "keywords": [
       "loss of control",
-      "superintelligen",
+      "superintelligen*",
       "existential",
       "extinction",
       "catastrophic risk",
-      "frontier model",
+      "frontier model*",
       "frontier ai",
       "ai safety",
       "rogue ai",
@@ -36,13 +36,11 @@
     "keywords": [
       "china",
       "chinese",
-      "adversar",
-      "national security",
+      "ccp",
       "arms race",
       "ai race",
-      "dominance",
-      "export control",
-      "ccp"
+      "export control*",
+      "adversar*"
     ],
     "gdelt": "\"artificial intelligence\" China (race OR dominance OR \"national security\" OR \"export controls\")",
     "match": [
@@ -61,15 +59,25 @@
     "short": "Job loss",
     "definition": "AI replacing workers: automation, layoffs, unemployment, displacement of jobs or wages.",
     "keywords": [
-      "workforce",
-      "worker",
       "job loss",
-      "jobs",
+      "jobs lost",
+      "job displacement",
+      "worker displacement",
+      "displaced worker*",
+      "workforce displacement",
       "unemployment",
-      "displacement",
-      "labor",
-      "layoff",
-      "automation"
+      "layoff*",
+      "automation",
+      "future of work",
+      "ai workforce",
+      "workforce impact*",
+      "impact on workers",
+      "impact on the workforce",
+      "technological unemployment",
+      "labor market*",
+      "reskilling",
+      "upskilling",
+      "retraining"
     ],
     "gdelt": "\"artificial intelligence\" (layoffs OR unemployment OR \"job losses\" OR \"replace workers\")",
     "match": [
@@ -87,13 +95,13 @@
     "short": "Power bills",
     "definition": "Data centers for AI raising electricity or water costs, straining the power grid, or harming the environment and communities.",
     "keywords": [
-      "data center",
-      "datacenter",
+      "data center*",
+      "datacenter*",
       "electricity",
-      "ratepayer",
+      "ratepayer*",
       "power grid",
-      "energy cost",
-      "utility rate",
+      "energy cost*",
+      "utility rate*",
       "water use"
     ],
     "gdelt": "\"data centers\" (electricity OR \"power bills\" OR grid OR \"utility rates\" OR ratepayers)",
@@ -113,15 +121,17 @@
     "short": "Kids and chatbots",
     "definition": "AI harming children or teens: companion chatbots, minors' safety or mental health, grooming, exploitation, age-inappropriate AI content.",
     "keywords": [
-      "child",
-      "children",
-      "minor",
+      "companion chatbot*",
+      "chatbot*",
+      "child safety",
+      "children online",
+      "child online",
       "minors",
       "teen",
-      "youth",
-      "companion chatbot",
-      "chatbot",
-      "kids"
+      "teenager*",
+      "kids online",
+      "age verification",
+      "age assurance"
     ],
     "gdelt": "chatbot (children OR teens OR minors OR kids)",
     "match": [
@@ -164,13 +174,13 @@
     "short": "Deepfakes",
     "definition": "Synthetic or manipulated media: deepfakes, digital replicas, AI impersonation, election deepfakes, nonconsensual intimate imagery, AI-generated fraud.",
     "keywords": [
-      "deepfake",
-      "deep fake",
+      "deepfake*",
+      "deep fake*",
       "synthetic media",
-      "digital replica",
-      "impersonat",
+      "digital replica*",
+      "impersonat*",
       "likeness",
-      "voice clone",
+      "voice clone*",
       "manipulated media"
     ],
     "gdelt": "(deepfake OR deepfakes OR \"synthetic media\")",
@@ -188,11 +198,15 @@
     "short": "Cyberattacks",
     "definition": "AI-enabled hacking or cyberattacks, including attacks on critical infrastructure.",
     "keywords": [
-      "cyber",
+      "cyberattack*",
+      "cyber attack*",
+      "cyber-attack*",
+      "cyber threat*",
+      "malicious cyber",
+      "cyber incident*",
       "hacking",
-      "hacker",
-      "ransomware",
-      "critical infrastructure"
+      "hacker*",
+      "ransomware"
     ],
     "gdelt": "\"artificial intelligence\" (cyberattack OR cyberattacks OR hackers OR ransomware)",
     "match": [
@@ -208,13 +222,12 @@
     "short": "Bioweapons",
     "definition": "AI helping create biological, chemical, radiological, or nuclear weapons, or engineered pandemics.",
     "keywords": [
-      "bioweapon",
-      "biological weapon",
+      "bioweapon*",
+      "biological weapon*",
       "biosecurity",
-      "chemical weapon",
+      "chemical weapon*",
       "cbrn",
-      "pathogen",
-      "pandemic"
+      "pathogen*"
     ],
     "gdelt": "\"artificial intelligence\" (bioweapon OR bioweapons OR \"biological weapons\" OR biosecurity)",
     "match": [
@@ -230,13 +243,15 @@
     "short": "Bias",
     "definition": "AI discriminating against people in decisions such as hiring, lending, housing, insurance, health care, or policing.",
     "keywords": [
-      "bias",
-      "discriminat",
-      "civil rights",
-      "algorithmic",
-      "automated decision",
-      "consequential decision",
-      "high-risk"
+      "bias*",
+      "discriminat*",
+      "nondiscriminat*",
+      "antidiscriminat*",
+      "automated decision*",
+      "consequential decision*",
+      "disparate impact",
+      "algorithmic bias",
+      "algorithmic discrimination"
     ],
     "gdelt": "\"artificial intelligence\" (bias OR discrimination) (hiring OR lending OR housing OR insurance)",
     "match": [

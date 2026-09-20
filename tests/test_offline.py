@@ -500,6 +500,44 @@ def check_headline_keeps_the_power():
     print("the plate keeps who holds the power: ok")
 
 
+def check_lobbying_keywords():
+    """A lobbying filing names a fear, or it does not. Runs of letters are not names.
+
+    Matching a keyword anywhere in the text found "agi" inside imaging, managing and agile, which
+    is where 168 of the 197 filings tagged with it came from; "labor" inside laboratory and
+    collaboration; "teen" inside fifteen; "minor" inside minority. Separately, the words
+    themselves were too broad: 2,265 of the 2,443 filings tagged with the fear of AI cyberattacks
+    rested on the bare string "cyber", which is how a filing reading "Cloud technology;
+    Cybersecurity; Encryption policy" came to name a fear of AI attacks.
+    """
+    from pipeline.common import fear_keywords, fears_mentioned
+    kw = fear_keywords()
+    for text, fear, want in (
+            ("medical imaging and managing engagement", "loss-of-control", False),
+            ("laboratory collaboration agreements", "job-loss", False),
+            ("fifteen reports on minority business", "kids-chatbots", False),
+            ("Cloud technology; Cybersecurity; Encryption policy", "ai-cyberattacks", False),
+            ("FY 2026 Labor/HHS Appropriations", "job-loss", False),
+            ("pandemic preparedness and drug pricing", "bioweapons", False),
+            ("AGI and superintelligence risk", "loss-of-control", True),
+            ("discriminatory automated decisions", "bias", True),
+            ("ransomware and hacking of AI systems", "ai-cyberattacks", True),
+            ("reskilling for the future of work", "job-loss", True),
+            ("companion chatbots and child safety", "kids-chatbots", True)):
+        got = fear in fears_mentioned(text, kw)
+        assert got == want, \
+            f"{text!r} {'should' if want else 'should not'} name {fear}"
+    # the words the evidence refused, kept out by name so they are not quietly restored
+    refused = {"cyber", "labor", "jobs", "worker", "workforce", "national security", "dominance",
+               "pandemic", "algorithmic", "high-risk", "civil rights", "child", "children",
+               "youth", "minor", "critical infrastructure"}
+    for f in config("fears"):
+        bare = {k.lower().rstrip("*") for k in f["keywords"]}
+        clash = bare & refused
+        assert not clash, f"{f['slug']} took back a word the filings showed to be generic: {clash}"
+    print("lobbying keywords name a fear rather than matching letters: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -511,6 +549,7 @@ def main():
     check_failed_source_retries()
     check_places_word()
     check_headline_keeps_the_power()
+    check_lobbying_keywords()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

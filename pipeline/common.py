@@ -542,16 +542,28 @@ class Entities:
 
 
 def fear_keywords():
+    """Each fear's lobbying words, compiled.
+
+    A word, not a run of letters. Matching anywhere in the text found "agi" inside imaging and
+    managing, "labor" inside laboratory and collaboration, "teen" inside fifteen, and "minor"
+    inside minority: 168 of the 197 filings that matched agi were phantoms. A keyword matches at
+    the start of a word and ends at the end of one, unless it is written with a trailing star,
+    which is how a stem like discriminat* covers discrimination and discriminatory.
+    """
     out = {}
     for f in config("fears"):
-        out[f["slug"]] = [k.lower() for k in f.get("keywords", [])]
+        pats = []
+        for k in f.get("keywords", []):
+            stem = k.lower().rstrip("*")
+            pats.append(re.compile(r"\b" + re.escape(stem) + ("" if k.endswith("*") else r"\b"), re.I))
+        out[f["slug"]] = pats
     return out
 
 
 def fears_mentioned(text, keywords=None):
     keywords = keywords or fear_keywords()
-    low = (text or "").lower()
-    return sorted(slug for slug, words in keywords.items() if any(w in low for w in words))
+    text = text or ""
+    return sorted(slug for slug, pats in keywords.items() if any(p.search(text) for p in pats))
 
 
 def strip_html(text):

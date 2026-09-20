@@ -411,7 +411,8 @@ def export(db, out_dir, base=""):
     election_words = ("raised by AI super PACs this cycle" if not election_spent else
                       f"raised by AI super PACs this cycle, {money(election_spent)} of it spent")
     spent = sorted(((election_total, election_words),
-                    (advocacy_total, "spent lobbying on the fears by advocacy groups, past year")),
+                    (advocacy_total,
+                     "reported by advocacy groups on lobbying filings that name a fear, past year")),
                    reverse=True)
     numbers = [n for n in [
         [money(spent[0][0]), spent[0][1]] if spent[0][0] else None,
@@ -914,9 +915,24 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         rows.append(["Lobbying", count(st["filings"], "filing") + " name it, past year"])
     if st["advocacy"]:
         rows.append(["Funding", f"{money(st['advocacy'])} from advocacy groups, past year"])
-    if source:
+    # The quote at the top carries its own attribution, so the table only names the source when
+    # there is no quote up there to name it.
+    bought = []
+    if st["measures"]:
+        where = f" in {count(len(st['states']), 'state')}" if st["states"] else ""
+        bought.append(f"{count(len(st['measures']), 'bill')}{where} cite it")
+    if st["controls"]:
+        bought.append(f"They carry {count(st['controls'], 'new government control')}")
+    # which office and how many it gains stays in the table below, where there is room for it
+    if source and not (source_label == "Headline from" and bought):
         rows.append([source_label, source])
+    # What the fear bought, in the same breath as the fear. The headline is evidence that the fear
+    # is loud; on its own, at the top of the page, it reads as the report's own statement and as
+    # good news. The counts under it are the other half and they are what the site is for.
     return {"chyron": f"Loudest fear right now: {best['name']}", "line": line, "line_url": line_url,
+            "said": line if source_label == "Headline from" else "",
+            "said_from": source if source_label == "Headline from" else "",
+            "bought": ". ".join(bought) + "." if bought else "",
             "rows": rows, "fear_slug": best["slug"]}
 
 
@@ -1051,17 +1067,18 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group
             for s in r["fears"]:
                 fear_amounts[s] += r["amount"] or 0
     top = max(fear_amounts.values() or [1])
-    fears = [{"name": s.replace("-", " ").capitalize(), "slug": s, "amount": money(v), "bar": max(3, round(100 * v / top))}
-             for s, v in fear_amounts.most_common(6)]
     fear_names = {f["slug"]: f["name"] for f in config("fears")}
-    for row in fears:
-        row["name"] = fear_names.get(row["slug"], row["name"])
+    fears = [{"slug": s, "name": fear_names.get(s, s.replace("-", " ").capitalize()),
+              "amount": money(v), "bar": max(3, round(100 * v / top))}
+             for s, v in fear_amounts.most_common(6)]
     lobbying = []
     for r in filings[:8]:
         chips = sorted({control_by[c]["chip"] for ref in (r["bill_refs"] or "").split(", ") if ref in by_ident
                         for c in by_ident[ref]["controls"]})
+        names = [fear_names.get(f, f) for f in (r["fears"] or [])]
         lobbying.append({"bill": r["bill_refs"] or "No bill numbers listed", "amount": money(r["amount"]),
-                         "period": f"{r['quarter']} {r['year']}", "controls": chips, "url": r["url"]})
+                         "period": f"{r['quarter']} {r['year']}", "controls": chips, "url": r["url"],
+                         "fears": names})
     money_out = [{"to": nice_name(r["committee_name"]), "amount": money(r["amount"]), "year": (r["date"] or "")[:4],
                   "source": "FEC", "url": r["url"]}
                  for r in receipts if (o["entity"] and o["entity"] == Entities_cache().match_name(r["counterparty"]))
@@ -1074,6 +1091,11 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group
         if r["committee_id"] not in ids or not (r["amount"] or 0):
             continue
         ent = ents_.match_name(r["counterparty"])
+        # The same line rule the total above this list uses. Without it a committee's own bank
+        # appeared among its donors for the interest it paid, and the names under the figure added
+        # up to more than the figure.
+        if not gave(r["line_number"], ent):
+            continue
         key = ent or r["counterparty_key"] or nice_name(r["counterparty"])
         label = ents_.by_slug[ent]["name"] if ent else nice_name(r["counterparty"])
         if ent and ent == o["entity"]:
@@ -1090,11 +1112,12 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group
     latest = [i for i in feed if i.get("org") == o["slug"]][:6]
     parts = []
     if o["lobbying"]:
-        parts.append(f"{money(o['lobbying'])} in lobbying that mentions AI")
+        parts.append(f"{money(o['lobbying'])} reported on filings that name a fear")
     if o["election"]:
         parts.append(f"{money(o['election'])} in election money")
     if len(parts) == 1:  # the big number above already says how much
-        parts = ["lobbying that mentions AI" if o["lobbying"] else "election money"]
+        parts = ["reported on lobbying filings that name a fear" if o["lobbying"] else
+                 "raised in election money"]
     return {"slug": o["slug"], "name": o["name"], "type": o["type"], "flag": o["flag"], "rank": str(o["rank"]),
             "of": f"{of:,}", "group": group, "spent": money(o["total"]), "period": "past year",
             "breakdown": " and ".join(parts),

@@ -18,6 +18,14 @@ SWEEP = ["artificial intelligence", "AI policy", "AI PAC", "AI super PAC",
          "machine learning", "data center", "deepfake", "tech policy"]
 AI_NAME = re.compile(r"(?:\bA\.?I\.?\b|artificial intelligence|machine learning|deepfake|"
                      r"algorithm|data cent(?:er|re))", re.I)
+# The FEC appends a bracket to tell two committees of similar name apart, and it is not what the
+# committee is about: "APPRAISAL INSTITUTE PAC (AI PAC)" is a real-estate appraisers' committee
+# and the two letters that matched are in the disambiguator. It comes off before the name is read.
+BRACKET = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def about_ai(name):
+    return bool(AI_NAME.search(BRACKET.sub("", name or "")))
 POLITICAL = ("O", "U", "V", "W", "N", "Q", "I")  # super PAC, hybrid, electioneering, and the PAC types
 
 
@@ -44,6 +52,18 @@ def sweep(db, http, key, ents, cycle, notes):
     Anything found here is stored without an entity attached: it is a committee the report knows
     about because the FEC lists it, not because somebody added it to a file.
     """
+    # Anything this sweep put here before is re-read against the test as it now stands. A committee
+    # it should not have taken is dropped rather than living on because it was added once.
+    dropped = []
+    for r in db.execute("SELECT id, name FROM committees WHERE entity IS NULL AND query LIKE 'sweep:%'"):
+        if not about_ai(r["name"]):
+            db.execute("DELETE FROM committees WHERE id=?", (r["id"],))
+            db.execute("DELETE FROM fec WHERE committee_id=?", (r["id"],))
+            dropped.append(r["name"])
+    if dropped:
+        db.commit()
+        notes.append(f"dropped {len(dropped)} the sweep should not have taken: {', '.join(dropped[:3])}")
+        log(f"[fec] dropped from the register sweep: {', '.join(dropped)}")
     known = {r["id"] for r in db.execute("SELECT id FROM committees")}
     added, new = 0, []
     for query in SWEEP:
@@ -55,7 +75,7 @@ def sweep(db, http, key, ents, cycle, notes):
             continue
         for c in found:
             cid, cname = c.get("committee_id"), c.get("name") or ""
-            if not cid or cid in known or not AI_NAME.search(cname):
+            if not cid or cid in known or not about_ai(cname):
                 continue
             if (c.get("committee_type") or "") not in POLITICAL:
                 continue

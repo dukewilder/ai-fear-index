@@ -10,7 +10,7 @@
 {% if o.fears %}
 <section class="block band"><div class="wrap">
 <h2 class="h">Fears its lobbying mentions</h2>
-<p class="sub">Lobbying on filings that mention each fear, {{ o.period }}</p>
+<p class="sub">What each filing reported, counted once for every fear it names, {{ o.period }}. One filing naming three fears appears against all three, so these do not add up.</p>
 <ol class="rank">{% for f in o.fears %}<li><a class="row norank" href="{{ url('fear', f.slug) }}"><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span></span><span class="val">{{ f.amount }}</span></a></li>{% endfor %}</ol>
 </div></section>
 {% endif %}
@@ -18,7 +18,8 @@
 {% if o.lobbying %}
 <section class="block"><div class="wrap">
 <h2 class="h">Lobbying that mentions AI</h2>
-<ul class="list" style="margin-top:12px">{% for l in o.lobbying %}<li class="item"><span class="item-top"><a class="row-name" href="{{ l.url }}" rel="noopener" target="_blank">{{ l.bill }}</a><span class="val small">{{ l.amount }}</span></span><span class="meta" style="margin-top:0">{{ l.period }}</span>{% if l.controls %}<span class="chips">{% for c in l.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+<p class="sub">Every filing on file, whether or not it names one of the fears. A filing reports one total for everything the registrant lobbied on that quarter.</p>
+<ul class="list" style="margin-top:12px">{% for l in o.lobbying %}<li class="item"><span class="item-top"><a class="row-name" href="{{ l.url }}" rel="noopener" target="_blank">{{ l.bill }}</a><span class="val small">{{ l.amount }}</span></span><span class="meta" style="margin-top:0">{{ l.period }}</span>{% if l.fears or l.controls %}<span class="chips">{% for f in l.fears %}<span class="chip">{{ f }}</span>{% endfor %}{% for c in l.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
 </div></section>
 {% endif %}
 

@@ -364,7 +364,10 @@ def redo_briefs(db):
 # 7: the plate's line read its tense from the whole sentence and could not name an office.
 # 8: "under child safety audits" carried the sponsor's reason instead of the act. The audit is of
 #    the service, and everyone using it is inside it.
-REDO_EDITION = ("2026-09-20", 8)
+# 9: the edition that went out said California would exempt data centers from environmental review.
+#    The measure puts them under the Governor's authority to certify them as exempt, which is an
+#    office deciding who is exempt, not a requirement going away. The plate dropped the office.
+REDO_EDITION = ("2026-09-20", 9)
 
 
 def redo_today(db):

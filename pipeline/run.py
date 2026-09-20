@@ -70,10 +70,14 @@ def main():
     sources += [s for s in DAILY if s not in sources and retry_due(db, s)]
     # A fear added after the day's reading has no readership until tomorrow's, and the index
     # scores it on fewer channels than it actually has for a day. Wikipedia backfills a fear the
-    # first time it sees one, so asking again costs one pass and settles it.
-    if "wikipedia" not in sources and any(
+    # first time it sees one, so asking again costs one pass and settles it. Once a day, though:
+    # the collector marks a fear done only when it comes back with something, so an article that
+    # has no readership to report would otherwise pull this in on every pass for good.
+    if "wikipedia" not in sources and kv_get(db, "wiki_catchup") != today and any(
             f.get("wikipedia") and not kv_get(db, f"wiki_done:{f['slug']}") for f in config("fears")):
         sources.append("wikipedia")
+        kv_set(db, "wiki_catchup", today)
+        db.commit()
     if args.only:
         sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]
     log(f"mode={mode} sources={sources} first run for: {[s for s in sources if s not in done] or 'none'}")

@@ -439,11 +439,11 @@ def places(db, kind, value, keep=None):
         "SELECT DISTINCT m.id, m.jurisdiction, m.jurisdiction_name FROM measures m "
         "JOIN tags t ON t.target = m.id WHERE t.kind = ? AND t.value = ?", (kind, value))
         if r["id"] in keep]
-    places = {r["jurisdiction_name"] for r in rows}
+    where = {r["jurisdiction_name"] for r in rows}
     # The jurisdiction code is the answer. The name's ending was a guess, and it guessed state for
     # the Executive Office of the President and for a bureau inside a department.
     federal = any((r["jurisdiction"] or "") in FEDERAL for r in rows)
-    return len(places), ("jurisdiction" if federal else "state")
+    return len(where), ("jurisdiction" if federal else "state")
 
 
 def patterns(db, today, recent):

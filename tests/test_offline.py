@@ -251,12 +251,60 @@ def check_no_euphemism():
     print("no euphemism in anything the site says itself: ok")
 
 
+def check_fec_sweep():
+    """The register sweep writes money into the database unattended, so it is exercised here.
+
+    Four things have to hold. A committee on the entity list is left to the loop that owns it. One
+    the sweep found before is read again, because its receipts keep changing after the day it was
+    found. One it should never have taken is dropped. And a name that only matches inside the
+    bracket the FEC adds to tell similar committees apart is not a match at all.
+    """
+    from pipeline import collect_fec as fec
+    from pipeline.common import connect as _connect
+    import tempfile as _tempfile
+    db = _connect(pathlib.Path(_tempfile.mkdtemp()) / "fec.db")
+    for cid, name, ent in (("C1", "AI SAFETY PAC", None),
+                           ("C2", "APPRAISAL INSTITUTE PAC (AI PAC)", None),
+                           ("C3", "LEADING THE FUTURE", "leading-the-future")):
+        db.execute("INSERT INTO committees(id,name,entity,query,receipts) VALUES(?,?,?,?,?)",
+                   (cid, name, ent, "sweep:x" if ent is None else "by name", 1000))
+    db.commit()
+    register = [{"committee_id": "C1", "name": "AI SAFETY PAC", "committee_type": "O"},
+                {"committee_id": "C4", "name": "HUMANITY ABOVE ARTIFICIAL INTELLIGENCE PAC",
+                 "committee_type": "O"},
+                {"committee_id": "C3", "name": "LEADING THE FUTURE", "committee_type": "O"},
+                {"committee_id": "C5", "name": "AIR LINE PILOTS ASSOCIATION PAC", "committee_type": "N"}]
+
+    class Http:
+        asked = []
+
+        def json(self, url, params=None, **kw):
+            if url.endswith("/committees/"):
+                return {"results": register if params["q"] == fec.SWEEP[0] else []}
+            if "/totals/" in url:
+                Http.asked.append(url.split("/committee/")[1].split("/")[0])
+                return {"results": [{"receipts": 5000, "disbursements": 0,
+                                     "independent_expenditures": 0}]}
+            return {"results": []}
+
+    fec.sweep(db, Http(), "key", None, 2026, [])
+    left = {r["id"]: r for r in db.execute("SELECT id, name, entity, receipts FROM committees")}
+    assert "C2" not in left, "the sweep kept a committee that only matches inside the bracket"
+    assert "C5" not in left, "the sweep took a committee whose name is not about AI"
+    assert "C4" in left, "the sweep missed a new committee"
+    assert left["C1"]["receipts"] == 5000, "a committee the sweep found before was not read again"
+    assert left["C3"]["receipts"] == 1000, "the sweep overwrote a committee the entity list owns"
+    assert Http.asked == ["C1", "C4"], f"totals asked for the wrong set: {Http.asked}"
+    print("the FEC register sweep: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
     check_headline_tidy()
     check_fears_config()
     check_no_euphemism()
+    check_fec_sweep()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

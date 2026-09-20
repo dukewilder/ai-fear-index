@@ -53,19 +53,26 @@ def sweep(db, http, key, ents, cycle, notes):
     about because the FEC lists it, not because somebody added it to a file.
     """
     # Anything this sweep put here before is re-read against the test as it now stands. A committee
-    # it should not have taken is dropped rather than living on because it was added once.
+    # it should not have taken is dropped rather than living on because it was added once. The rows
+    # are read into a list first: deleting from a table while stepping its own cursor lets SQLite
+    # skip rows, which would leave a bad committee in place until some later run happened to catch it.
+    mine = [(r["id"], r["name"]) for r in db.execute(
+        "SELECT id, name FROM committees WHERE entity IS NULL AND query LIKE 'sweep:%'")]
     dropped = []
-    for r in db.execute("SELECT id, name FROM committees WHERE entity IS NULL AND query LIKE 'sweep:%'"):
-        if not about_ai(r["name"]):
-            db.execute("DELETE FROM committees WHERE id=?", (r["id"],))
-            db.execute("DELETE FROM fec WHERE committee_id=?", (r["id"],))
-            dropped.append(r["name"])
+    for cid, cname in mine:
+        if not about_ai(cname):
+            db.execute("DELETE FROM committees WHERE id=?", (cid,))
+            db.execute("DELETE FROM fec WHERE committee_id=?", (cid,))
+            dropped.append(cname)
     if dropped:
         db.commit()
         notes.append(f"dropped {len(dropped)} the sweep should not have taken: {', '.join(dropped[:3])}")
         log(f"[fec] dropped from the register sweep: {', '.join(dropped)}")
-    known = {r["id"] for r in db.execute("SELECT id FROM committees")}
-    added, new = 0, []
+    # Committees on the entity list are read by the loop above and are left alone here. One the
+    # sweep found is read again every run, because its receipts go on changing after the day it
+    # was found and skipping it would freeze its figures at whatever they were that morning.
+    tracked = {r["id"] for r in db.execute("SELECT id FROM committees WHERE entity IS NOT NULL")}
+    seen, added, new = set(), 0, []
     for query in SWEEP:
         try:
             found = http.json(f"{BASE}/committees/", params={
@@ -75,8 +82,9 @@ def sweep(db, http, key, ents, cycle, notes):
             continue
         for c in found:
             cid, cname = c.get("committee_id"), c.get("name") or ""
-            if not cid or cid in known or not about_ai(cname):
+            if not cid or cid in tracked or cid in seen or not about_ai(cname):
                 continue
+            seen.add(cid)
             if (c.get("committee_type") or "") not in POLITICAL:
                 continue
             t = totals_for(http, key, cid, cycle)
@@ -84,7 +92,6 @@ def sweep(db, http, key, ents, cycle, notes):
                 continue  # the register lists it and the totals endpoint does not; not ours to fix
             if not (t.get("receipts") or t.get("independent_expenditures")):
                 continue  # registered but has raised and spent nothing; it is not money yet
-            known.add(cid)
             new.append(f"{cname} ({cid})")
             upsert(db, "committees", {
                 "id": cid, "name": cname, "entity": None, "query": f"sweep:{query}",

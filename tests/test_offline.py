@@ -407,6 +407,41 @@ def check_failed_source_retries():
     print("a failed daily source is tried again today: ok")
 
 
+def check_places_word():
+    """An executive order is not a state, whatever its office is called.
+
+    The plate says "in ten states" or "in ten jurisdictions" depending on what it counted. The
+    test for that read the end of the place's name, so Education Department was federal and
+    Executive Office of the President was a state. The jurisdiction code is the answer.
+    """
+    from pipeline import brief
+    from pipeline.common import connect as _connect
+    import tempfile as _tempfile
+    db = _connect(pathlib.Path(_tempfile.mkdtemp()) / "places.db")
+    day = dt.date.today().isoformat()
+    rows = [("m1", "ca", "California"), ("m2", "ny", "New York"), ("m3", "tx", "Texas")]
+    for mid, code, name in rows:
+        upsert(db, "measures", {"id": mid, "kind": "bill", "jurisdiction": code,
+                                "jurisdiction_name": name, "session": "2025", "identifier": "SB 1",
+                                "title": "t", "summary": "s", "status": "pending", "url": f"u{mid}",
+                                "introduced_date": day, "source": "test", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", "c", "q", "t", iso()))
+    db.commit()
+    assert brief.places(db, "control", "c") == (3, "state"), "three states are three states"
+    upsert(db, "measures", {"id": "m4", "kind": "order", "jurisdiction": "us-exec",
+                            "jurisdiction_name": "Executive Office of the President", "session": "",
+                            "identifier": "EO 1", "title": "t", "summary": "s", "status": "passed",
+                            "url": "u4", "introduced_date": day, "source": "test", "first_seen": iso()})
+    db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("m4", "h", 1, iso()))
+    db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("m4", "control", "c", "q", "t", iso()))
+    db.commit()
+    n, word = brief.places(db, "control", "c")
+    assert (n, word) == (4, "jurisdiction"), \
+        f"an executive order counted as a state: the plate would have said {n} {word}s"
+    print("an executive order is not a state: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -416,6 +451,7 @@ def main():
     check_fec_sweep()
     check_post_needs_entries()
     check_failed_source_retries()
+    check_places_word()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()
@@ -492,6 +528,13 @@ def main():
         assert label, f"the front page stopped saying {word!r}; the plate still counts it"
         assert chain[label] == f"{plate[key]:,}", \
             f"the plate says {plate[key]:,} and the page says {chain[label]} for {word!r}"
+    # The plate counts offices in two places of its own, and they drifted apart once already.
+    from pipeline.brief import patterns as plate_patterns  # noqa: E402
+    lines = plate_patterns(db, dt.date.today().isoformat(), ())
+    offices = next((l for l in lines if l["key"].startswith("offices:")), None)
+    assert offices, "the plate stopped counting offices"
+    assert offices["key"] == f"offices:{plate['offices']}", \
+        f"the plate's office line says {offices['key']} and its own total says {plate['offices']}"
     assert data["fears"] and data["controls"]
     assert data["funders"], "advocacy lobbying should rank separately"
     assert data["industry"], "company and trade group lobbying should rank separately"

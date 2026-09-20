@@ -13,6 +13,7 @@ is dropped rather than softened, and the edition runs a line shorter.
     python -m pipeline.brief --db state/index.db --out state/brief --dry-run
 """
 import argparse
+import collections
 import datetime as dt
 import zoneinfo
 import json
@@ -431,16 +432,18 @@ def count(n, one, many=None, cap=False):
     return f"{words(n, cap)} {one if n == 1 else (many or one + 's')}"
 
 
-def places(db, kind, value):
+def places(db, kind, value, keep=None):
     """Say states when they are all states. Congress and a federal agency are not."""
-    rows = db.execute(
-        "SELECT DISTINCT m.jurisdiction, m.jurisdiction_name FROM measures m "
-        "JOIN tags t ON t.target = m.id JOIN tag_runs tr ON tr.target = m.id "
-        "WHERE tr.ai_related = 1 AND t.kind = ? AND t.value = ?", (kind, value)).fetchall()
-    federal = any((r["jurisdiction"] or "") in ("us", "fed") or
-                  (r["jurisdiction_name"] or "").endswith(("Department", "Administration", "Commission"))
-                  for r in rows)
-    return len(rows), ("jurisdiction" if federal else "state")
+    keep = in_scope(db) if keep is None else keep
+    rows = [r for r in db.execute(
+        "SELECT DISTINCT m.id, m.jurisdiction, m.jurisdiction_name FROM measures m "
+        "JOIN tags t ON t.target = m.id WHERE t.kind = ? AND t.value = ?", (kind, value))
+        if r["id"] in keep]
+    places = {r["jurisdiction_name"] for r in rows}
+    # The jurisdiction code is the answer. The name's ending was a guess, and it guessed state for
+    # the Executive Office of the President and for a bureau inside a department.
+    federal = any((r["jurisdiction"] or "") in FEDERAL for r in rows)
+    return len(places), ("jurisdiction" if federal else "state")
 
 
 def patterns(db, today, recent):
@@ -455,46 +458,62 @@ def patterns(db, today, recent):
     fears = fears_by_slug()
     out = []
 
-    for r in db.execute(
-            "SELECT t.value AS slug, COUNT(DISTINCT m.id) AS n, COUNT(DISTINCT m.jurisdiction_name) AS j "
-            "FROM tags t JOIN measures m ON m.id = t.target JOIN tag_runs tr ON tr.target = m.id "
-            "WHERE t.kind='control' AND tr.ai_related=1 GROUP BY t.value HAVING n >= 5"):
+    # Counted over the set the front page shows, not over every tag on file, because the plate
+    # and the page are read side by side.
+    keep = in_scope(db)
+    tally = collections.defaultdict(set)
+    for t in db.execute("SELECT kind, value, target FROM tags WHERE kind IN ('control','fear')"):
+        if t["target"] in keep:
+            tally[(t["kind"], t["value"])].add(t["target"])
+
+    for (kind, slug), ids in sorted(tally.items(), key=lambda kv: -len(kv[1])):
+        if kind != "control" or len(ids) < 5:
+            continue
+        r = {"slug": slug, "n": len(ids)}
         c = names.get(r["slug"])
         if not c:
             continue
-        n, word = places(db, "control", r["slug"])
+        n, word = places(db, "control", r["slug"], keep)
         out.append({"key": f"control:{r['slug']}:{r['n']}", "weight": WEIGHT.get(r["slug"], 1),
                     "sentence": f"{count(r['n'], 'measure', cap=True)} in {count(n, word)} "
                                 f"would {c['pattern']}.",
                     "meta": c["chip"], "office": "",
                     "head": f"{r['n']} measures in {count(n, word)}: {c['head']}"})
 
-    for r in db.execute(
-            "SELECT t.value AS slug, COUNT(DISTINCT m.id) AS n, COUNT(DISTINCT m.jurisdiction_name) AS j "
-            "FROM tags t JOIN measures m ON m.id = t.target JOIN tag_runs tr ON tr.target = m.id "
-            "WHERE t.kind='fear' AND tr.ai_related=1 GROUP BY t.value HAVING n >= 5"):
+    for (kind, slug), ids in sorted(tally.items(), key=lambda kv: -len(kv[1])):
+        if kind != "fear" or len(ids) < 5:
+            continue
+        r = {"slug": slug, "n": len(ids)}
         f = fears.get(r["slug"])
         if not f:
             continue
-        n, word = places(db, "fear", r["slug"])
+        n, word = places(db, "fear", r["slug"], keep)
         out.append({"key": f"fear:{r['slug']}:{r['n']}", "weight": 3,
                     "sentence": f"{count(r['n'], 'measure', cap=True)} in {count(n, word)} "
                                 f"name the same fear: {f['name']}.",
                     "meta": f["name"], "office": "",
                     "head": f"{r['n']} measures name the same fear: {f['name']}"})
 
-    row = db.execute(
-        "SELECT COUNT(DISTINCT value) AS n FROM tags WHERE kind='agency'").fetchone()
-    top = db.execute(
-        "SELECT value, COUNT(*) n FROM tags WHERE kind='agency' GROUP BY value ORDER BY n DESC LIMIT 1"
-    ).fetchone()
-    if row["n"] and top:
-        out.append({"key": f"offices:{row['n']}", "weight": 4,
-                    "sentence": f"{count(row['n'], 'named office', 'named offices', cap=True)} would gain a "
-                                f"power over AI. The one named most often is the {top['value']}, in "
-                                f"{count(top['n'], 'measure')}.",
+    # Normalized and taken over the page's own set, the same way the front page counts offices.
+    # Counting distinct strings made this line say 195 while the page said 190, and split one
+    # office across two spellings when deciding which is named most often.
+    named, by_office = {}, collections.defaultdict(set)
+    for t in db.execute("SELECT target, value FROM tags WHERE kind='agency'"):
+        if t["target"] not in keep:
+            continue
+        k = name_key(t["value"])
+        if not k:
+            continue
+        named.setdefault(k, (t["value"] or "").strip())
+        by_office[k].add(t["target"])
+    if named:
+        k = max(by_office, key=lambda x: len(by_office[x]))
+        out.append({"key": f"offices:{len(named)}", "weight": 4,
+                    "sentence": f"{count(len(named), 'named office', 'named offices', cap=True)} would gain a "
+                                f"power over AI. The one named most often is the {named[k]}, in "
+                                f"{count(len(by_office[k]), 'measure')}.",
                     "meta": "", "office": "",  # the sentence already names it
-                    "head": f"{row['n']} offices would gain a power over AI"})
+                    "head": f"{len(named)} offices would gain a power over AI"})
 
     # the same line-number rule the site uses, so a total here matches the total there
     ents = Entities()
@@ -508,10 +527,9 @@ def patterns(db, today, recent):
     if len(committees) >= 2:
         out.append({"key": f"money:{int(given)}", "weight": 4,
                     "sentence": f"${given / 1e6:,.1f} million from {count(len(donors), 'donor')} sits in "
-                                f"{count(len(committees), 'committee')} arguing about how afraid you "
-                                f"should be of AI.",
+                                f"{count(len(committees), 'political committee')} working on AI policy.",
                     "meta": ", ".join(sorted(c.title() for c in committees)), "office": "",
-                    "head": f"${given / 1e6:,.1f} million on how afraid you should be"})
+                    "head": f"${given / 1e6:,.1f} million in {len(committees)} committees on AI policy"})
 
     return [p for p in out if p["key"] not in recent]
 
@@ -586,6 +604,23 @@ def alt(head, lines):
     return f"A card from the AI Fear Report headed: {head}. {body}"
 
 
+FEDERAL = ("us", "fed", "us-exec")
+
+
+def in_scope(db):
+    """The measures the front page counts, which is the set every number on the plate is taken over.
+
+    Read, judged to be about AI, filed since the report starts or a rule or order, and not on the
+    suppression list. The plate goes out on X while the page it describes is one click away, so a
+    count taken over a wider set than the page uses is a contradiction waiting to be noticed.
+    """
+    suppressed = set(config("suppress").get("urls", []))
+    return {r["id"] for r in db.execute(
+        "SELECT m.id, m.url FROM measures m JOIN tag_runs tr ON tr.target = m.id "
+        "WHERE tr.ai_related = 1 AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))",
+        (SINCE,)) if r["url"] not in suppressed}
+
+
 def totals(db):
     """The three counts the plate carries, on the rule the front page counts by.
 
@@ -594,11 +629,7 @@ def totals(db):
     file instead of the ones the page shows, put five offices on the plate that the page did not
     have. The test suite holds these against the exported page numbers.
     """
-    suppressed = set(config("suppress").get("urls", []))
-    keep = {r["id"] for r in db.execute(
-        "SELECT m.id, m.url FROM measures m JOIN tag_runs tr ON tr.target = m.id "
-        "WHERE tr.ai_related = 1 AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))",
-        (SINCE,)) if r["url"] not in suppressed}
+    keep = in_scope(db)
     known = {c["slug"] for c in config("controls")}
     controlled, offices = set(), set()
     for t in db.execute("SELECT target, kind, value FROM tags WHERE kind IN ('control','agency')"):

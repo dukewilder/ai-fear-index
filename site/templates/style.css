@@ -40,13 +40,20 @@ a:hover{color:var(--accent)}
 .masthead{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:2px solid var(--ink)}
 .masthead .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
 .brand{display:inline-flex;align-items:center;gap:8px;font-family:var(--disp);font-size:25px;font-weight:800;letter-spacing:.01em;line-height:1;text-transform:uppercase;text-decoration:none;white-space:nowrap}
-.brand .badge{display:inline-block;padding:3px 7px 2px;background:var(--accent);color:#F1EDE3;font-size:.86em;letter-spacing:.02em}
+/* A square, the same square the avatar and the card draw: the letters are 0.70em of cap
+   with 0.22em of air on every side, so the box is 1.14em. It was 30.88 by 26.5. */
+/* A square, the same one the avatar and the card draw: 0.70em of cap with 0.22em of air on
+   every side, so 1.14em. It was 30.88 by 26.5. The top offset drops the square onto the cap
+   centre of FEAR REPORT, because align-items centres it on the line box instead, and that
+   box's middle sits 1.25px above the caps on a face with this much ascender. Both numbers
+   were read off the rendered page, not guessed. */
+.brand .badge{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:1.14em;height:1.14em;padding:0;background:var(--accent);color:#F1EDE3;font-size:.86em;letter-spacing:.02em;line-height:1;position:relative;top:.05em}
 .nav{display:flex;align-items:center;gap:18px}
 .nav a{display:inline-flex;align-items:center;min-height:44px;font:500 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:none}
 .nav a[aria-current=page]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
 .theme{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--edge);background:transparent;color:var(--muted);font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .theme:hover{border-color:var(--ink);color:var(--ink)}
-@media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.brand .badge{padding:2px 5px 1px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme{padding:0 6px}.theme span{display:none}.status .asof{display:none}}
+@media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme{padding:0 6px}.theme span{display:none}.status .asof{display:none}}
 .theme i{display:inline-block;width:8px;height:8px;border:1px solid currentColor;background:var(--ink)}
 :root[data-theme=dark] .theme i,:root:not([data-theme=light]) .theme i{background:var(--ink)}
 .status{--hair:var(--rule-band);border-bottom:1px solid var(--hair);background:var(--band);font:500 11px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}

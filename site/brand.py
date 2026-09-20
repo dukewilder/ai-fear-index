@@ -114,15 +114,44 @@ def ink(d, text, fnt, track=0.0):
     return measured(text, fnt, track)
 
 
+# How much room the letters get on each side of the square, as a fraction of the type size.
+BADGE_PAD = 0.22
+# The letters are not centred on their box but on their weight. "AI" is a triangle with a hole in
+# it beside a solid bar, so its ink sits 3.4% right and 3.2% low of the middle of its own bounding
+# box, and a box-centred mark reads as sitting low. Measured, not guessed: render AI at 400pt and
+# the ink box is 277 by 280 while the centre of mass is at 147.8, 149.0.
+#
+# Half of that offset, not all of it. Drawn at 0, 50 and 100 per cent and looked at: the whole
+# correction overshoots and leaves a visible gap below and to the right, which is the same fault
+# the other way round. Half lands even.
+BADGE_NUDGE = (-0.017, -0.016)
+
+
+def badge_side(d, size):
+    """The side of the square the letters sit in.
+
+    Square, because a mark that is itself square reads as broken when its box is not. The letters
+    measure 191 by 193 at the avatar's size and the box around them was 354 by 315: a third more
+    air at the sides than above, which is what made a centred mark look uncentred.
+    """
+    f = font("barlow-condensed-800", size)
+    _, _, iw, ih = ink(d, "AI", f)
+    return max(iw, ih) + size * BADGE_PAD * 2
+
+
 def badge(d, x, y, size, fg=VERMILLION, bg=PAPER):
-    """The mark: AI in a filled box, the letters centred on their ink rather than their metrics."""
+    """The mark: AI in a square, on its weight rather than its metrics. Returns the square."""
     f = font("barlow-condensed-800", size)
     left, top, iw, ih = ink(d, "AI", f)
-    pad = size * 0.30
-    bw, bh = iw + pad * 2, ih + pad * 1.5
-    d.rectangle([x, y, x + bw, y + bh], fill=bg)
-    d.text((x + (bw - iw) / 2 - left, y + (bh - ih) / 2 - top), "AI", font=f, fill=fg)
-    return bw, bh
+    # Rounded once, here, and the letters placed on the rounded box. Rounding each corner of the
+    # rectangle separately let a square come out a pixel wider than it was tall whenever it landed
+    # on a fraction, which is how the banner's mark measured 134 by 135.
+    x0, y0, s = int(round(x)), int(round(y)), int(round(badge_side(d, size)))
+    nx, ny = BADGE_NUDGE
+    d.rectangle([x0, y0, x0 + s, y0 + s], fill=bg)
+    d.text((x0 + (s - iw) / 2 - left + iw * nx, y0 + (s - ih) / 2 - top + ih * ny),
+           "AI", font=f, fill=fg)
+    return s, s
 
 
 def wordmark(d, x, y, size, fill=PAPER, back=VERMILLION):
@@ -136,10 +165,10 @@ def wordmark(d, x, y, size, fill=PAPER, back=VERMILLION):
 
 
 def wordmark_size(d, size):
-    f = font("barlow-condensed-800", size)
-    _, _, iw, ih = ink(d, "AI", f)
+    """What wordmark() will occupy, from the same numbers it draws with."""
+    side = badge_side(d, size)
     _, _, tw, _ = ink(d, "FEAR REPORT", font("barlow-condensed-800", size * 1.16))
-    return iw + size * 0.60 + size * 0.34 + tw, ih + size * 0.45
+    return side + size * 0.34 + tw, side
 
 
 def avatar(path, size=800, label=True, bg=VERMILLION, fg=PAPER):
@@ -150,23 +179,19 @@ def avatar(path, size=800, label=True, bg=VERMILLION, fg=PAPER):
     """
     mark = int(size * (0.34 if label else 0.44))
     d = ImageDraw.Draw(Image.new("RGB", (size, size)))
-    f = font("barlow-condensed-800", mark)
-    left, top, iw, ih = ink(d, "AI", f)
-    pad = mark * 0.30
-    bw, bh = iw + pad * 2, ih + pad * 1.5
+    side = badge_side(d, mark)   # the same square the wordmark draws, so the two cannot drift
 
     f2 = font("barlow-condensed-800", int(size * 0.105))
     track = size * 0.011
     _, l_top, _, lh = ink(d, "FEAR REPORT", f2)
     gap = size * 0.058
-    block = bh + gap + lh if label else bh
+    block = side + gap + lh if label else side
 
     def paint(g):
-        x, y = (size - bw) / 2, (size - block) / 2
-        g.rectangle([x, y, x + bw, y + bh], fill=fg)
-        g.text((x + (bw - iw) / 2 - left, y + (bh - ih) / 2 - top), "AI", font=f, fill=bg)
+        x, y = (size - side) / 2, (size - block) / 2
+        badge(g, x, y, mark, fg=bg, bg=fg)
         if label:
-            spaced_mid(g, size / 2, y + bh + gap - l_top, "FEAR REPORT", f2, fg, track)
+            spaced_mid(g, size / 2, y + side + gap - l_top, "FEAR REPORT", f2, fg, track)
 
     im = compose(size, size, bg, paint)
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)

@@ -619,9 +619,60 @@ def check_overdue_daily_source():
     print("a daily source that has not succeeded today is due: ok")
 
 
+def check_mark_geometry():
+    """The mark is a square with the letters centred in it, and the square sits on the word.
+
+    The box was 354 by 315 on the avatar, a third more air at the sides than above, which is what
+    made a mark that measured centred look uncentred. The avatar also carried its own copy of the
+    geometry, so it could drift from the wordmark without anything noticing. Drawn here on a plain
+    field and measured off the pixels.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "site"))
+    from PIL import Image, ImageDraw
+    import brand
+
+    def box_of(im, *colours):
+        a = im.load()
+        w, h = im.size
+        xs, ys = [], []
+        for y in range(h):
+            for x in range(w):
+                if any(sum(abs(a[x, y][i] - c[i]) for i in range(3)) < 90 for c in colours):
+                    xs.append(x); ys.append(y)
+        return (min(xs), min(ys), max(xs), max(ys)) if xs else None
+
+    PAPER, VERM = (241, 237, 227), (179, 50, 31)
+    im = Image.new("RGB", (520, 400), (0, 0, 0))
+    d = ImageDraw.Draw(im)
+    bw, bh = brand.badge(d, 60, 60, 200, fg=VERM, bg=PAPER)
+    assert bw == bh, f"badge() returned {bw} by {bh}, which is not a square"
+    x0, y0, x1, y1 = box_of(im, PAPER, VERM)
+    side_w, side_h = x1 - x0 + 1, y1 - y0 + 1
+    assert abs(side_w - side_h) <= 1, f"the drawn square is {side_w} by {side_h}"
+    letters = box_of(im.crop((x0, y0, x1 + 1, y1 + 1)), VERM)
+    lx0, ly0, lx1, ly1 = letters
+    off_h = (lx0 - (side_w - 1 - lx1)) / 2
+    off_v = (ly0 - (side_h - 1 - ly1)) / 2
+    # Up and to the left by about a sixtieth of the box: the deliberate optical offset, no more.
+    assert -0.06 * side_w < off_h <= 0.5, f"the letters sit {off_h:+.1f}px off across the square"
+    assert -0.06 * side_h < off_v <= 0.5, f"the letters sit {off_v:+.1f}px off down the square"
+
+    # and the square is centred on the cap height of FEAR REPORT, not on its line box
+    im2 = Image.new("RGB", (1400, 400), (0, 0, 0))
+    d2 = ImageDraw.Draw(im2)
+    brand.wordmark(d2, 60, 100, 160, fill=PAPER, back=VERM)
+    sq = box_of(im2.crop((0, 0, 400, 400)), PAPER, VERM)
+    word = box_of(im2.crop((sq[2] + 8, 0, 1400, 400)), PAPER)
+    drift = ((sq[1] + sq[3]) / 2) - ((word[1] + word[3]) / 2)
+    assert abs(drift) <= 1.5, f"the square sits {drift:+.1f}px off the middle of FEAR REPORT"
+    print("the mark is a square, centred on its letters and on the word: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
+    check_mark_geometry()
     check_headline_tidy()
     check_fears_config()
     check_no_euphemism()

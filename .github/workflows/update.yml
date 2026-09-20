@@ -93,9 +93,13 @@ jobs:
   # The rest of the run: a pass every twenty minutes until the job's time is up.
   keep:
     needs: pass
-    # always(), because keep restores the data branch for itself. A first pass that runs out of
-    # time or errors should cost one pass, not the five hours of passes behind it.
-    if: ${{ always() && (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
+    # Not needs-pass-succeeded, because keep restores the data branch for itself: a first pass
+    # that runs out of time or errors should cost one pass, not the five hours behind it.
+    # Not always() either. always() also runs when the run itself was cancelled, so a push that
+    # cancelled the old run to put new code in front would watch the old run's keep start two
+    # seconds later and hold the concurrency group for the rest of the day. !cancelled() keeps
+    # the first half and drops the second.
+    if: ${{ !cancelled() && (inputs.mode == '' || inputs.mode == null || inputs.mode == 'auto') && (inputs.only == '' || inputs.only == null) }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:

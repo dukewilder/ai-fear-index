@@ -116,7 +116,7 @@ SYSTEM = (
 )
 
 RULES = (
-    "Write one sentence, at most 20 words, in the present or conditional tense.\n"
+    "Write one sentence, at most 20 words. {tense}\n"
     "Say who is bound and what they must do. If a duty falls on everyone in order to identify some "
     "people, the sentence says everyone: a rule that checks whether a user is a child checks every "
     "user, so write that it checks every user.\n"
@@ -131,8 +131,15 @@ RULES = (
 )
 
 
+LAW = ("This measure has passed, so write in the present tense: it requires, it makes, it bans.")
+PENDING = ("This measure has NOT passed. It was introduced and is still somewhere in the process, so "
+           "every verb is conditional: it WOULD require, it WOULD make. Never write that anyone must "
+           "do anything, or that anything is the case, because none of it is yet.")
+
+
 def sentence(key, row):
-    out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{RULES}\n\n"
+    rules = RULES.format(tense=LAW if (row["status"] or "") == "passed" else PENDING)
+    out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{rules}\n\n"
                             'Return JSON: {"sentence": "...", "quote": "..."}', max_tokens=400)
     return (out.get("sentence") or "").strip(), (out.get("quote") or "").strip()
 
@@ -142,9 +149,22 @@ BANNED = re.compile(
     r"oversight|responsib\w*|thoughtful\w*|balanced?|sensible|reasonable steps|bad actors?)\b", re.I)
 
 
-def usable(text, quote, body_norm):
-    """The sentence has to rest on words in the text, and not borrow the sponsor's vocabulary."""
+CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
+
+
+def usable(text, quote, body_norm, passed=False):
+    """The sentence has to rest on words in the text, not borrow the sponsor's vocabulary, and not
+    describe a bill sitting in committee as though it already bound anyone.
+
+    The tense is the whole difference between a record and a rumour, so it is checked here rather
+    than trusted to the instruction above: a measure that has not passed says would, and one that
+    has does not.
+    """
     if not text or not quote:
+        return False
+    if passed and CONDITIONAL.search(text):
+        return False
+    if not passed and not CONDITIONAL.search(text):
         return False
     if len(text) > MAX_SENTENCE or not text.endswith("."):
         return False
@@ -170,7 +190,7 @@ def write_lines(key, rows, want=WANT):
         except Exception as exc:  # one bad row must not cost the edition
             log(f"[brief] {row['id']}: {exc}")
             continue
-        if not usable(text, quote, body):
+        if not usable(text, quote, body, (row["status"] or "") == "passed"):
             log(f"[brief] {row['id']}: sentence did not hold up, skipped")
             continue
         places.add(row["jurisdiction_name"])

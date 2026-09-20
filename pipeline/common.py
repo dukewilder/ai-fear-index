@@ -246,6 +246,25 @@ def retag_recitals(db):
     return len(ids)
 
 
+def redo_briefs(db):
+    """Throw away the editions written before the tense was checked.
+
+    The first edition called a bill sitting in committee a duty that data centers "must" meet. It
+    was published but never posted, and the entries it used are marked as spent, so without this
+    they would never come round again. Clearing the table puts them back in the pool to be written
+    properly.
+    """
+    if kv_get(db, "redo:briefs"):
+        return 0
+    n = db.execute("SELECT COUNT(*) FROM brief").fetchone()[0]
+    db.execute("DELETE FROM brief")
+    kv_set(db, "redo:briefs", True)
+    db.commit()
+    if n:
+        log(f"[repair] {n} brief entries cleared, to be written again with the tense checked")
+    return n
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
@@ -254,6 +273,7 @@ def connect(path):
     add_columns(db)
     repair(db)
     retag_recitals(db)
+    redo_briefs(db)
     return db
 
 

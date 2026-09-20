@@ -42,6 +42,9 @@ env:
   X_API_SECRET: ${{ secrets.X_API_SECRET }}
   X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
   X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+  # The hour in New York at which the day's edition goes out. A pass lands every twenty minutes,
+  # so the first one inside this hour sends it and the database stops the rest. Blank it to stop.
+  POST_HOUR: "9"
   CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
   GH_TOKEN: ${{ github.token }}
   MODE: ${{ inputs.mode || 'auto' }}

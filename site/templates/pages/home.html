@@ -2,9 +2,9 @@
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
 <p class="chyron">{{ d.exhibit.chyron }}</p>
-{% if d.exhibit.said and d.exhibit.bought %}
+{% if d.exhibit.bought %}{% if d.exhibit.said %}
 <blockquote class="said">{% if d.exhibit.line_url %}<a href="{{ d.exhibit.line_url }}" rel="noopener" target="_blank">{{ d.exhibit.said }}</a>{% else %}{{ d.exhibit.said }}{% endif %}{% if d.exhibit.said_from %}<cite>{{ d.exhibit.said_from }}</cite>{% endif %}</blockquote>
-<p class="scare">{{ d.exhibit.bought }}</p>
+{% endif %}<p class="scare">{{ d.exhibit.bought }}</p>
 {% else %}
 <p class="scare">{% if d.exhibit.line_url %}<a href="{{ d.exhibit.line_url }}" rel="noopener" target="_blank" style="color:inherit;text-decoration:none">{{ d.exhibit.line }}</a>{% else %}{{ d.exhibit.line }}{% endif %}</p>
 {% endif %}

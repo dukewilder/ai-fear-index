@@ -915,23 +915,23 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         rows.append(["Lobbying", count(st["filings"], "filing") + " name it, past year"])
     if st["advocacy"]:
         rows.append(["Funding", f"{money(st['advocacy'])} from advocacy groups, past year"])
-    # The quote at the top carries its own attribution, so the table only names the source when
-    # there is no quote up there to name it.
+    # What the fear bought, in the same breath as the fear. A headline alone at the top of the page
+    # reads as the report's own statement, and as good news. It is evidence that the fear is loud,
+    # which is half of what this site is about; these counts are the other half, and they go in the
+    # larger type. Which office gains what stays in the table below, where there is room for it.
     bought = []
     if st["measures"]:
         where = f" in {count(len(st['states']), 'state')}" if st["states"] else ""
         bought.append(f"{count(len(st['measures']), 'bill')}{where} cite it")
     if st["controls"]:
         bought.append(f"They carry {count(st['controls'], 'new government control')}")
-    # which office and how many it gains stays in the table below, where there is room for it
-    if source and not (source_label == "Headline from" and bought):
+    # The quote up there carries its own attribution, so the table only names the source when there
+    # is no quote. What gets quoted is a publisher's headline where there is one and the leading
+    # measure's own title where there is not, so a quiet news week still leads with the counts.
+    if source and not bought:
         rows.append([source_label, source])
-    # What the fear bought, in the same breath as the fear. The headline is evidence that the fear
-    # is loud; on its own, at the top of the page, it reads as the report's own statement and as
-    # good news. The counts under it are the other half and they are what the site is for.
     return {"chyron": f"Loudest fear right now: {best['name']}", "line": line, "line_url": line_url,
-            "said": line if source_label == "Headline from" else "",
-            "said_from": source if source_label == "Headline from" else "",
+            "said": line if source else "", "said_from": source or "",
             "bought": ". ".join(bought) + "." if bought else "",
             "rows": rows, "fear_slug": best["slug"]}
 

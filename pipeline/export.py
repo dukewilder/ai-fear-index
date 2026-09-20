@@ -1128,14 +1128,17 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group
                  "source": f"FEC, {g['n']} filings" if g["n"] > 1 else "FEC", "url": g["url"]}
                 for g in sorted(givers.values(), key=lambda g: -g["total"])[:12]]
     latest = [i for i in feed if i.get("org") == o["slug"]][:6]
+    # Each half carries its own period. Lobbying is the last four quarters; election money is
+    # everything the committee has raised this cycle, and the receipts behind this one start in
+    # August 2025. One "past year" under both of them was wrong about the second.
     parts = []
     if o["lobbying"]:
-        parts.append(f"{money(o['lobbying'])} reported on filings that name a fear")
+        parts.append(f"{money(o['lobbying'])} reported on filings that name a fear, past year")
     if o["election"]:
-        parts.append(f"{money(o['election'])} in election money")
+        parts.append(f"{money(o['election'])} raised in election money this cycle")
     if len(parts) == 1:  # the big number above already says how much
-        parts = ["reported on lobbying filings that name a fear" if o["lobbying"] else
-                 "raised in election money"]
+        parts = ["reported on lobbying filings that name a fear, past year" if o["lobbying"] else
+                 "raised in election money this cycle"]
     return {"slug": o["slug"], "name": o["name"], "type": o["type"], "flag": o["flag"], "rank": str(o["rank"]),
             "of": f"{of:,}", "group": group, "spent": money(o["total"]), "period": "past year",
             "breakdown": " and ".join(parts),

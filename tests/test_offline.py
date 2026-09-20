@@ -611,6 +611,9 @@ def main():
         body = page.read_text()
         for stray in ("</span> filings", "> filings<", "mentions  fear"):
             assert stray not in body, f"{page.name} renders a unit with no number: {stray!r}"
+        # Election receipts run the length of a two-year cycle, not the last four quarters
+        assert "election money, past year" not in body and "election money this year" not in body, \
+            f"{page.name} dates cycle-to-date election money as a year"
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

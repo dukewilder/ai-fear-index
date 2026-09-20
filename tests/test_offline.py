@@ -159,10 +159,43 @@ def check_headline_tidy():
     print("headline tidying keeps every letter: ok")
 
 
+def check_fears_config():
+    """Every fear has to carry the same fields and patterns that compile.
+
+    The tagger, the news matcher, GDELT and the Wikipedia collector each read a different key off
+    these, and a fear missing one fails whichever collector wanted it, hours later and quietly.
+    """
+    from pipeline.common import config
+    import re as _re
+    fears = config("fears")
+    keys = set(fears[0])
+    assert keys >= {"slug", "name", "short", "definition", "keywords", "gdelt", "match",
+                    "wikipedia", "because"}, f"the first fear is missing fields: {keys}"
+    seen = set()
+    for f in fears:
+        assert set(f) == keys, f"{f.get('slug')} has fields {set(f) ^ keys} the others do not"
+        assert f["slug"] not in seen, f"two fears called {f['slug']}"
+        seen.add(f["slug"])
+        for field in ("name", "short", "definition", "gdelt", "because"):
+            assert isinstance(f[field], str) and f[field].strip(), f"{f['slug']} has an empty {field}"
+        assert f["keywords"], f"{f['slug']} has no keywords"
+        assert f["match"], f"{f['slug']} has no match patterns"
+        for pat in f["match"]:
+            _re.compile(pat)   # raises here rather than inside a collector
+        # "because" is dropped in after "It cites the fear that", so it is a clause, not a sentence
+        why = f["because"]
+        assert not why.endswith("."), f"{f['slug']}: because ends in a full stop and one is added"
+        assert not why.lower().startswith("that "), f"{f['slug']}: because repeats the 'that'"
+        assert why[0] == why[0].lower() or why.split()[0] in ("AI", "China", "OpenAI", "Congress"), \
+            f"{f['slug']}: because starts mid-sentence, so only a proper noun is capitalised"
+    print(f"{len(fears)} fears, all well formed: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
     check_headline_tidy()
+    check_fears_config()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

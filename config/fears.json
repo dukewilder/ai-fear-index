@@ -134,6 +134,31 @@
     "because": "children are talking to chatbots"
   },
   {
+    "slug": "ai-therapists",
+    "name": "AI therapists",
+    "short": "AI therapists",
+    "definition": "An AI giving therapy, counselling or mental health care, advertising itself as a licensed mental health professional, or standing in for one.",
+    "keywords": [
+      "psychotherapy",
+      "therapy services",
+      "mental health chatbot",
+      "mental health professional",
+      "licensed counselor",
+      "clinical social work",
+      "behavioral health",
+      "mental health provider"
+    ],
+    "gdelt": "(\"AI therapist\" OR \"AI therapy\" OR \"mental health chatbot\" OR \"chatbot therapist\" OR \"therapy chatbot\") (psychotherapy OR counseling OR counselling OR \"mental health\")",
+    "match": [
+      "\\b(psychotherap\\w*|therapy services|mental health (professional|service|provider|chatbot|counsel\\w+)|clinical social work\\w*|licensed (professional )?(clinical )?counsel\\w+|behavioral health (service|provider))",
+      "artificial intelligence|\\bAI\\b|chatbot|automated system"
+    ],
+    "wikipedia": [
+      "AI_therapist"
+    ],
+    "because": "an AI is standing in for a therapist"
+  },
+  {
     "slug": "deepfakes",
     "name": "Deepfakes",
     "short": "Deepfakes",

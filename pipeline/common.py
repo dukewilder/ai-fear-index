@@ -325,7 +325,9 @@ def redo_briefs(db):
 # 6: the next one reverted to the sponsor's grammar, a list of what a company has to do. A duty
 #    sentence that hands nobody a power is refused.
 # 7: the plate's line read its tense from the whole sentence and could not name an office.
-REDO_EDITION = ("2026-09-20", 7)
+# 8: "under child safety audits" carried the sponsor's reason instead of the act. The audit is of
+#    the service, and everyone using it is inside it.
+REDO_EDITION = ("2026-09-20", 8)
 
 
 def redo_today(db):
@@ -348,6 +350,30 @@ def redo_today(db):
     return n
 
 
+# Bump when a change to config/fears.json needs the whole record read again. Adding a fear does
+# not change a single measure's text, and the tagger only re-reads a measure whose text has
+# changed, so without this a new fear would only ever be applied to bills filed after it.
+RETAG_FEARS = 1
+
+
+def retag_for_fears(db):
+    """Queue every AI measure to be read again, because the list of fears it is read against grew.
+
+    The hash is cleared rather than the tags. A measure keeps the labels it has until the moment
+    it is read again, so the site never shows a gap while the queue drains. About 1,700 measures,
+    which the daily cap clears in a day or two.
+    """
+    key = f"retag:fears:{RETAG_FEARS}"
+    if kv_get(db, key):
+        return 0
+    n = db.execute("UPDATE tag_runs SET text_hash = NULL WHERE ai_related = 1").rowcount
+    kv_set(db, key, True)
+    db.commit()
+    if n:
+        log(f"[repair] {n} measures queued to be read against the fears as they now stand")
+    return n
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
@@ -358,6 +384,7 @@ def connect(path):
     retag_recitals(db)
     redo_briefs(db)
     redo_today(db)
+    retag_for_fears(db)
     return db
 
 

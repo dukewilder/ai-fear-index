@@ -151,7 +151,13 @@ RULES = (
     "So do not open with the jurisdiction and then requires, mandates, directs or orders followed "
     "by a company. Open with what is put under whose control.\n"
     "If a duty falls on everyone in order to identify some people, the sentence says everyone: a "
-    "rule that checks whether a user is a child checks every user.\n"
+    "rule that checks whether a user is a child checks every user. If the measure deletes a "
+    "condition that had narrowed who a duty applied to, it is widening that duty and the sentence "
+    "says so.\n"
+    "Do not carry a compound the sponsor built to name the reason rather than the act: child "
+    "safety audits, safety standards, trust and safety, transparency requirements, consumer "
+    "protection. Name the act and who it lands on. An audit of whether a service is safe for "
+    "children is an audit of the service, and everyone using it is inside it.\n"
     "Never use a word the sponsor chose to make the measure sound smaller than it is. Do not write "
     "safeguards, guardrails, protections, safety net, common sense, modernize, framework, or "
     "oversight. Name the power.\n"
@@ -189,7 +195,14 @@ BANNED = re.compile(
     # the measured ones: vocabulary that marks a machine wrote it, and the puffery under it
     r"robust|comprehensive|sweeping|landscape|pivotal|crucial|vital|significant|"
     r"underscor\w*|highlight\w*|showcas\w*|delv\w*|intricate|nuanced|holistic|seamless|"
-    r"transformative|groundbreaking|far-reaching|unprecedented)\b", re.I)
+    r"transformative|groundbreaking|far-reaching|unprecedented)\b"
+    # compounds built to name the reason rather than the act. "Child safety audits" is an audit of
+    # a service everybody uses, and the words in front of it are why, not what.
+    r"|\b(?:child(?:ren)?(?:'s)?|kids?(?:'s)?|minors?(?:'s)?|user|public|online|consumer)[\s-]+safety\b"
+    r"|\bsafety[\s-]+(?:audit|review|standard|requirement|measure|protocol|assessment|practice)s?\b"
+    r"|\btrust and safety\b"
+    r"|\baccountability measures?\b"
+    r"|\btransparency[\s-]+(?:requirement|obligation|measure|standard)s?\b", re.I)
 
 # a sentence that stops reporting and starts explaining what it means
 EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit is not\b", re.I)

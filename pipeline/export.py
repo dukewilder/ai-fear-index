@@ -333,7 +333,11 @@ def export(db, out_dir, base=""):
             "new_week": sum(1 for m in ms if (m["introduced_date"] or "") >= week_ago),
             "filings": filings_by_fear[slug], "advocacy": advocacy_by_fear[slug], "statements": post_fears[slug],
             "news30": int(news30.get(slug, 0)), "wiki30": int(wiki30.get(slug, 0)),
-            "has_wiki": bool(f.get("wikipedia")),
+            # An article on file and no readership yet are different things. A fear added today has
+            # both a Wikipedia article and nothing collected from it until the next daily pass, and
+            # a zero there would be a claim nobody has checked rather than a count.
+            "has_wiki": bool(f.get("wikipedia")) and slug in wiki30,
+            "wiki_article": bool(f.get("wikipedia")),
         }
     for slug, score in index_scores(fears, fear_stats).items():
         fear_stats[slug]["index"] = score
@@ -625,8 +629,11 @@ def build_grid(order, stats, ends=None, today=None):
         cells = []
         for key, _ in GRID_CHANNELS:
             if key == "wiki30" and not st["has_wiki"]:
-                # No article on this fear to count, which is not the same as nobody reading one.
-                cells.append({"n": "\u2013", "level": 0, "note": "No Wikipedia article on this fear"})
+                # Nothing to count, which is not the same as nobody reading. Either there is no
+                # article on this fear, or there is one and its readership has not been read yet.
+                cells.append({"n": "\u2013", "level": 0,
+                              "note": ("Readership not collected yet" if st["wiki_article"]
+                                       else "No Wikipedia article on this fear")})
                 continue
             v = channel_value(st, key)
             level = 0 if not v or not tops[key] else min(4, 1 + int(3.99 * math.log1p(v) / math.log1p(tops[key])))

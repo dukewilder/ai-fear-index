@@ -594,6 +594,9 @@ def main():
     assert offices["key"] == f"offices:{plate['offices']}", \
         f"the plate's office line says {offices['key']} and its own total says {plate['offices']}"
     assert data["fears"] and data["controls"]
+    # The top of the page has to say who ends up holding the controls, not just that they exist
+    assert "office" in (data["exhibit"]["bought"] or ""), \
+        f"the hero stopped naming who holds the controls: {data['exhibit']['bought']!r}"
     assert data["funders"], "advocacy lobbying should rank separately"
     assert data["industry"], "company and trade group lobbying should rank separately"
     assert not ({f["name"] for f in data["funders"]} & {i["name"] for i in data["industry"]}), \

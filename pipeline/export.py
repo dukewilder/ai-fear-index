@@ -928,7 +928,12 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         where = f" in {count(len(st['states']), 'state')}" if st["states"] else ""
         bought.append(f"{count(len(st['measures']), 'bill')}{where} cite it")
     if st["controls"]:
-        bought.append(f"They carry {count(st['controls'], 'new government control')}")
+        # Who ends up holding them. The bills and the controls say the fear turned into law; this
+        # says it turned into somebody's authority, which is the whole of what this report is for.
+        # It sat in the table below in small type, against a single office named in three of them.
+        held = {name_key(a) for m in st["measures"] for a in m["agencies"] if name_key(a)}
+        bought.append(f"They carry {count(st['controls'], 'new government control')}"
+                      + (f", held by {count(len(held), 'office')}" if held else ""))
     # The quote up there carries its own attribution, so the table only names the source when there
     # is no quote. What gets quoted is a publisher's headline where there is one and the leading
     # measure's own title where there is not, so a quiet news week still leads with the counts.

@@ -11,8 +11,8 @@ import argparse
 import importlib
 import time
 
-from .common import (connect, kv_get, kv_set, log, now, retry_at, retry_clear, retry_due,
-                     source_run)
+from .common import (config, connect, kv_get, kv_set, log, now, retry_at, retry_clear,
+                     retry_due, source_run)
 
 HOURLY = ["gdelt", "news", "rss", "fedreg"]
 DAILY = ["congress", "openstates", "lda", "fec", "wikipedia"]
@@ -68,6 +68,12 @@ def main():
         sources += [s for s in DAILY if s not in done]  # first run of a source catches it up
     # a source that asked to be tried again later today, having been refused for nothing
     sources += [s for s in DAILY if s not in sources and retry_due(db, s)]
+    # A fear added after the day's reading has no readership until tomorrow's, and the index
+    # scores it on fewer channels than it actually has for a day. Wikipedia backfills a fear the
+    # first time it sees one, so asking again costs one pass and settles it.
+    if "wikipedia" not in sources and any(
+            f.get("wikipedia") and not kv_get(db, f"wiki_done:{f['slug']}") for f in config("fears")):
+        sources.append("wikipedia")
     if args.only:
         sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]
     log(f"mode={mode} sources={sources} first run for: {[s for s in sources if s not in done] or 'none'}")

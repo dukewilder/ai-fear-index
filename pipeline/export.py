@@ -840,6 +840,20 @@ def our_domain(domain, hosts):
     return FEED_HOST.sub("", (domain or "").lower()) in hosts
 
 
+def sentence_name(fear):
+    """The fear's name as it reads inside a sentence rather than as a label.
+
+    The names are written as headings, so they carry a capital that is wrong mid-sentence: "cite
+    Loss of control" reads as the title of something. Which ones keep the capital is not something
+    a rule can work out from the letters, because "China" and "Deepfakes" are the same shape and
+    only one of them is a place, so every fear carries its own sentence form in the config and
+    check_fears_config makes sure it is there. The same discipline "because" already follows in
+    that file: a fragment written to be dropped into a sentence, capitalised only where the word
+    would be capitalised anywhere.
+    """
+    return fear["sentence"]
+
+
 def build_exhibit(db, order, fear_stats, today, suppressed=()):
     """The top of the front page: the fear leading the index, its loudest headline, the receipt.
 
@@ -938,7 +952,9 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
     bought = []
     if st["measures"]:
         where = f" in {count(len(st['states']), 'state')}" if st["states"] else ""
-        bought.append(f"{count(len(st['measures']), 'bill')}{where} cite it")
+        # Named, not "it". This line is the one that gets read on its own and screenshotted on
+        # its own, and an "it" pointing back at a chyron above it does not survive either.
+        bought.append(f"{count(len(st['measures']), 'bill')}{where} cite {sentence_name(best)}")
     if st["controls"]:
         # Who ends up holding them. The bills and the controls say the fear turned into law; this
         # says it turned into somebody's authority, which is the whole of what this report is for.

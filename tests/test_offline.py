@@ -170,15 +170,24 @@ def check_fears_config():
     import re as _re
     fears = config("fears")
     keys = set(fears[0])
-    assert keys >= {"slug", "name", "short", "definition", "keywords", "gdelt", "match",
-                    "wikipedia", "because"}, f"the first fear is missing fields: {keys}"
+    assert keys >= {"slug", "name", "sentence", "short", "definition", "keywords", "gdelt",
+                    "match", "wikipedia", "because"}, f"the first fear is missing fields: {keys}"
     seen = set()
     for f in fears:
         assert set(f) == keys, f"{f.get('slug')} has fields {set(f) ^ keys} the others do not"
         assert f["slug"] not in seen, f"two fears called {f['slug']}"
         seen.add(f["slug"])
-        for field in ("name", "short", "definition", "gdelt", "because"):
+        for field in ("name", "sentence", "short", "definition", "gdelt", "because"):
             assert isinstance(f[field], str) and f[field].strip(), f"{f['slug']} has an empty {field}"
+        # "sentence" is the name dropped mid-sentence, after "cite", so it carries no heading
+        # capital. Same allowlist as "because" below: only a proper noun keeps one.
+        s = f["sentence"]
+        # It has to be the same name, not a second one: an article in front is the only licence,
+        # for the fears whose name will not take a bare "cite" in front of it.
+        bare = s[4:] if s.lower().startswith("the ") else s
+        assert bare.lower() == f["name"].lower(), f"{f['slug']}: sentence is not the name, it is {s!r}"
+        assert s[0] == s[0].lower() or s.split()[0] in ("AI", "China", "OpenAI", "Congress"), \
+            f"{f['slug']}: sentence starts with a capital that is not a proper noun"
         assert f["keywords"], f"{f['slug']} has no keywords"
         assert f["match"], f"{f['slug']} has no match patterns"
         for pat in f["match"]:

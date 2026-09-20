@@ -172,8 +172,6 @@ def share_card(path, big, label, sub="", kicker="AI FEAR REPORT", foot="aifearre
 def card_specs(d):
     """Which cards to draw: one for the front page, one per fear, one for the rankings."""
     ix = d["index"]
-    yield "home", ix["value"], ix["text"] + (f", in {ix['where']}" if ix.get("where") else ""), \
-        f"{ix.get('second', '')} {ix.get('second_text', '')}".strip()
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
             f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
@@ -211,12 +209,17 @@ def page_specs(d):
               "title": name, "ctx": {}}]
     for f in d["fear_pages"]:
         specs.append({"kind": "fear", "route": f"fear/{f['slug']}", "out": f"fear/{f['slug']}/index.html",
-                      "template": "fear.html", "title": f"{f['name']}, {name}",
+                      "template": "fear.html",
+                      "title": f"{f['name']}: the AI bills and the money, {name}",
                       "ctx": {"f": f, "timeline": timeline_svg(f["timeline"])}})
     for o in d["org_pages"]:
         specs.append({"kind": "org", "route": f"org/{o['slug']}", "out": f"org/{o['slug']}/index.html",
-                      "template": "org.html", "title": f"{o['name']}, {name}", "ctx": {"o": o}})
-    for kind, title in (("feed", "Feed"), ("rankings", "Rankings"), ("method", "How the numbers work")):
+                      "template": "org.html",
+                      "title": f"{o['name']}: AI lobbying, {name}",
+                      "ctx": {"o": o}})
+    for kind, title in (("feed", "Feed: every AI bill and rule as it arrives"),
+                        ("rankings", "Rankings: who gains power over AI"),
+                        ("method", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
                       "title": f"{title}, {name}", "ctx": {}})
     for s in specs:
@@ -226,10 +229,26 @@ def page_specs(d):
         s["description"] = None
         if s["kind"] == "fear":
             f = s["ctx"]["f"]
-            s["description"] = f"{f['name']} scores {f['score']} on the Fear Index. {f.get('line') or ''}".strip()
+            s["description"] = (f"{f['name']}: how loud the fear is, who pays to lobby on it, and the "
+                                f"laws it is used to justify. Scores {f['score']} of 100 on the Fear "
+                                f"Index. {f.get('line') or ''}").strip()
         elif s["kind"] == "home":
-            s["description"] = (f"{d['index']['value']} {d['index']['text']}. {d['index']['second']} "
-                                f"{d['index']['second_text']}.")
+            s["description"] = (f"Every fear about AI, tracked against what it buys. "
+                                f"{d['index']['value']} {d['index']['text']}, with the lobbying money "
+                                f"and the government offices behind each one, updated around the clock.")
+        elif s["kind"] == "org":
+            o = s["ctx"]["o"]
+            s["description"] = (f"{o['name']}: which AI fears it argues for, what it spends lobbying on "
+                                f"them, and the measures its money is attached to.")
+        elif s["kind"] == "feed":
+            s["description"] = ("Every AI bill, rule, and public statement as it arrives, tagged with "
+                                "the fear it cites and the control it would impose.")
+        elif s["kind"] == "rankings":
+            s["description"] = (f"The {d.get('beneficiaries_total', '')} agencies and officials that AI "
+                                f"bills would hand new power to, ranked by how often they are named.").replace("  ", " ")
+        elif s["kind"] == "method":
+            s["description"] = ("Where every number on this site comes from: the government sources, "
+                                "how measures are tagged, and what each label means.")
     return specs
 
 
@@ -251,12 +270,18 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     shell = env.get_template("base.html")
     if preview:
         pathlib.Path(preview_path).write_text(shell.render(pages=pages, preview=True,
-                                                           title=name, nav=""))
+                                                           title=name, nav="", home=True))
         return [preview_path]
     written = []
     site_url = (d.get("site_url") or "").rstrip("/")
     cards = {}
     try:
+        import sys
+        sys.path.insert(0, str(HERE))
+        from brand import share as share_image
+        share_image(pathlib.Path(out_dir) / "og" / "share.png",
+                    (d.get("site") or {}).get("tagline") or "Every fear about AI, and what it buys.")
+        cards["share"] = f"{site_url}/og/share.png" if site_url else None
         for card, big, label, sub in card_specs(d):
             share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
                        kicker=name.upper(), foot=site_url.replace("https://", "") or name)
@@ -266,10 +291,41 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     for page in pages:
         target = pathlib.Path(out_dir) / page["out"]
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(shell.render(pages=[page], preview=False, title=page["title"], nav=page["nav"],
-                                       og_image=cards.get(page.get("card")), description=page.get("description")))
+        route = page["route"]
+        target.write_text(shell.render(
+            pages=[page], preview=False, title=page["title"], nav=page["nav"],
+            home=page["kind"] == "home", og_image=cards.get(page.get("card")) or cards.get("share"),
+            canonical=f"{site_url}/{route}{'/' if route else ''}" if site_url else None,
+            description=page.get("description")))
         written.append(str(target))
+    if site_url:
+        written += write_index_files(out_dir, site_url, pages, d)
     return written
+
+
+def write_index_files(out_dir, site_url, pages, d):
+    """robots.txt and a sitemap, so a crawler is told what exists rather than guessing.
+
+    Every page is worth indexing and none of them change on a schedule a crawler could predict, so
+    the sitemap carries one lastmod for the lot: the moment the data was last exported.
+    """
+    out = pathlib.Path(out_dir)
+    stamp = (d.get("built_at") or "")[:10]
+    urls = []
+    for page in pages:
+        route = page["route"]
+        loc = f"{site_url}/{route}{'/' if route else ''}"
+        urls.append(f"  <url><loc>{loc}</loc>"
+                    f"{f'<lastmod>{stamp}</lastmod>' if stamp else ''}"
+                    f"<changefreq>{'daily' if page['kind'] in ('home', 'feed') else 'weekly'}</changefreq>"
+                    f"<priority>{'1.0' if page['kind'] == 'home' else '0.7'}</priority></url>")
+    (out / "sitemap.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls) + "\n</urlset>\n")
+    (out / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\n\nSitemap: {site_url}/sitemap.xml\n")
+    return [str(out / "sitemap.xml"), str(out / "robots.txt")]
 
 
 if __name__ == "__main__":

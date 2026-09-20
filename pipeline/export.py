@@ -479,6 +479,9 @@ def export(db, out_dir, base=""):
         "totals": {"funders": len(ranked), "industry": len(industry_ranked), "election": len(com_ranked),
                    "beneficiaries": len(agency_count)},
         "links": {"data": f"{REPO_URL}/tree/data", "code": REPO_URL,
+                  # the raw file, for anything that wants the table rather than a page about it
+                  "csv": f"{REPO_URL.replace('github.com', 'raw.githubusercontent.com')}"
+                         f"/data/public/measures.csv",
                   "report": f"{REPO_URL}/issues/new?template=error.yml"},
         "analytics": {"goatcounter": "dukewilder"},
         "exhibit": exhibit, "index": index, "grid": grid, "polls": polls, "numbers": numbers, "site": site,

@@ -316,7 +316,9 @@ def redo_briefs(db):
 # Bump this when an edition already written needs writing again, and say why in the comment.
 # 2: the first rewrite fell through to a pattern because every candidate sentence was rejected,
 #    and the rejections did not say which gate did it. They do now.
-REDO_EDITION = ("2026-09-20", 2)
+# 3: it fell through again, and the log that would have said why is not reachable from here. The
+#    reasons are now written into the database, where they ride the data branch.
+REDO_EDITION = ("2026-09-20", 3)
 
 
 def redo_today(db):

@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-from .common import Entities, config, connect, env, log, now
+from .common import Entities, annotate, config, connect, env, kv_set, log, now
 from .export import gave
 from .tag import agreed, call, norm
 
@@ -262,8 +262,19 @@ def usable(text, quote, body_norm, passed=False, office=""):
     return not why_not(text, quote, body_norm, passed, office)
 
 
-def write_lines(key, rows, want=WANT):
-    """Turn candidate measures into checked sentences, stopping once the edition is full."""
+def note(attempts, where, reason, sentence_text="", fatal=False):
+    if attempts is not None:
+        attempts.append({"measure": where, "reason": reason,
+                         "sentence": (sentence_text or "")[:220], "unreachable": fatal})
+
+
+def write_lines(key, rows, want=WANT, attempts=None):
+    """Turn candidate measures into checked sentences, stopping once the edition is full.
+
+    Every candidate that does not make it appends its reason to attempts, which the edition stores
+    in the database. An edition that falls back to counts has thrown a dozen sentences away, and
+    without this the only record of why is a CI log that expires.
+    """
     lines, places = [], set()
     for row in rows:
         if len(lines) >= want:
@@ -271,16 +282,20 @@ def write_lines(key, rows, want=WANT):
         # one state should not be the whole edition; the case is that this is everywhere
         if row["jurisdiction_name"] in places:
             continue
+        where = f"{row['jurisdiction_name']} {row['identifier']}"
         body = norm(f"{row['title'] or ''}\n{row['summary'] or ''}")
         try:
             text, quote = sentence(key, row)
         except Exception as exc:  # one bad row must not cost the edition
-            log(f"[brief] {row['id']}: {exc}")
+            note(attempts, where, f"the model did not answer: {str(exc)[:160]}", fatal=True)
+            log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")
             continue
         reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "")
         if reason:
-            log(f"[brief] {row['jurisdiction_name']} {row['identifier']}: skipped, {reason}")
+            note(attempts, where, reason, sentence_text=text)
+            log(f"[brief] {where}: skipped, {reason}")
             continue
+        note(attempts, where, "used")
         places.add(row["jurisdiction_name"])
         lines.append({"target": row["id"], "sentence": text, "quote": quote,
                       "office": row["office"] or "", "controls": row["controls"] or "",
@@ -551,7 +566,19 @@ def edition(db, key, out_dir, today, want=WANT, dry_run=False):
         return None
     used = {r["target"] for r in db.execute("SELECT target FROM brief")}
 
-    lines = write_lines(key, pool(db, today), 1)
+    attempts = []
+    lines = write_lines(key, pool(db, today), 1, attempts)
+    kv_set(db, f"brief:attempts:{today}", attempts)
+    db.commit()
+    unreachable = [a for a in attempts if a.get("unreachable")]
+    if attempts and len(unreachable) == len(attempts):
+        # Not one candidate was judged: the model could not be reached at all. The counts below
+        # are still true and the edition still goes out, because a day with no post is worse than
+        # a plain one. But an edition of counts looks like an ordinary quiet day from outside, so
+        # this marks the run red rather than letting it pass for one.
+        annotate("error", "the brief reached no model",
+                 f"none of {len(attempts)} candidates were judged: {unreachable[0]['reason']}")
+        kv_set(db, f"brief:unreachable:{today}", unreachable[0]["reason"][:300])
     lead = lines[0] if lines else None
     if lead is None:
         spare = sorted(patterns(db, today, used), key=lambda p: -p["weight"])

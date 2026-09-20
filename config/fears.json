@@ -25,7 +25,8 @@
     "wikipedia": [
       "Existential_risk_from_artificial_intelligence",
       "AI_alignment"
-    ]
+    ],
+    "because": "AI might get away from the people running it"
   },
   {
     "slug": "china-race",
@@ -51,7 +52,8 @@
     ],
     "wikipedia": [
       "Artificial_intelligence_arms_race"
-    ]
+    ],
+    "because": "China is ahead, or about to be"
   },
   {
     "slug": "job-loss",
@@ -76,7 +78,8 @@
     ],
     "wikipedia": [
       "Technological_unemployment"
-    ]
+    ],
+    "because": "AI is coming for the jobs"
   },
   {
     "slug": "power-bills",
@@ -101,7 +104,8 @@
     "wikipedia": [
       "Environmental_impact_of_artificial_intelligence",
       "Data_center"
-    ]
+    ],
+    "because": "data centers are taking the power and the water"
   },
   {
     "slug": "kids-chatbots",
@@ -126,7 +130,8 @@
     ],
     "wikipedia": [
       "Chatbot"
-    ]
+    ],
+    "because": "children are talking to chatbots"
   },
   {
     "slug": "deepfakes",
@@ -149,7 +154,8 @@
     ],
     "wikipedia": [
       "Deepfake"
-    ]
+    ],
+    "because": "anyone can now fake anyone"
   },
   {
     "slug": "ai-cyberattacks",
@@ -168,7 +174,8 @@
       "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
       "cyberattack|cyber attack|hacker|hacking|ransomware|malware|breach"
     ],
-    "wikipedia": []
+    "wikipedia": [],
+    "because": "AI makes an attack on the grid easier"
   },
   {
     "slug": "bioweapons",
@@ -189,7 +196,8 @@
       "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
       "bioweapon|biological weapon|biosecurity|pathogen|bioterror"
     ],
-    "wikipedia": []
+    "wikipedia": [],
+    "because": "AI could help somebody build a weapon"
   },
   {
     "slug": "bias",
@@ -213,6 +221,7 @@
     ],
     "wikipedia": [
       "Algorithmic_bias"
-    ]
+    ],
+    "because": "an algorithm decides who gets hired, housed, or lent to"
   }
 ]

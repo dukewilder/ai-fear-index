@@ -21,6 +21,7 @@ import urllib.parse
 
 import requests
 
+from .brief import edition_date
 from .common import connect, env, kv_get, kv_set, log, now
 
 POST_URL = "https://api.x.com/2/tweets"
@@ -153,7 +154,7 @@ def main():
     ap.add_argument("--force", action="store_true", help="post again even if this date already went")
     args = ap.parse_args()
     db = connect(args.db)
-    run(db, args.brief, args.date or now().date().isoformat(), args.dry_run, args.force)
+    run(db, args.brief, args.date or edition_date(), args.dry_run, args.force)
 
 
 if __name__ == "__main__":

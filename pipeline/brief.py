@@ -14,6 +14,7 @@ is dropped rather than softened, and the edition runs a line shorter.
 """
 import argparse
 import datetime as dt
+import zoneinfo
 import json
 import pathlib
 import re
@@ -26,7 +27,19 @@ from .tag import agreed, call, norm
 MODEL_NOTE = "claude-haiku-4-5-20251001"
 WANT = 3          # lines in an edition: enough to show a pattern, few enough to read
 POOL_DAYS = 45    # measures move slower than a day, so an edition draws from a rolling pool
-MAX_SENTENCE = 120
+MAX_SENTENCE = 210  # a sentence that names the power needs more room than one that names a duty
+
+
+EASTERN = zoneinfo.ZoneInfo("America/New_York")
+
+
+def edition_date():
+    """The date an American reader would call today, which is not the date in UTC.
+
+    A post sent at nine in the morning in New York goes out on the UTC date that matches, but one
+    sent in the evening does not, and the plate then carries tomorrow.
+    """
+    return now().astimezone(EASTERN).date().isoformat()
 
 
 def controls_by_slug():
@@ -110,33 +123,37 @@ def doc(row):
 
 
 SYSTEM = (
-    "You write one sentence about a U.S. bill or rule for a public record of what AI fear is buying. "
-    "You are read by people who are about to be bound by these measures, so you say what a measure "
-    "does to them in the words the measure itself uses. Reply with a single JSON object and nothing else."
+    "You write one sentence about a U.S. bill or rule for a public record of what fear of AI is "
+    "buying and who ends up holding it. The reader is about to be bound by these measures. Reply "
+    "with a single JSON object and nothing else."
 )
 
 RULES = (
-    "Write one sentence, at most 20 words. {tense}\n"
-    "Say who is bound and what they must do. If a duty falls on everyone in order to identify some "
-    "people, the sentence says everyone: a rule that checks whether a user is a child checks every "
-    "user, so write that it checks every user.\n"
+    "Write one sentence, at most 30 words. {tense}\n"
+    "Say what the measure puts under whose control. Name the government body that would decide, "
+    "inspect, licence, or be reported to, inside the sentence. If the measure names no body, say "
+    "the state or the jurisdiction by name.\n"
+    "A duty on a company is a power for whoever it answers to, and it is the power that goes in "
+    "the sentence. Not required to restore the water, but put under the department that decides "
+    "whether it has.\n"
+    "If a duty falls on everyone in order to identify some people, the sentence says everyone: a "
+    "rule that checks whether a user is a child checks every user.\n"
     "Never use a word the sponsor chose to make the measure sound smaller than it is. Do not write "
-    "safeguards, guardrails, protections, safety net, common sense, modernize, framework, or oversight "
-    "when the measure creates a duty, a licence, a register, or a power to inspect. Name the duty.\n"
-    "Do not say whether the measure is good or bad, and do not add a reason it was introduced.\n"
+    "safeguards, guardrails, protections, safety net, common sense, modernize, framework, or "
+    "oversight. Name the power.\n"
     "Use the measure's own words for what it does. Do not reach for a near neighbour of one: a "
     "supply a data centre diminishes is a diminished supply, never a diminutive one.\n"
-    "Do not name the bill number, and do not write the words bill, act, or legislation. Start with the "
-    "jurisdiction.\n"
-    "quote is copied word for word from the Title or Summary and is the text the sentence rests on, "
-    "between 6 and 30 words."
+    "Report it. Do not argue it, do not say what it shows or reveals or highlights, and do not "
+    "end on a clause beginning with a participle: no underscoring its importance, no reflecting a "
+    "trend. Do not say it is not one thing but another. Do not ask a question and answer it.\n"
+    "Plain words. Not robust, comprehensive, sweeping, landscape, framework, pivotal, crucial, "
+    "significant, or key. No adjective that is not doing specific work.\n"
+    "Do not say whether the measure is good or bad, and do not add a reason it was introduced.\n"
+    "Do not name the bill number, and do not write the words bill, act, or legislation. Start with "
+    "the jurisdiction.\n"
+    "quote is copied word for word from the Title or Summary and is the text the sentence rests "
+    "on, between 6 and 30 words."
 )
-
-
-LAW = ("This measure has passed, so write in the present tense: it requires, it makes, it bans.")
-PENDING = ("This measure has NOT passed. It was introduced and is still somewhere in the process, so "
-           "every verb is conditional: it WOULD require, it WOULD make. Never write that anyone must "
-           "do anything, or that anything is the case, because none of it is yet.")
 
 
 def sentence(key, row):
@@ -148,7 +165,14 @@ def sentence(key, row):
 
 BANNED = re.compile(
     r"\b(safeguard\w*|guardrail\w*|protections?|safety net|common ?sense|modern\w*|framework\w*|"
-    r"oversight|responsib\w*|thoughtful\w*|balanced?|sensible|reasonable steps|bad actors?)\b", re.I)
+    r"oversight|responsib\w*|thoughtful\w*|balanced?|sensible|reasonable steps|bad actors?|"
+    # the measured ones: vocabulary that marks a machine wrote it, and the puffery under it
+    r"robust|comprehensive|sweeping|landscape|pivotal|crucial|vital|significant|"
+    r"underscor\w*|highlight\w*|showcas\w*|delv\w*|intricate|nuanced|holistic|seamless|"
+    r"transformative|groundbreaking|far-reaching|unprecedented)\b", re.I)
+
+# a sentence that stops reporting and starts explaining what it means
+EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit is not\b", re.I)
 
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
@@ -170,7 +194,7 @@ def usable(text, quote, body_norm, passed=False):
         return False
     if len(text) > MAX_SENTENCE or not text.endswith("."):
         return False
-    if BANNED.search(text):
+    if BANNED.search(text) or EXPLAINING.search(text):
         return False
     if re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I):
         return False
@@ -198,12 +222,10 @@ def write_lines(key, rows, want=WANT):
         places.add(row["jurisdiction_name"])
         lines.append({"target": row["id"], "sentence": text, "quote": quote,
                       "office": row["office"] or "", "controls": row["controls"] or "",
-                      "jurisdiction": row["jurisdiction_name"], "url": row["url"],
-                      "status": row["status"] or ""})
+                      "fears": row["fears"] or "", "jurisdiction": row["jurisdiction_name"],
+                      "url": row["url"], "status": row["status"] or ""})
     return lines
 
-
-ARROW = "\u2192"
 
 NUMBERS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
@@ -370,13 +392,6 @@ def alt(head, lines):
     return f"A card from the AI Fear Report headed: {head}. {body}"
 
 
-def chips(controls, names, most=2):
-    """The two that matter. A measure can carry four, and four chips is a list, not a label."""
-    seen = sorted((c for c in (controls or "").split("|") if c in names),
-                  key=lambda c: -WEIGHT.get(c, 1))
-    return ", ".join(dict.fromkeys(names[c]["chip"] for c in seen[:most]))
-
-
 def totals(db):
     one = lambda q: db.execute(q).fetchone()[0]
     return {
@@ -387,76 +402,114 @@ def totals(db):
     }
 
 
-def entry(line):
-    """One line, always the same shape: what it does, then who ends up holding it."""
-    text = line["sentence"].rstrip()
-    office = line.get("office") or ""
-    if office and office.lower() not in text.lower():
-        article = "" if office.startswith(("the ", "The ")) else "the "
-        text = f"{text} Held by {article}{office}."
-    return f"{ARROW} {text}"
+def subject(db, lead):
+    """Which of a measure's controls the rest of the post talks about.
 
-
-def compose(lines, tot, cfg):
-    """The post, the same shape every day: the line, the entries, the count, the address.
-
-    Nothing rotates. A reader who sees this twice should recognise the second one before they
-    have read a word of it, which is the only thing a format is for.
+    A measure often carries several. The one worth the most is the one to lead on when nothing
+    else decides it, but the reason and the pattern both have to be about the same one or the
+    post says three things about three subjects.
     """
-    body = "\n".join(entry(l) for l in lines)
-    # No address in the text. X linkifies a bare domain, which puts the post on the rate for a
-    # post with a link and costs it reach besides. The plate carries the address instead.
-    return (f"{cfg['opener']}\n\n{body}\n\n"
-            f"{tot['measures']:,} measures. {tot['controlled']} carry a control. "
-            f"{tot['offices']} offices hold one.")
+    controls = [c for c in (lead.get("controls") or "").split("|") if c]
+    return max(controls, key=lambda c: WEIGHT.get(c, 1)) if controls else ""
+
+
+def cited(lead, fears):
+    """The fear the measure's own text cites, or nothing.
+
+    Only what this measure says. An earlier version inferred a fear from the other measures
+    imposing the same control and said so, which is an inference dressed as reporting.
+    """
+    for slug in (lead.get("fears") or "").split("|"):
+        f = fears.get(slug)
+        if f and f.get("because"):
+            return f["because"]
+    return ""
+
+
+STATUS = {"passed": "Passed.", "failed": "Died in committee.", "pending": "Still live."}
+
+
+def compose(lead, spare, tot, cfg, fears):
+    """The measures, what they cite, and the counts. Nothing joining them up.
+
+    The site does not tell a reader what to make of a row and neither does this. No line here
+    says that one measure is part of a pattern; the measure is stated, the count is stated, and
+    the reader puts them together or does not.
+    """
+    parts = [cfg["opener"], ""]
+    first = [lead["sentence"]]
+    if lead.get("status") in STATUS:
+        first.append(STATUS[lead["status"]])
+    fear = cited(lead, fears)
+    if fear:
+        first.append(f"The text cites {fear}.")
+    parts += [" ".join(first)]
+    for p in spare:
+        parts += ["", p["sentence"]]
+    parts += ["", f"{tot['measures']:,} measures tracked. {tot['controlled']} carry a control. "
+                  f"{tot['offices']} offices hold one."]
+    return "\n".join(parts).strip()
 
 
 FRESH = 1  # a measure that carries a control and names an office arrives about twice a week
 
 
-def edition(db, key, out_dir, today, want=WANT, dry_run=False):
-    """Build one edition: what moved, then what it all adds up to.
+def spare_for(db, lead, today, used):
+    """The two counts under the measure: one about the control, one about a fear.
 
-    Measures that carry a control arrive at roughly three a week, so an edition that waited for
-    three of them would either run empty or reach for a measure that does not carry its weight.
-    The pattern lines are there for that: each is computed from the whole record, so it is true on
-    any day, and it only repeats once the number behind it has moved.
+    A post that never names a fear does not answer for its own first line. A quarter of measures
+    cite one in their own text, so the fear is carried by a count instead, which is a fact about
+    the record rather than a claim about the measure above it.
+    """
+    spare = sorted(patterns(db, today, used), key=lambda p: -p["weight"])
+    controls = [c for c in (lead.get("controls") or "").split("|") if c]
+    mine = max(controls, key=lambda c: WEIGHT.get(c, 1)) if controls else ""
+    by_control = [p for p in spare if p["key"].startswith("control:")]
+    if mine:
+        by_control.sort(key=lambda p: not p["key"].startswith(f"control:{mine}:"))
+    # the fears all weigh the same, so the one worth printing is the one with the most behind it
+    by_fear = sorted((p for p in spare if p["key"].startswith("fear:")),
+                     key=lambda p: -int(p["key"].rsplit(":", 1)[1]))
+    out = by_control[:1] + by_fear[:1]
+    return out or spare[:2]
+
+
+def edition(db, key, out_dir, today, want=WANT, dry_run=False):
+    """One measure that moved, and the counts it sits among.
+
+    Measures carrying a control arrive at about nine a week, which one a day can live on. The
+    counts are computed from the whole record, so they hold on any day, and each is keyed to its
+    own number: it comes round again only once that number has moved.
     """
     cfg = config("brief")
-    names = controls_by_slug()
+    names, fear_names = controls_by_slug(), fears_by_slug()
     day = dt.date.fromisoformat(today)
     if db.execute("SELECT 1 FROM brief WHERE edition=? LIMIT 1", (today,)).fetchone():
         log(f"[brief] {today} is already written")
         return None
     used = {r["target"] for r in db.execute("SELECT target FROM brief")}
 
-    lines = write_lines(key, pool(db, today), min(FRESH, want))
-    if len(lines) < want:
-        # a pattern line about a control an entry above already showed says it twice
-        shown = {c for l in lines for c in (l["controls"] or "").split("|") if c}
-        spare = [p for p in patterns(db, today, used)
-                 if p["key"].split(":")[0] != "control" or p["key"].split(":")[1] not in shown]
-        spare.sort(key=lambda p: -p["weight"])
-        # two lines of the same family in one edition read as padding, so take one of each
-        families, picked = set(), []
-        for p in spare:
-            family = p["key"].split(":")[0]
-            if family in families:
-                continue
-            families.add(family)
-            picked.append(p)
-        order = list({p["key"]: p for p in picked + spare}.values())
-        for p in order[:want - len(lines)]:
-            lines.append({"target": p["key"], "sentence": p["sentence"], "quote": "",
-                          "office": p["office"], "controls": "", "meta": p["meta"],
-                          "head": p["head"], "jurisdiction": "", "url": "", "status": ""})
-    if not lines:
-        log("[brief] nothing to say today, no edition")
-        return None
+    lines = write_lines(key, pool(db, today), 1)
+    lead = lines[0] if lines else None
+    if lead is None:
+        spare = sorted(patterns(db, today, used), key=lambda p: -p["weight"])
+        if not spare:
+            log("[brief] nothing to say today, no edition")
+            return None
+        top = spare[0]
+        lead = {"target": top["key"], "sentence": top["sentence"], "quote": "", "office": top["office"],
+                "controls": "", "fears": "", "meta": top["meta"], "head": top["head"],
+                "jurisdiction": "", "url": "", "status": ""}
+        spare = spare[1:3]
+    else:
+        spare = spare_for(db, lead, today, used)
 
     tot = totals(db)
-    head = headline(key, lines, names, tot)
-    text = compose(lines, tot, cfg)
+    head = headline(key, [lead], names, tot)
+    text = compose(lead, spare, tot, cfg, fear_names)
+    rows = [lead] + [{"target": p["key"], "sentence": p["sentence"], "quote": "", "office": p["office"],
+                      "controls": "", "meta": p["meta"], "head": p["head"], "jurisdiction": "",
+                      "url": "", "status": ""} for p in spare]
 
     out = pathlib.Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -465,16 +518,16 @@ def edition(db, key, out_dir, today, want=WANT, dry_run=False):
     from brand import plate
     plate(image, day.strftime("%A %-d %B %Y"), head)
     edition_data = {"edition": today, "headline": head, "text": text, "image": image,
-                    "alt": alt(head, lines), "lines": lines, "totals": tot}
+                    "alt": alt(head, rows), "lines": rows, "totals": tot}
     (out / f"{today}.json").write_text(json.dumps(edition_data, indent=1))
     if not dry_run:
-        for l in lines:
+        for l in rows:
             db.execute("INSERT OR REPLACE INTO brief(target, edition, sentence, evidence, office, "
                        "controls, written_at) VALUES(?,?,?,?,?,?,?)",
                        (l["target"], today, l["sentence"], l["quote"], l["office"], l["controls"],
                         now().isoformat()))
         db.commit()
-    log(f"[brief] {today}: {len(lines)} entries, card at {image}"
+    log(f"[brief] {today}: {len(rows)} entries, plate at {image}"
         f"{' (dry run, nothing recorded)' if dry_run else ''}")
     return edition_data
 
@@ -488,7 +541,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     db = connect(args.db)
-    today = args.date or now().date().isoformat()
+    today = args.date or edition_date()
     data = edition(db, env("ANTHROPIC_API_KEY"), args.out, today, args.lines, args.dry_run)
     if data:
         print("\n" + "-" * 60)

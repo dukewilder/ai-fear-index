@@ -42,6 +42,39 @@ def check_brief_prompt():
                          row["office"]) == "", "a sound pending sentence was rejected"
     assert brief.why_not(good, "would put every operator under the ohio department", body, True,
                          row["office"]), "a passed measure written conditionally was accepted"
+    # the gates that decide whether a sentence is reporting or repeating the sponsor
+    FDA = "Health and Human Services Department, Food and Drug Administration"
+    SHAPES = [
+        ("California requires operators of companion chatbots to perform risk assessments and submit "
+         "to independent audits reported to the Attorney General.", "California", False),
+        (FDA + " requires operators to file reports and keep records.", FDA, False),
+        ("California puts AI auditors under registration with the Government Operations Agency, "
+         "which licenses them and investigates violations.", "California", True),
+        ("New York would require every frontier developer to register with the Office for AI Model "
+         "Developer Oversight, which decides who may release one.", "New York", True),
+    ]
+    for text, place, keep in SHAPES:
+        head = brief.tense_of(text, place)
+        kept = not (brief.DUTY_OPENER.search(head) and not brief.POWER.search(text))
+        assert kept == keep, f"power framing: {text[:60]!r} should be {'kept' if keep else 'rejected'}"
+    # and through why_not itself, so removing the gate fails here rather than in production
+    duty = ("California requires operators of companion chatbots to perform risk assessments and "
+            "submit to independent audits reported to the Attorney General.")
+    dbody = ("california requires operators of companion chatbots to perform risk assessments and "
+             "submit to independent audits reported to the attorney general")
+    assert "duty" in brief.why_not(duty, "requires operators of companion chatbots to perform risk",
+                                   dbody, True, "", "", "California"), "the duty gate is not wired in"
+    assert brief.starts_later("commencing January 1, 2029, the agency", "2026-09-20") == "2029"
+    assert brief.starts_later("effective January 1, 2025, the agency", "2026-09-20") == ""
+    later = ("California puts AI auditors under registration with the Government Operations Agency, "
+             "which licenses them.")
+    lbody = ("california puts ai auditors under registration with the government operations agency "
+             "which licenses them")
+    assert "2029" in brief.why_not(later, "puts ai auditors under registration with the government",
+                                   lbody, True, "", "2029", "California"), "the start-year gate is not wired in"
+    assert brief.why_not(later.replace("Agency,", "Agency from 2029,"),
+                         "puts ai auditors under registration with the government",
+                         lbody, True, "", "2029", "California") == "", "a sentence carrying the year was rejected"
     print("brief prompt and gates: ok")
 
 

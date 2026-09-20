@@ -322,7 +322,9 @@ def redo_briefs(db):
 #    rewritten, caught by a row-by-row except and reported as the model not answering.
 # 5: the first real sentence read "California puts AI auditors under registration" for a law whose
 #    registry opens in 2029. A measure that names a later start now has to say the year.
-REDO_EDITION = ("2026-09-20", 5)
+# 6: the next one reverted to the sponsor's grammar, a list of what a company has to do. A duty
+#    sentence that hands nobody a power is refused.
+REDO_EDITION = ("2026-09-20", 6)
 
 
 def redo_today(db):

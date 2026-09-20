@@ -146,7 +146,10 @@ RULES = (
     "the state or the jurisdiction by name.\n"
     "A duty on a company is a power for whoever it answers to, and it is the power that goes in "
     "the sentence. Not required to restore the water, but put under the department that decides "
-    "whether it has.\n"
+    "whether it has. Not required to submit to audits reported to the attorney general, but put "
+    "under an auditor whose report the attorney general can demand.\n"
+    "So do not open with the jurisdiction and then requires, mandates, directs or orders followed "
+    "by a company. Open with what is put under whose control.\n"
     "If a duty falls on everyone in order to identify some people, the sentence says everyone: a "
     "rule that checks whether a user is a child checks every user.\n"
     "Never use a word the sponsor chose to make the measure sound smaller than it is. Do not write "
@@ -194,6 +197,24 @@ EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit i
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
 
+# A sentence that names the power has a shape. Something is put under a body, or a body is given
+# something, or a body does the deciding. A sentence that only lists what a company has to do is
+# the sponsor's framing however many offices it mentions in passing: "submit to audits reported to
+# the Attorney General" names the Attorney General and hands it nothing.
+POWER = re.compile(
+    r"\bunder\b"
+    r"|\b(?:which|who|that)\s+(?:\w+\s+){0,2}"
+    r"(?:decid\w+|licens\w+|approv\w+|inspect\w+|certif\w+|investigat\w+|revok\w+|issu\w+|"
+    r"registers?|determin\w+|audits?|enforc\w+|permits?|refus\w+|withhold\w+|bars?|blocks?|"
+    r"may|must|can|holds?|keeps?|orders?|sets?|names?)\b"
+    r"|\b(?:gives?|hands?|grants?|leaves?)\s+(?:the\s+)?\w+"
+    r"|\b(?:licen[sc]ed|approved|certified|registered|inspected|authoris?zed|vetted)\s+by\b", re.I)
+DUTY_FRAMED = "written as a duty on a company, not the power it creates"
+# Looked for in the main clause rather than the first few words, because "Health and Human Services
+# Department, Food and Drug Administration requires operators to file reports" is the same sentence
+# with a longer name on the front.
+DUTY_OPENER = re.compile(r"\b(requires?|mandates?|obligates?|directs?|orders?|compels?)\b", re.I)
+
 # When a measure that has passed says it starts in a later year, the present tense alone claims it
 # is in force now. Four of the strongest candidates in the pool are exactly this: California bills
 # chaptered this year whose registries and duties begin in 2027, 2028 or 2029.
@@ -217,9 +238,19 @@ def starts_later(text, today):
 MAIN_CLAUSE = re.compile(r",|\b(which|who|whom|whose|that|whether)\b", re.I)
 
 
-def tense_of(text):
-    """The first clause, which is the one carrying the tense."""
-    return MAIN_CLAUSE.split(text or "", 1)[0]
+def tense_of(text, jurisdiction=""):
+    """The first clause, which is the one carrying the tense.
+
+    The jurisdiction comes off the front first, because one of them is called "Health and Human
+    Services Department, Food and Drug Administration" and the comma in its name is not a clause
+    boundary. Without this the clause is the name alone, which carries no verb at all: every
+    pending rule from that agency would read as written in the present tense, and every duty
+    sentence from it would slip the check for one.
+    """
+    body = (text or "").strip()
+    if jurisdiction and body.lower().startswith(jurisdiction.lower()):
+        body = body[len(jurisdiction):].lstrip(" ,")
+    return MAIN_CLAUSE.split(body, 1)[0]
 
 
 OFFICIAL = re.compile(
@@ -243,7 +274,7 @@ def without_names(text, office=""):
     return OFFICIAL.sub(" ", out)
 
 
-def why_not(text, quote, body_norm, passed=False, office="", starts=""):
+def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction=""):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
     Named rather than returned as a bare False, so a run that throws every candidate away says
@@ -253,7 +284,7 @@ def why_not(text, quote, body_norm, passed=False, office="", starts=""):
         return "no sentence"
     if not quote:
         return "no quote"
-    head = tense_of(text)
+    head = tense_of(text, jurisdiction)
     if passed and CONDITIONAL.search(head):
         return f"passed but says {CONDITIONAL.search(head).group(0)!r}"
     if not passed and not CONDITIONAL.search(head):
@@ -272,12 +303,14 @@ def why_not(text, quote, body_norm, passed=False, office="", starts=""):
         return f"says {loose.group(0)!r} instead of naming who is bound"
     if passed and starts and starts not in text:
         return f"passed but starts in {starts}, and the sentence does not say so"
+    if DUTY_OPENER.search(head) and not POWER.search(text):
+        return DUTY_FRAMED
     if not agreed({"controls": {"line": quote}}, body_norm, "controls"):
         return "the quote it leaned on is not in the measure"
     return ""
 
 
-def usable(text, quote, body_norm, passed=False, office="", starts=""):
+def usable(text, quote, body_norm, passed=False, office="", starts="", jurisdiction=""):
     """The sentence has to rest on words in the text, not borrow the sponsor's vocabulary, and not
     describe a bill sitting in committee as though it already bound anyone.
 
@@ -285,7 +318,7 @@ def usable(text, quote, body_norm, passed=False, office="", starts=""):
     than trusted to the instruction above: a measure that has not passed says would, and one that
     has does not.
     """
-    return not why_not(text, quote, body_norm, passed, office, starts)
+    return not why_not(text, quote, body_norm, passed, office, starts, jurisdiction)
 
 
 def note(attempts, where, reason, sentence_text="", fatal=False):
@@ -301,7 +334,7 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
     in the database. An edition that falls back to counts has thrown a dozen sentences away, and
     without this the only record of why is a CI log that expires.
     """
-    lines, places = [], set()
+    lines, places, second = [], set(), None
     for row in rows:
         if len(lines) >= want:
             break
@@ -322,18 +355,32 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
             log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")
             continue
         starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
-        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "", starts)
+        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "",
+                         starts, row["jurisdiction_name"] or "")
         if reason:
             note(attempts, where, reason, sentence_text=text)
             log(f"[brief] {where}: skipped, {reason}")
+            if reason == DUTY_FRAMED and second is None:
+                # True, checkable, and the wrong way round. Worth keeping in reserve: an edition
+                # of counts says less than a sentence in the sponsor's grammar.
+                second = (row, where, text, quote)
             continue
         note(attempts, where, "used")
         places.add(row["jurisdiction_name"])
-        lines.append({"target": row["id"], "sentence": text, "quote": quote,
-                      "office": row["office"] or "", "controls": row["controls"] or "",
-                      "fears": row["fears"] or "", "jurisdiction": row["jurisdiction_name"],
-                      "url": row["url"], "status": row["status"] or ""})
+        lines.append(made(row, text, quote))
+    if not lines and second is not None:
+        row, where, text, quote = second
+        note(attempts, where, "used, though it is written as a duty")
+        log(f"[brief] {where}: used, though it is written as a duty and nothing better was written")
+        lines.append(made(row, text, quote))
     return lines
+
+
+def made(row, text, quote):
+    return {"target": row["id"], "sentence": text, "quote": quote,
+            "office": row["office"] or "", "controls": row["controls"] or "",
+            "fears": row["fears"] or "", "jurisdiction": row["jurisdiction_name"],
+            "url": row["url"], "status": row["status"] or ""}
 
 
 NUMBERS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]

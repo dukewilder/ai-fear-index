@@ -853,10 +853,19 @@ def brief_latest(db):
     """
     latest = kv_get(db, "brief:latest") or {}
     day, head = latest.get("edition"), latest.get("headline")
-    if not day or not head:
+    if not day:
+        # Editions written before this key existed, and any run where brief.py has not gone yet
+        # today. The table knows which days were published even when it does not know what they
+        # said, and the plate is named for its day, so the card is still reachable. The headline
+        # arrives with the next edition and the alt text stops being generic then.
+        row = db.execute("SELECT MAX(edition) FROM brief").fetchone()
+        day = row[0] if row else None
+        head = None
+    if not day:
         return None
-    return {"date": day, "headline": head, "image": f"/brief/{day}.png",
-            "alt": latest.get("alt") or head}
+    return {"date": day, "headline": head or "", "image": f"/brief/{day}.png",
+            "alt": latest.get("alt") or head
+            or f"The AI Fear Report card for {day}, posted on X."}
 
 
 def sentence_name(fear):

@@ -710,11 +710,21 @@ def check_every_page_asks(dist, db, day):
             # watching every reader of a site about who is watching, and has to be argued for.
             assert m.group(1) in ALLOWED_HOSTS, \
                 f"{where} loads from {m.group(1)}; this site ships self-contained"
-    # and a database with no edition yet has to render the section without a card rather than
-    # pointing at a picture that does not exist
+    # Three states, because the card comes from two places. With the key, the headline is known.
+    # Without it, the table still knows which days were published, which is every edition written
+    # before the key existed. With neither, the section has to render without a card rather than
+    # point at a picture that was never made.
     db.execute("DELETE FROM kv WHERE key='brief:latest'")
+    db.execute("INSERT OR REPLACE INTO brief(target, edition, sentence, evidence, office, "
+               "controls, written_at) VALUES('t', '2026-09-19', 's', 'q', '', '', '')")
     db.commit()
-    assert export.brief_latest(db) is None, "an empty database must report no card"
+    fell_back = export.brief_latest(db)
+    assert fell_back and fell_back["date"] == "2026-09-19", \
+        f"the table should still name an edition: {fell_back}"
+    assert fell_back["alt"].strip(), "a card with no headline still needs alt text"
+    db.execute("DELETE FROM brief")
+    db.commit()
+    assert export.brief_latest(db) is None, "a database with no edition at all must report no card"
     print(f"the brief and the pitch-in are on all {len(pages)} pages, brief first: ok")
 
 

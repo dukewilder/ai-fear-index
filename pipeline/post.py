@@ -134,6 +134,14 @@ def run(db, brief_dir, date, dry_run=False, force=False, flag=""):
         print(f"alt:   {data.get('alt', '')[:150]}")
         print(f"\n{len(text)} characters. Nothing was posted.")
         return None
+    if not force and not db.execute("SELECT 1 FROM brief WHERE edition=? LIMIT 1",
+                                    (date,)).fetchone():
+        # The file is a rendering of rows in the database, not the record itself. A pass that
+        # cleared the day to write it again and then could not write it leaves yesterday's file
+        # sitting there, and posting that sends out a sentence this code has already refused.
+        # No rows means nothing was written by the code now running, so nothing goes out.
+        log(f"[post] {date} has a file on disk but no entries in the database; nothing goes out")
+        return None
     creds = credentials()
     media_id = upload(creds, image) if image.exists() else None
     if not media_id:

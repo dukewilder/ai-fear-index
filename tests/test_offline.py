@@ -298,6 +298,48 @@ def check_fec_sweep():
     print("the FEC register sweep: ok")
 
 
+def check_post_needs_entries():
+    """An edition is posted from the database, not from whatever file is lying about.
+
+    The file on the data branch outlives the code that wrote it. A pass that clears the day to
+    write it again and then cannot write it leaves the old file in place, and the poster reads
+    files. Without this guard the morning post would carry a sentence the current code has
+    already refused. So: rows for the day, or nothing goes out.
+    """
+    from pipeline import post
+    from pipeline.common import connect as _connect
+    import tempfile as _tempfile
+    room = pathlib.Path(_tempfile.mkdtemp())
+    db = _connect(room / "post.db")
+    day = "2026-09-20"
+    briefs = room / "brief"
+    briefs.mkdir()
+    (briefs / f"{day}.json").write_text(json.dumps(
+        {"edition": day, "headline": "stale", "text": "a sentence the code has since refused",
+         "alt": "", "lines": []}))
+
+    def refuse():
+        raise AssertionError("the poster reached for credentials with nothing written for the day")
+
+    kept, post.credentials = post.credentials, refuse
+    try:
+        assert post.run(db, str(briefs), day) is None, "a stale file was posted"
+        db.execute("INSERT INTO brief(target, edition, sentence, evidence, office, controls, "
+                   "written_at) VALUES(?,?,?,?,?,?,?)",
+                   ("t1", day, "a sentence this code wrote", "", "", "", iso(dt.datetime.now())))
+        db.commit()
+        try:
+            post.run(db, str(briefs), day)
+        except AssertionError as e:
+            if "reached for credentials" not in str(e):
+                raise
+        else:
+            raise AssertionError("the guard held an edition the database does have")
+    finally:
+        post.credentials = kept
+    print("the poster refuses a stale edition: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -305,6 +347,7 @@ def main():
     check_fears_config()
     check_no_euphemism()
     check_fec_sweep()
+    check_post_needs_entries()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

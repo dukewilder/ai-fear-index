@@ -516,7 +516,7 @@ def export(db, out_dir, base=""):
     (out / "site_data.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
     (out / "status.json").write_text(json.dumps(status, indent=1, default=str))
     # The blind-spot list rides the data branch rather than the site: it is a note to whoever
-    # maintains the nine fears, not something a reader of the report needs.
+    # maintains the fear list, not something a reader of the report needs.
     spots = kv_get(db, "blindspots:report")
     if spots:
         (out / "blindspots.json").write_text(json.dumps(spots, indent=1, default=str))
@@ -785,7 +785,7 @@ def build_feed(db, ents, measures, lob, receipts, today):
                         "WHERE tr.ai_related = 1 AND p.published >= ?", (horizon,)):
         named = sorted(post_tags.get(p["id"], []))
         if not named:
-            continue  # AI-related is not the bar here; naming one of the nine fears is
+            continue  # AI-related is not the bar here; naming one of the fears on file is
         ent = ents.by_slug.get(p["entity"], {})
         items.append({"type": "statement", "label": "Statement", "text": f"{ent.get('name', p['entity'])}: {cut(p['title'] or '', 160)}",
                       "url": p["url"], "time_iso": p["published"], "time": p["published"][:10],

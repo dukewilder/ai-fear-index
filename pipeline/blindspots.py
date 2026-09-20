@@ -1,6 +1,6 @@
-"""What the nine fears do not cover, counted rather than guessed.
+"""What the fears on file do not cover, counted rather than guessed.
 
-The nine are hand-written on purpose: a ranking only means something if its categories hold still,
+They are hand-written on purpose: a ranking only means something if its categories hold still,
 and one fear has to be defined identically across four sources that share no vocabulary. The cost
 of that is a blind spot. A fear nobody has written down yet is invisible, however many bills are
 filed about it, because nothing is looking.
@@ -23,7 +23,7 @@ import json
 import pathlib
 import re
 
-from .common import EUPHEMISM, config, connect, iso, kv_get, kv_set
+from .common import EUPHEMISM, config, connect, iso, kv_get, kv_set, spell
 
 MIN_TEXT = 200      # characters of summary; below this the tagger had nothing to read
 MIN_DOCS = 5        # a phrase in fewer measures than this is noise, not a subject
@@ -97,7 +97,7 @@ def fear_patterns(fears):
 
 
 def fear_names(fears):
-    """The words the nine call themselves, so the list does not report them back."""
+    """The words the fears call themselves, so the list does not report them back."""
     words = set()
     for f in fears:
         for source in [f["name"], f.get("short") or ""]:
@@ -210,7 +210,7 @@ def run(db, state, mode):
     state["added"] = len(top)
     state["message"] = (
         f"{uncovered_rows} of {len(rows)} untagged measures match no fear at all; "
-        f"{len(top)} subjects the nine do not name"
+        f"{len(top)} subjects the {spell(len(config('fears')))} do not name"
         + (f"; growing: {', '.join(u['phrase'] + ' +' + str(u['change']) for u in risers)}" if risers else "")
         + (f"; recall gaps: {', '.join(m['fear'] + ' ' + str(m['measures']) for m in report['missed'][:3])}"
            if report["missed"] else "")
@@ -227,7 +227,8 @@ def main():
     state = {"added": 0, "message": ""}
     report = run(db, state, "manual")
     print(state["message"], "\n")
-    print(f"  {'subject the nine do not name':<40}{'measures':>9}{'places':>8}{'change':>8}")
+    label = f"subject the {spell(len(config('fears')))} do not name"
+    print(f"  {label:<40}{'measures':>9}{'places':>8}{'change':>8}")
     for u in report["uncovered"]:
         change = "" if u["change"] is None else f"{u['change']:+d}"
         print(f"  {u['phrase']:<40}{u['measures']:>9}{u['places']:>8}{change:>8}")

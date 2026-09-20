@@ -20,7 +20,8 @@ import pathlib
 import re
 import sys
 
-from .common import EUPHEMISM, Entities, annotate, config, connect, env, kv_set, log, now
+from .common import (EUPHEMISM, SINCE, Entities, annotate, config, connect, env, kv_set, log,
+                     name_key, now)
 from .export import gave
 from .tag import agreed, call, norm
 
@@ -586,13 +587,28 @@ def alt(head, lines):
 
 
 def totals(db):
-    one = lambda q: db.execute(q).fetchone()[0]
-    return {
-        "measures": one("SELECT COUNT(*) FROM measures m JOIN tag_runs r ON r.target=m.id WHERE r.ai_related=1"),
-        "controlled": one("SELECT COUNT(DISTINCT m.id) FROM measures m JOIN tags t ON t.target=m.id "
-                          "WHERE t.kind='control'"),
-        "offices": one("SELECT COUNT(DISTINCT value) FROM tags WHERE kind='agency'"),
-    }
+    """The three counts the plate carries, on the rule the front page counts by.
+
+    The plate goes out on X while the page it describes is one click away, so the two have to
+    agree. Counting distinct agency strings instead of normalized names, over every measure on
+    file instead of the ones the page shows, put five offices on the plate that the page did not
+    have. The test suite holds these against the exported page numbers.
+    """
+    suppressed = set(config("suppress").get("urls", []))
+    keep = {r["id"] for r in db.execute(
+        "SELECT m.id, m.url FROM measures m JOIN tag_runs tr ON tr.target = m.id "
+        "WHERE tr.ai_related = 1 AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))",
+        (SINCE,)) if r["url"] not in suppressed}
+    known = {c["slug"] for c in config("controls")}
+    controlled, offices = set(), set()
+    for t in db.execute("SELECT target, kind, value FROM tags WHERE kind IN ('control','agency')"):
+        if t["target"] not in keep:
+            continue
+        if t["kind"] == "control" and t["value"] in known:
+            controlled.add(t["target"])
+        elif t["kind"] == "agency" and name_key(t["value"]):
+            offices.add(name_key(t["value"]))
+    return {"measures": len(keep), "controlled": len(controlled), "offices": len(offices)}
 
 
 def subject(db, lead):

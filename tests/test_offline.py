@@ -340,6 +340,42 @@ def check_post_needs_entries():
     print("the poster refuses a stale edition: ok")
 
 
+def check_failed_source_retries():
+    """A daily source that errors is tried again today, not tomorrow.
+
+    The daily pass marks itself done whatever happened inside it, so before this a source that
+    threw at six in the morning sat red for twenty-four hours, and a fix pushed at noon did not
+    run until the next morning either. Four things have to hold: a daily source that errored is
+    asked for again; one that succeeded lets go of the key it was carrying; one that set its own
+    retry during the run keeps it, because openstates asks for another turn when it reaches its
+    allowance, which is not a failure; and an hourly source is left alone, since the next run is
+    twenty minutes away.
+    """
+    from pipeline import run as runner
+    from pipeline.common import connect as _connect, kv_get as _kv_get
+    import tempfile as _tempfile
+    db = _connect(pathlib.Path(_tempfile.mkdtemp()) / "runs.db")
+    for name, ok in (("fec", 0), ("lda", 1), ("openstates", 1), ("congress", 1), ("rss", 0)):
+        db.execute("INSERT INTO status(source,last_run,ok,added,message) VALUES(?,?,?,?,?)",
+                   (name, iso(dt.datetime.now()), ok, 0, ""))
+    db.execute("INSERT INTO kv(key,value) VALUES('retry:lda', '\"2026-01-01T00:00:00\"')")
+    db.execute("INSERT INTO kv(key,value) VALUES('retry:openstates', '\"2026-01-01T00:00:00\"')")
+    db.commit()
+    asked = {"fec": None, "lda": "2026-01-01T00:00:00", "congress": None, "rss": None,
+             "openstates": "2026-01-01T00:00:00"}
+    # openstates reached its allowance during the run and moved its own key on the way past
+    db.execute("UPDATE kv SET value='\"2026-09-20T18:00:00\"' WHERE key='retry:openstates'")
+    db.commit()
+    runner.ask_again(db, list(asked), asked)
+    assert _kv_get(db, "retry:fec"), "a daily source that errored was not asked for again"
+    assert not _kv_get(db, "retry:lda"), "a daily source that succeeded kept a spent retry"
+    assert _kv_get(db, "retry:openstates") == "2026-09-20T18:00:00", \
+        "a source that asked for its own next turn had the request overwritten"
+    assert not _kv_get(db, "retry:congress"), "a source that succeeded was asked for again"
+    assert not _kv_get(db, "retry:rss"), "an hourly source was given a retry it does not need"
+    print("a failed daily source is tried again today: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -348,6 +384,7 @@ def main():
     check_no_euphemism()
     check_fec_sweep()
     check_post_needs_entries()
+    check_failed_source_retries()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()
@@ -364,8 +401,23 @@ def main():
         db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
         for kind, value in [("fear", ["loss-of-control", "deepfakes", "kids-chatbots", "china-race"][i % 4]),
                             ("control", ["mandatory-reporting", "new-agency-powers", "labeling-mandates"][i % 3]),
-                            ("agency", ["California Attorney General", "Federal Trade Commission"][i % 2])]:
+                            # The third spelling is the second office again. Real tags arrive
+                            # worded however the bill worded them, and a count of distinct
+                            # strings reports one office as two.
+                            ("agency", ["California Attorney General", "Federal Trade Commission",
+                                        "the FEDERAL  TRADE COMMISSION"][i % 3])]:
             db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, kind, value, "quote", "test", iso()))
+    # A measure the front page does not show: read, judged not about AI, and tagged all the same.
+    # Anything counting over the whole tags table rather than the page's own set picks it up.
+    upsert(db, "measures", {"id": "os-offpage", "kind": "bill", "jurisdiction": "ca",
+                            "jurisdiction_name": "California", "session": "2025", "identifier": "SB 999",
+                            "title": "A bill about something else", "summary": "Not about AI.",
+                            "status": "pending", "latest_action": "Referred", "latest_action_date": iso()[:10],
+                            "introduced_date": iso()[:10], "url": "https://example.com/offpage",
+                            "sponsors": "Sample", "source": "test", "updated": iso()[:10], "first_seen": iso()})
+    db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("os-offpage", "h", 0, iso()))
+    for kind, value in (("control", "new-agency-powers"), ("agency", "Nevada Gaming Control Board")):
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-offpage", kind, value, "quote", "test", iso()))
     clients = ["OPENAI OPCO, LLC", "META PLATFORMS, INC.", "BUSINESS ROUNDTABLE",
                "CENTER FOR AI SAFETY ACTION FUND", "AMERICANS FOR RESPONSIBLE INNOVATION"]
     for i in range(30):
@@ -397,6 +449,18 @@ def main():
     db.commit()
     data = export.export(db, tmp)
     assert data["index"]["value"] != "0", data["index"]
+    # The plate goes out on X while the page it describes is one click away. They are counted by
+    # two different pieces of code, so the numbers are held against each other here.
+    from pipeline.brief import totals as plate_totals  # noqa: E402
+    plate = plate_totals(db)
+    chain = {label: value for value, label in data["index"]["chain"]}
+    for word, key in (("bills, rules and orders", "measures"),
+                      ("new government control", "controlled"),
+                      ("handed new power", "offices")):
+        label = next((l for l in chain if word in l), None)
+        assert label, f"the front page stopped saying {word!r}; the plate still counts it"
+        assert chain[label] == f"{plate[key]:,}", \
+            f"the plate says {plate[key]:,} and the page says {chain[label]} for {word!r}"
     assert data["fears"] and data["controls"]
     assert data["funders"], "advocacy lobbying should rank separately"
     assert data["industry"], "company and trade group lobbying should rank separately"

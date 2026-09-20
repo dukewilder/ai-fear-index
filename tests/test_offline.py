@@ -14,7 +14,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from pipeline import export  # noqa: E402
-from pipeline.common import connect, iso, name_key, upsert  # noqa: E402
+from pipeline.common import config, connect, iso, name_key, upsert  # noqa: E402
 
 
 def check_brief_prompt():
@@ -442,6 +442,63 @@ def check_places_word():
     print("an executive order is not a state: ok")
 
 
+def check_headline_keeps_the_power():
+    """A headline that drops the body reads the measure backwards.
+
+    The morning of 20 September the plate said "California would exempt data center projects from
+    environmental review". The sentence it came from said the projects go under the Governor's
+    authority to certify them as exempt. One office deciding who is exempt is a power; the plate
+    said a rule had gone away, which is the opposite of what this report is for. Everything else
+    guarding the headline stops it saying something untrue. This stops it saying the true thing
+    backwards.
+    """
+    from pipeline import brief
+    real = brief.call
+    lead = {"sentence": "California would put data center projects under the Governor's authority "
+                        "to certify them as environmental leadership development projects exempt "
+                        "from standard environmental review.",
+            "office": "California Office of Land Use and Climate Innovation",
+            "jurisdiction": "California", "controls": "data-center-limits", "head": ""}
+    names = {c["slug"]: c for c in config("controls")}
+    assert brief.power_holder(lead["sentence"]) == {"governor"}, brief.power_holder(lead["sentence"])
+    try:
+        said = []
+
+        def two_tries(key, system, prompt, max_tokens=0):
+            said.append(prompt)
+            return {"line": ["California would exempt data center projects from environmental review",
+                             "California would let the Governor exempt data center projects"][len(said) - 1]}
+
+        brief.call = two_tries
+        got = brief.headline("k", [lead], names, {})
+        assert "governor" in got.lower(), f"the plate dropped the body again: {got}"
+        assert len(said) == 2, "the headline was not asked again after it dropped the body"
+
+        # and when it will not keep the body, the plate falls back to the sentence's own words
+        def never(key, system, prompt, max_tokens=0):
+            return {"line": "California would exempt data center projects from review"}
+
+        brief.call = never
+        got = brief.headline("k", [lead], names, {})
+        assert got == "California would put data center projects under the Governor's authority", got
+
+        # a sentence that names no body is asked once, as before
+        plainly = dict(lead, sentence="Texas would require an AI company to label synthetic media.",
+                       jurisdiction="Texas", controls="labeling-mandates")
+        asked = []
+
+        def once(key, system, prompt, max_tokens=0):
+            asked.append(1)
+            return {"line": "Texas would require labels on synthetic media"}
+
+        brief.call = once
+        assert brief.headline("k", [plainly], names, {}) == "Texas would require labels on synthetic media"
+        assert len(asked) == 1, "a sentence with no body was asked twice"
+    finally:
+        brief.call = real
+    print("the plate keeps who holds the power: ok")
+
+
 def main():
     check_brief_prompt()
     check_plate_fits()
@@ -452,6 +509,7 @@ def main():
     check_post_needs_entries()
     check_failed_source_retries()
     check_places_word()
+    check_headline_keeps_the_power()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

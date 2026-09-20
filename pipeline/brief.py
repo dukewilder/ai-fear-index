@@ -547,10 +547,47 @@ HEAD_RULES = (
     "Do not be clever, do not ask a question, and do not open with who, what, how, why, or when.\n"
     "Keep the tense exactly as the sentence has it. If the sentence says would, the headline says "
     "would. Dropping it turns a proposal into a law and the headline into a false one.\n"
-    "Do not add a number, a place, or anything else the sentence does not already say."
+    "Do not add a number, a place, or anything else the sentence does not already say.\n"
+    "If the sentence puts something under a body, or says a body certifies, approves, exempts or "
+    "decides, name that body. A measure that lets one office decide who is exempt is not the same "
+    "as the requirement going away, and a headline without the body says the second one."
 )
 
 NUMERAL = re.compile(r"\d[\d,.]*")
+
+
+# The words the POWER pattern supplies itself, as opposed to the ones naming who holds it.
+POWER_GLUE = {"under", "that", "which", "who", "whom", "gives", "give", "hands", "hand", "grants",
+              "grant", "leaves", "leave", "authority", "state", "independent", "outside", "party",
+              "third"}
+
+
+def power_holder(text):
+    """The words that name who holds the power, out of the phrase saying there is one.
+
+    A headline is nine words and the model decides which nine. Dropping the body turns "puts data
+    centre projects under the Governor's authority to certify them as exempt" into "would exempt
+    data centre projects from environmental review", which is the same measure read backwards: a
+    rule disappearing rather than an office deciding who it disappears for. Whatever else the
+    headline loses, it does not lose this.
+    """
+    m = POWER.search(text or "")
+    if not m:
+        return set()
+    return {w.lower() for w in re.findall(r"[A-Za-z]{4,}", m.group(0))} - POWER_GLUE
+
+
+def power_clause(text, limit=13):
+    """The sentence's own words up to the end of the phrase that names the power.
+
+    Cutting at a word count lands mid-phrase. The end of the power phrase is a boundary, and
+    everything up to it is the sentence's own wording, already checked against the measure.
+    """
+    m = POWER.search(text or "")
+    if not m:
+        return ""
+    head = (text[:m.end()] or "").strip().rstrip(",;:")
+    return head if 5 <= len(head.split()) <= limit else ""
 
 
 def plain(line, names):
@@ -559,6 +596,9 @@ def plain(line, names):
     Cutting a sentence off at nine words lands mid-phrase and says something the measure does
     not, so the fallback builds a new line out of two fields instead of trimming one.
     """
+    held = power_clause(line.get("sentence") or "")
+    if held:
+        return held
     best = sorted((c for c in (line.get("controls") or "").split("|") if c in names),
                   key=lambda c: -WEIGHT.get(c, 1))
     where = line.get("jurisdiction") or ""
@@ -579,21 +619,35 @@ def headline(key, lines, names, totals):
     if lead.get("head"):
         return lead["head"]
     text = lead["sentence"]
-    try:
-        out = call(key, HEAD_SYSTEM, f"SENTENCE\n{text}\n\n{HEAD_RULES}\n\n"
-                                    'Return JSON: {"line": "..."}', max_tokens=150)
-        line = (out.get("line") or "").strip().rstrip(".")
-    except Exception as exc:
-        log(f"[brief] headline: {exc}")
-        line = ""
     # the headline is the largest text on the plate, so it answers for its tense like the rest
     source = set(NUMERAL.findall(text))
     place = lead.get("jurisdiction") or ""
     conditional = bool(CONDITIONAL.search(tense_of(text, place)))
-    if line and len(line.split()) <= 10 and not sponsors_word(line, lead.get("office") or "", loose=True) \
-            and set(NUMERAL.findall(line)) <= source \
-            and bool(CONDITIONAL.search(tense_of(line, place))) == conditional:
-        return line
+    holder = power_holder(text)
+    extra = ""
+    for _ in range(2 if holder else 1):
+        try:
+            out = call(key, HEAD_SYSTEM, f"SENTENCE\n{text}\n\n{HEAD_RULES}{extra}\n\n"
+                                        'Return JSON: {"line": "..."}', max_tokens=150)
+            line = (out.get("line") or "").strip().rstrip(".")
+        except Exception as exc:
+            log(f"[brief] headline: {exc}")
+            break
+        if holder and not any(w in line.lower() for w in holder):
+            # Everything else here stops the headline saying something untrue. This stops it
+            # saying the true thing backwards, which is the only way it has gone wrong so far.
+            log(f"[brief] headline dropped who holds the power: {line!r}")
+            extra = ("\n\nThe attempt before this one dropped the body the sentence puts this "
+                     f"under. The headline has to name {' or '.join(sorted(holder))}. A measure "
+                     "that hands one office the power to decide is not the same as the rule it "
+                     "decides about going away, and without the body the line says the second.")
+            continue
+        if line and len(line.split()) <= 10 \
+                and not sponsors_word(line, lead.get("office") or "", loose=True) \
+                and set(NUMERAL.findall(line)) <= source \
+                and bool(CONDITIONAL.search(tense_of(line, place))) == conditional:
+            return line
+        break
     return plain(lead, names)
 
 

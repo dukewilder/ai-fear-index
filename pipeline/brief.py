@@ -124,6 +124,8 @@ RULES = (
     "safeguards, guardrails, protections, safety net, common sense, modernize, framework, or oversight "
     "when the measure creates a duty, a licence, a register, or a power to inspect. Name the duty.\n"
     "Do not say whether the measure is good or bad, and do not add a reason it was introduced.\n"
+    "Use the measure's own words for what it does. Do not reach for a near neighbour of one: a "
+    "supply a data centre diminishes is a diminished supply, never a diminutive one.\n"
     "Do not name the bill number, and do not write the words bill, act, or legislation. Start with the "
     "jurisdiction.\n"
     "quote is copied word for word from the Title or Summary and is the text the sentence rests on, "

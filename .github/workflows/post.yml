@@ -51,7 +51,16 @@ jobs:
           mkdir -p state
           git fetch --depth=1 origin data
           git archive FETCH_HEAD | tar -x -C state
-          ls state/brief || echo "no editions written yet"
+          # An edition reaches the data branch once a pass has saved state after writing it, which
+          # is hourly. The published site has every edition as soon as it is written, so anything
+          # the data branch has not caught up on is taken from there.
+          if [ ! -d state/brief ] || [ -z "$(ls -A state/brief 2>/dev/null)" ]; then
+            echo "no editions on the data branch; taking them from the published site"
+            git fetch --depth=1 origin gh-pages
+            mkdir -p state/brief
+            git archive FETCH_HEAD brief | tar -x -C state --strip-components=0 || true
+          fi
+          ls -la state/brief || echo "no editions anywhere yet"
       - name: Post
         run: |
           python -m pipeline.post --db state/index.db --brief state/brief \

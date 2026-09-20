@@ -34,15 +34,15 @@ one_pass() {
   echo "::group::pass $1 at $(date -u +%H:%MZ)"
   python -m pipeline.run --mode "$MODE" --only "$ONLY" --db state/index.db --out state \
     || echo "::warning::pass $1 ended in an error; whatever it saved before that is kept"
-  if [ -f state/index.db ] && [ $(( $(date +%s) - data_saved )) -ge "$DATA_EVERY" ]; then
-    save state data Data
-    data_saved=$(date +%s)
-  fi
   # One edition of the brief a day, written but not posted. It rides the data branch so the
   # next run knows what has already been said, and is copied onto the site to be looked at.
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     python -m pipeline.brief --db state/index.db --out state/brief \
       || echo "::warning::pass $1 wrote no brief"
+  fi
+  if [ -f state/index.db ] && [ $(( $(date +%s) - data_saved )) -ge "$DATA_EVERY" ]; then
+    save state data Data
+    data_saved=$(date +%s)
   fi
   # One post a day, at POST_HOUR UTC, and only once: the database remembers the date it went.
   # Unset POST_HOUR and nothing is ever posted, which is the state this ships in.

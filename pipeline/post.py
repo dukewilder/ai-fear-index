@@ -57,11 +57,13 @@ def auth_header(method, url, creds, params=None):
 
 
 def credentials():
-    creds = {"key": env("X_API_KEY"), "secret": env("X_API_SECRET"),
-             "token": env("X_ACCESS_TOKEN"), "token_secret": env("X_ACCESS_SECRET")}
-    missing = [k for k, v in creds.items() if not v]
+    names = {"key": "X_API_KEY", "secret": "X_API_SECRET",
+             "token": "X_ACCESS_TOKEN", "token_secret": "X_ACCESS_SECRET"}
+    # asked for without required, so a run that is missing three of them says all three
+    creds = {k: env(v, required=False) for k, v in names.items()}
+    missing = [names[k] for k, v in creds.items() if not v]
     if missing:
-        raise RuntimeError(f"X credentials missing: {', '.join(missing)}")
+        raise RuntimeError(f"not set in this environment: {', '.join(missing)}")
     return creds
 
 

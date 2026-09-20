@@ -44,6 +44,14 @@ one_pass() {
     python -m pipeline.brief --db state/index.db --out state/brief \
       || echo "::warning::pass $1 wrote no brief"
   fi
+  # One post a day, at POST_HOUR UTC, and only once: the database remembers the date it went.
+  # Unset POST_HOUR and nothing is ever posted, which is the state this ships in.
+  if [ -n "${POST_HOUR:-}" ] && [ -n "${X_API_KEY:-}" ] && [ "$(date -u +%-H)" = "$POST_HOUR" ]; then
+    python -m pipeline.post --db state/index.db --brief state/brief \
+      || echo "::warning::pass $1 could not post the brief"
+    save state data Data   # so the next pass knows it already went
+    data_saved=$(date +%s)
+  fi
   if [ -f state/site_data.json ]; then
     rm -rf dist
     if python site/build.py --data state/site_data.json --out dist --base "" > /dev/null; then

@@ -310,6 +310,8 @@ HEAD_RULES = (
     "It is a plain statement with a verb. Someone who reads only this line and nothing else "
     "should come away knowing one fact.\n"
     "Do not be clever, do not ask a question, and do not open with who, what, how, why, or when.\n"
+    "Keep the tense exactly as the sentence has it. If the sentence says would, the headline says "
+    "would. Dropping it turns a proposal into a law and the headline into a false one.\n"
     "Do not add a number, a place, or anything else the sentence does not already say."
 )
 
@@ -349,9 +351,12 @@ def headline(key, lines, names, totals):
     except Exception as exc:
         log(f"[brief] headline: {exc}")
         line = ""
+    # the headline is the largest text on the plate, so it answers for its tense like the rest
     source = set(NUMERAL.findall(text))
+    conditional = bool(CONDITIONAL.search(text))
     if line and len(line.split()) <= 10 and not BANNED.search(line) \
-            and set(NUMERAL.findall(line)) <= source:
+            and set(NUMERAL.findall(line)) <= source \
+            and bool(CONDITIONAL.search(line)) == conditional:
         return line
     return plain(lead, names)
 

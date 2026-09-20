@@ -177,7 +177,10 @@ def avatar(path, size=800, label=True, bg=VERMILLION, fg=PAPER):
     With the name under it, the block is the badge plus the gap plus the name, and that block is
     what gets centred, not the badge alone.
     """
-    mark = int(size * (0.34 if label else 0.44))
+    # Without the name the square carries the whole picture, so it grows. 0.52 leaves an even
+    # ring of ground once the circle is cut; at 0.58 the corners crowd the edge and the ring
+    # goes thin where they reach, and at 0.44 the mark floats in a field of red.
+    mark = int(size * (0.34 if label else 0.52))
     d = ImageDraw.Draw(Image.new("RGB", (size, size)))
     side = badge_side(d, mark)   # the same square the wordmark draws, so the two cannot drift
 

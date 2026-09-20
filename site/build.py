@@ -135,35 +135,44 @@ def wrap_text(draw, text, font, width):
     return lines
 
 
-def share_card(path, big, label, sub="", kicker="AI FEAR REPORT", foot="aifearreport"):
-    """A 1200 by 630 card in the site's own style: paper, ink, one stamped figure."""
-    from PIL import Image, ImageDraw, ImageFont
-    im = Image.new("RGB", (CARD_W, CARD_H), "#F1EDE3")
+def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com"):
+    """A 1200 by 630 card in the site's own style: paper, ink, one stamped figure.
+
+    The mark itself goes on it, drawn by the same function that draws the avatar and the banner.
+    It used to set the words "AI FEAR REPORT" in a red box in whatever face PIL had lying around,
+    which is a card carrying a picture of the name rather than the mark, in the wrong typeface.
+    """
+    from PIL import Image, ImageDraw
+    from brand import font as bfont, ink as bink, wordmark, PAPER, INK, VERMILLION
+    im = Image.new("RGB", (CARD_W, CARD_H), PAPER)
     d = ImageDraw.Draw(im)
-    d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline="#141210", width=3)
-    d.line([(0, 104), (CARD_W, 104)], fill="#141210", width=2)
-    f_kick = ImageFont.load_default(size=28)
-    f_big = ImageFont.load_default(size=200 if len(big) <= 5 else 150)
-    f_lab = ImageFont.load_default(size=44)
-    f_sub = ImageFont.load_default(size=28)
-    f_foot = ImageFont.load_default(size=24)
-    kb = d.textbbox((0, 0), kicker, font=f_kick)
-    d.rectangle([60, 38, 60 + (kb[2] - kb[0]) + 30, 38 + (kb[3] - kb[1]) + 24], fill="#B3321F")
-    d.text((75, 44), kicker, font=f_kick, fill="#F1EDE3")
-    bb = d.textbbox((0, 0), big, font=f_big)
-    top = 150
-    d.text((52, top - bb[1]), big, font=f_big, fill="#141210")
-    y = top + (bb[3] - bb[1]) + 26
-    for line in wrap_text(d, label, f_lab, CARD_W - 120)[:2]:
-        d.text((60, y), line, font=f_lab, fill="#141210")
-        y += 54
+    d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline=INK, width=3)
+    band = 118
+    d.line([(0, band), (CARD_W, band)], fill=INK, width=2)
+    mark = 44
+    wordmark(d, 60, (band - mark * 1.14) / 2, mark, fill=VERMILLION, back=PAPER)
+
+    f_big = bfont("barlow-condensed-800", 210 if len(big) <= 5 else 160)
+    f_lab = bfont("barlow-condensed-700", 52)
+    f_sub = bfont("barlow-500", 30)
+    f_foot = bfont("ibm-plex-mono-500", 24)
+    # Measured first, then set as one block in the middle of the space it has. Stacking downwards
+    # from a fixed start left the figure high and a third of the card empty under it.
+    rows = [(big, f_big, INK, 30)]
+    rows += [(l, f_lab, INK, 16) for l in wrap_text(d, label, f_lab, CARD_W - 120)[:2]]
     if sub:
-        y += 10
-        for line in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]:
-            d.text((60, y), line, font=f_sub, fill="#5D584D")
-            y += 38
-    d.line([(60, CARD_H - 70), (CARD_W - 60, CARD_H - 70)], fill="#141210", width=2)
-    d.text((60, CARD_H - 56), foot, font=f_foot, fill="#5D584D")
+        rows[-1] = (*rows[-1][:3], 30)
+        rows += [(l, f_sub, "#5D584D", 14) for l in wrap_text(d, sub, f_sub, CARD_W - 120)[:2]]
+    heights = [bink(d, t, f)[3] for t, f, _, _ in rows]
+    block = sum(heights) + sum(g for *_, g in rows[:-1])
+    y = band + (CARD_H - 74 - band - block) / 2
+    for (text, f, colour, gap), h in zip(rows, heights):
+        lx, ty, _, _ = bink(d, text, f)
+        d.text((60 - lx, y - ty), text, font=f, fill=colour)
+        y += h + gap
+    d.line([(60, CARD_H - 74), (CARD_W - 60, CARD_H - 74)], fill=INK, width=2)
+    lf, tf, _, hf = bink(d, foot, f_foot)
+    d.text((60 - lf, CARD_H - 74 + (74 - hf) / 2 - tf), foot, font=f_foot, fill="#5D584D")
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     im.save(path, "PNG", optimize=True)
 

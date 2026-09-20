@@ -82,7 +82,11 @@
 {% if d.site and d.site.x_handle %}
 <section class="block" id="brief"><div class="wrap">
 <h2 class="h">One brief a day</h2>
-<p class="sub">Every morning one card goes out on X: the measure that moved, the fear it cites, and the office that ends up holding what it creates. Same records as the rest of the report, cut to what changed.</p>
+{# The heading already says how often, so the line under it does not say it again. "Empower" is
+   the account's own word for this and cannot be used here: it is on the euphemism list, being
+   the exact move the report exists to undo. "Hand power to" says the same thing and says it
+   plainly, which is the point. #}
+<p class="sub">The bills, the money, and the offices they hand power to.</p>
 {# The latest card itself, not a line about it. It carries its own date in its own type, so there
    is no caption under it saying the same thing in smaller letters. #}
 {% if d.brief %}

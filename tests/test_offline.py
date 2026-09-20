@@ -237,7 +237,11 @@ def check_no_euphemism():
             if isinstance(v, str):
                 scan(f"{name}/{k}", v)
     for t in sorted((ROOT / "site" / "templates").rglob("*.html")):
-        text = _re.sub(r"\{[%{].*?[%}]\}", " ", t.read_text(), flags=_re.S)
+        # Tags, expressions and Jinja comments all come out first. A {# #} comment reaches no
+        # reader, and the note explaining why a word is banned has to be able to name the word.
+        # It flagged its own explanation the first time, which is the check working and the strip
+        # being one character short.
+        text = _re.sub(r"\{[%{#].*?[#%}]\}", " ", t.read_text(), flags=_re.S)
         scan(f"template {t.name}", " ".join(_re.sub(r"<[^>]+>", " ", text).split()))
 
     # and the copy written straight into the code, which is neither config nor template: the tile

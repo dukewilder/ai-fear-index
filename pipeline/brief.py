@@ -165,6 +165,12 @@ RULES = (
 )
 
 
+LAW = ("This measure has passed. Write it in the present tense: it requires, it puts, it bans.")
+PENDING = ("This measure has not passed. It was introduced and is somewhere in the process, so every "
+           "verb is conditional: it would require, it would put. Nobody is bound by it yet, so do not "
+           "write that anyone must do anything, or that anything is already the case.")
+
+
 def sentence(key, row):
     rules = RULES.format(tense=LAW if (row["status"] or "") == "passed" else PENDING)
     out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{rules}\n\n"
@@ -286,6 +292,11 @@ def write_lines(key, rows, want=WANT, attempts=None):
         body = norm(f"{row['title'] or ''}\n{row['summary'] or ''}")
         try:
             text, quote = sentence(key, row)
+        except (NameError, AttributeError, TypeError, KeyError, IndexError):
+            # A broken name or signature is a fault in this file. Swallowing it row by row is how
+            # a missing tense string cost every edition for a day while the log said the sentences
+            # did not hold up. It stops the run instead.
+            raise
         except Exception as exc:  # one bad row must not cost the edition
             note(attempts, where, f"the model did not answer: {str(exc)[:160]}", fatal=True)
             log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")

@@ -318,7 +318,9 @@ def redo_briefs(db):
 #    and the rejections did not say which gate did it. They do now.
 # 3: it fell through again, and the log that would have said why is not reachable from here. The
 #    reasons are now written into the database, where they ride the data branch.
-REDO_EDITION = ("2026-09-20", 3)
+# 4: those reasons named it. Every sentence had been dying of a NameError since the rules were
+#    rewritten, caught by a row-by-row except and reported as the model not answering.
+REDO_EDITION = ("2026-09-20", 4)
 
 
 def redo_today(db):

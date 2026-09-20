@@ -17,7 +17,36 @@ from pipeline import export  # noqa: E402
 from pipeline.common import connect, iso, name_key, upsert  # noqa: E402
 
 
+def check_brief_prompt():
+    """Build the prompt the brief sends, for both statuses, without touching the network.
+
+    A rewrite of the rules once deleted the two tense strings and left the line that formats them
+    in. Every sentence then died of a NameError that the row-by-row catch swallowed, so a whole
+    day of editions fell back to counts while the log said the sentences did not hold up. This
+    costs nothing and would have caught it.
+    """
+    from pipeline import brief
+    for status, expect in (("passed", "present tense"), ("pending", "conditional")):
+        tense = brief.LAW if status == "passed" else brief.PENDING
+        rules = brief.RULES.format(tense=tense)
+        assert expect in rules, f"{status}: the rules do not tell the model the tense"
+        assert "{tense}" not in rules, f"{status}: the placeholder survived"
+    row = {"jurisdiction_name": "Ohio", "identifier": "HB 1", "title": "A title",
+           "summary": "A summary long enough to quote from.", "status": "pending",
+           "office": "Ohio Department of Commerce"}
+    assert "Ohio" in brief.doc(row)
+    # and the gates, both ways round
+    body = "ohio would put every operator under the ohio department of commerce"
+    good = "Ohio would put every operator under the Ohio Department of Commerce, which decides who may run one."
+    assert brief.why_not(good, "would put every operator under the ohio department", body, False,
+                         row["office"]) == "", "a sound pending sentence was rejected"
+    assert brief.why_not(good, "would put every operator under the ohio department", body, True,
+                         row["office"]), "a passed measure written conditionally was accepted"
+    print("brief prompt and gates: ok")
+
+
 def main():
+    check_brief_prompt()
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "index.db")
     today = dt.date.today()

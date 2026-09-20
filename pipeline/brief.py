@@ -832,6 +832,11 @@ def edition(db, key, out_dir, today, want=WANT, dry_run=False):
                        "controls, written_at) VALUES(?,?,?,?,?,?,?)",
                        (l["target"], today, l["sentence"], l["quote"], l["office"], l["controls"],
                         now().isoformat()))
+        # The site shows the latest card rather than describing it, and the site is built from the
+        # database, not from this folder. The headline rides the database so the page can name the
+        # edition it is showing; the plate itself is copied onto the site beside it.
+        kv_set(db, "brief:latest", {"edition": today, "headline": head,
+                                    "alt": edition_data["alt"]})
         db.commit()
     log(f"[brief] {today}: {len(rows)} entries, plate at {image}"
         f"{' (dry run, nothing recorded)' if dry_run else ''}")

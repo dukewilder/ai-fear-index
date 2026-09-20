@@ -79,6 +79,28 @@
 {{ page.html|safe }}
 </main>
 {% endfor %}
+{% if d.site and d.site.x_handle %}
+<section class="block" id="brief"><div class="wrap">
+<h2 class="h">One brief a day</h2>
+<p class="sub">Every morning one card goes out on X: the measure that moved, the fear it cites, and the office that ends up holding what it creates. Same records as the rest of the report, cut to what changed.</p>
+{# The latest card itself, not a line about it. It carries its own date in its own type, so there
+   is no caption under it saying the same thing in smaller letters. #}
+{% if d.brief %}
+<a class="brief-card" href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="brief-card">
+<img src="{{ base }}{{ d.brief.image }}" width="1600" height="900" loading="lazy" decoding="async" alt="{{ d.brief.alt }}">
+</a>
+{% endif %}
+<a class="copy donate" href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="x-follow">Follow @{{ d.site.x_handle }}</a>
+</div></section>
+{% endif %}
+{% if d.site and (d.site.donate_url or d.site.donate_btc) %}
+<section class="block" id="keep"><div class="wrap">
+<h2 class="h">Pitch in to keep the report running</h2>
+{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
+{% if d.site.donate_url %}<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
+{% endif %}{% if d.site.donate_btc %}<div class="btc"><span class="btc-k">Bitcoin</span><a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc">{{ d.site.donate_btc }}</a><button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy</button></div>
+{% endif %}</div></section>
+{% endif %}
 <footer class="site-foot"><div class="wrap">
 <div class="foot-top">
 <div class="foot-id">
@@ -87,7 +109,9 @@
 <p class="colophon">Compiled from public records. Every number links to its source. Updated around the clock, unattended.</p>
 </div>
 <nav class="foot-links" aria-label="Elsewhere">
-{% if d.site and d.site.donate_url %}<a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% elif d.site and d.site.donate_btc %}<a href="{{ url('home') }}#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% endif %}
+{# Both sections are on this page, whichever page it is, so the footer points at them here
+   rather than sending the reader to the front page for something a screen above them. #}
+{% if d.site and d.site.donate_url %}<a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% elif d.site and d.site.donate_btc %}<a href="#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% endif %}
 {% if d.site and d.site.x_handle %}<a href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="x-footer">Daily brief on X</a>{% endif %}
 <a href="{{ d.links.code }}">Source code</a>
 <a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a>

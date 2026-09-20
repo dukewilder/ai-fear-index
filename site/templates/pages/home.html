@@ -120,11 +120,6 @@
 <ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
-{% if d.site.donate_url or d.site.donate_btc %}
-<section class="block" id="keep"><div class="wrap">
-<h2 class="h">Pitch in to keep the report running</h2>
-{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
-{% if d.site.donate_url %}<a class="copy donate" href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate">{{ d.site.donate_label }}</a>
-{% endif %}{% if d.site.donate_btc %}<div class="btc"><span class="btc-k">Bitcoin</span><a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc">{{ d.site.donate_btc }}</a><button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy</button></div>
-{% endif %}</div></section>
-{% endif %}
+{# The daily brief and the pitch-in sit in base.html now, so every page carries them, not the
+   front page alone. A reader who arrives on a fear page from a link has read the whole report
+   they are going to read, and the two things to do about it should be under it. #}

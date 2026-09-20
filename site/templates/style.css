@@ -277,6 +277,11 @@ a.copy.donate{text-decoration:none}
 .jumpbar .jump a{height:27px}
 }
 
+/* The card the account posts, shown at its own 16:9 so the box never changes height as the
+   picture loads and nothing under it jumps. Capped well short of the column: it is an example of
+   what arrives, not the thing the page is for. */
+.brief-card{display:block;max-width:520px;margin-top:16px;border:1px solid var(--ink);line-height:0}
+.brief-card img{display:block;width:100%;height:auto;aspect-ratio:16/9}
 .btc{display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px;padding:12px 14px;border:1px solid var(--ink);background:var(--panel);max-width:100%}
 .btc-k{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .btc-a{font-family:var(--mono);font-size:13px;word-break:break-all;color:var(--ink)}

@@ -678,6 +678,46 @@ def check_mark_geometry():
     print("the mark is a square, centred on its letters and on the word: ok")
 
 
+ALLOWED_HOSTS = {"gc.zgo.at"}   # the counter, and nothing else
+
+
+def check_every_page_asks(dist, db, day):
+    """The brief and the pitch-in are on every page, in that order, and the card is real.
+
+    They used to live in the front page's own template, so a reader who arrived on a fear page
+    from a link reached the end of the report with nothing to do. Moved into base.html, which is
+    easy to undo by accident, hence this.
+
+    The card is checked as a path, because pass.sh copies state/brief into dist/brief after the
+    build: an <img> naming an edition that was never written is a broken picture on every page at
+    once, not one. And nothing on any page may load from another host. The obvious way to show an
+    X account is X's own timeline widget, which is a third-party script on every page, a set of
+    X's cookies for every reader, and a box that does not match this site in either theme.
+    """
+    pages = sorted(dist.rglob("*.html"))
+    assert len(pages) >= 5, f"only {len(pages)} pages built"
+    for p in pages:
+        t, where = p.read_text(), p.relative_to(dist).as_posix()
+        assert 'id="brief"' in t, f"{where} has no daily brief section"
+        assert 'id="keep"' in t, f"{where} has no pitch-in section"
+        assert t.index('id="brief"') < t.index('id="keep"'), \
+            f"{where} puts the pitch-in above the brief"
+        assert 'class="brief-card"' in t, f"{where} names an edition but shows no card"
+        assert f"/brief/{day}.png" in t, f"{where} points at the wrong edition"
+        for m in re.finditer(r'<(?:img|script|iframe)[^>]+src="(?:https?:)?//([^"/]+)', t):
+            # One exception, named rather than assumed: the counter, which sets no cookie and
+            # follows nobody between sites. Anything else arriving here is a new third party
+            # watching every reader of a site about who is watching, and has to be argued for.
+            assert m.group(1) in ALLOWED_HOSTS, \
+                f"{where} loads from {m.group(1)}; this site ships self-contained"
+    # and a database with no edition yet has to render the section without a card rather than
+    # pointing at a picture that does not exist
+    db.execute("DELETE FROM kv WHERE key='brief:latest'")
+    db.commit()
+    assert export.brief_latest(db) is None, "an empty database must report no card"
+    print(f"the brief and the pitch-in are on all {len(pages)} pages, brief first: ok")
+
+
 def check_icon_centred():
     """The tab icon is one mark, centred, at every size a browser asks for.
 
@@ -882,6 +922,15 @@ def main():
     assert data["industry"], "company and trade group lobbying should rank separately"
     assert not ({f["name"] for f in data["funders"]} & {i["name"] for i in data["industry"]}), \
         "an organization must appear in one ranking or the other, never both"
+    # An edition on record, so the page shows the card rather than only the words about it. The
+    # real one is written by pipeline.brief; this is the row it leaves behind.
+    from pipeline.common import kv_set as _kv_set  # noqa: E402
+    brief_day = dt.date.today().isoformat()
+    _kv_set(db, "brief:latest", {"edition": brief_day, "headline": "An office takes a register",
+                                 "alt": "A card from the AI Fear Report."})
+    db.commit()
+    data = export.export(db, tmp, "")
+    assert data["brief"]["image"] == f"/brief/{brief_day}.png", data["brief"]
     site = ROOT / "site" / "build.py"
     subprocess.run([sys.executable, str(site), "--data", str(tmp / "site_data.json"), "--out", str(tmp / "dist"),
                     "--base", ""], check=True)
@@ -898,6 +947,7 @@ def main():
         # Election receipts run the length of a two-year cycle, not the last four quarters
         assert "election money, past year" not in body and "election money this year" not in body, \
             f"{page.name} dates cycle-to-date election money as a year"
+    check_every_page_asks(tmp / "dist", db, brief_day)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

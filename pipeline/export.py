@@ -515,6 +515,10 @@ def export(db, out_dir, base=""):
                          f"/data/public/measures.csv",
                   "report": f"{REPO_URL}/issues/new?template=error.yml"},
         "analytics": {"goatcounter": "dukewilder"},
+        # The latest card, so the page can show one rather than describe one. Written by
+        # pipeline.brief, which also drops the plate itself into the published folder. A pass that
+        # has not written today's edition yet leaves yesterday's here, which is a card either way.
+        "brief": brief_latest(db),
         "exhibit": exhibit, "index": index, "grid": grid, "polls": polls, "numbers": numbers, "site": site,
         "quotes": quotes[:5], "already_law": already_law, "law_total": law_total,
         "law_passed": law_passed,
@@ -838,6 +842,21 @@ def read_directly():
 
 def our_domain(domain, hosts):
     return FEED_HOST.sub("", (domain or "").lower()) in hosts
+
+
+def brief_latest(db):
+    """The edition the site should show, or nothing at all.
+
+    Nothing is the normal state on a fresh database and on any run before the first edition is
+    written, so the section that shows the card has to be able to not exist. The date is the
+    plate's own filename, published under /brief by the pass that builds the site.
+    """
+    latest = kv_get(db, "brief:latest") or {}
+    day, head = latest.get("edition"), latest.get("headline")
+    if not day or not head:
+        return None
+    return {"date": day, "headline": head, "image": f"/brief/{day}.png",
+            "alt": latest.get("alt") or head}
 
 
 def sentence_name(fear):

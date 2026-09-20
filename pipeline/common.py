@@ -304,6 +304,27 @@ def redo_briefs(db):
     return n
 
 
+def redo_today(db):
+    """Write today's edition again, because the one on file was written in the old shape.
+
+    The edition for 20 September was composed before the arrows and the three-beat entries came
+    out, and it is the one that went to X. Clearing the row and the record of the post has the
+    next pass write it properly and the nine o'clock pass send it. The entries it used go back in
+    the pool, as they do for any edition that is thrown away.
+    """
+    day = "2026-09-20"
+    if kv_get(db, f"redo:{day}"):
+        return 0
+    n = db.execute("SELECT COUNT(*) FROM brief WHERE edition=?", (day,)).fetchone()[0]
+    db.execute("DELETE FROM brief WHERE edition=?", (day,))
+    db.execute("DELETE FROM kv WHERE key=?", (f"posted:{day}",))
+    kv_set(db, f"redo:{day}", True)
+    db.commit()
+    if n:
+        log(f"[repair] the {day} edition is cleared, to be written again in the shape that replaced it")
+    return n
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
@@ -313,6 +334,7 @@ def connect(path):
     repair(db)
     retag_recitals(db)
     redo_briefs(db)
+    redo_today(db)
     return db
 
 

@@ -451,7 +451,7 @@ def compose(lead, spare, tot, cfg, fears):
         first.append(STATUS[lead["status"]])
     fear = cited(lead, fears)
     if fear:
-        first.append(f"The text cites {fear}.")
+        first.append(f"It cites the fear that {fear}.")
     parts += [" ".join(first)]
     for p in spare:
         parts += ["", p["sentence"]]

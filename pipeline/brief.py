@@ -139,6 +139,8 @@ SYSTEM = (
 
 RULES = (
     "Write one sentence, at most 30 words. {tense}\n"
+    "If the measure says it starts in a later year, put that year in the sentence. A law on the "
+    "books that bites in 2029 is still the story, and saying from 2029 is more of it, not less.\n"
     "Say what the measure puts under whose control. Name the government body that would decide, "
     "inspect, licence, or be reported to, inside the sentence. If the measure names no body, say "
     "the state or the jurisdiction by name.\n"
@@ -192,6 +194,22 @@ EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit i
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
 
+# When a measure that has passed says it starts in a later year, the present tense alone claims it
+# is in force now. Four of the strongest candidates in the pool are exactly this: California bills
+# chaptered this year whose registries and duties begin in 2027, 2028 or 2029.
+STARTS = re.compile(r"\b(?:commencing|operative|effective|beginning|no later than|on or after)\s+"
+                    r"(?:on\s+)?(?:January|February|March|April|May|June|July|August|September|"
+                    r"October|November|December)\s+\d{1,2},\s*(20\d\d)", re.I)
+
+
+def starts_later(text, today):
+    """The first year after this one that the measure names as its own start, if it names one."""
+    year = dt.date.fromisoformat(today).year if isinstance(today, str) else today.year
+    for m in STARTS.finditer(text or ""):
+        if int(m.group(1)) > year:
+            return m.group(1)
+    return ""
+
 # Where the tense of the sentence lives. The sentence has to start with the jurisdiction, so the
 # main verb is in the first clause; everything from the first comma or relative pronoun onward
 # describes the office. That matters because "may" is the natural word for a power the office
@@ -225,7 +243,7 @@ def without_names(text, office=""):
     return OFFICIAL.sub(" ", out)
 
 
-def why_not(text, quote, body_norm, passed=False, office=""):
+def why_not(text, quote, body_norm, passed=False, office="", starts=""):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
     Named rather than returned as a bare False, so a run that throws every candidate away says
@@ -252,12 +270,14 @@ def why_not(text, quote, body_norm, passed=False, office=""):
     loose = re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I)
     if loose:
         return f"says {loose.group(0)!r} instead of naming who is bound"
+    if passed and starts and starts not in text:
+        return f"passed but starts in {starts}, and the sentence does not say so"
     if not agreed({"controls": {"line": quote}}, body_norm, "controls"):
         return "the quote it leaned on is not in the measure"
     return ""
 
 
-def usable(text, quote, body_norm, passed=False, office=""):
+def usable(text, quote, body_norm, passed=False, office="", starts=""):
     """The sentence has to rest on words in the text, not borrow the sponsor's vocabulary, and not
     describe a bill sitting in committee as though it already bound anyone.
 
@@ -265,7 +285,7 @@ def usable(text, quote, body_norm, passed=False, office=""):
     than trusted to the instruction above: a measure that has not passed says would, and one that
     has does not.
     """
-    return not why_not(text, quote, body_norm, passed, office)
+    return not why_not(text, quote, body_norm, passed, office, starts)
 
 
 def note(attempts, where, reason, sentence_text="", fatal=False):
@@ -274,7 +294,7 @@ def note(attempts, where, reason, sentence_text="", fatal=False):
                          "sentence": (sentence_text or "")[:220], "unreachable": fatal})
 
 
-def write_lines(key, rows, want=WANT, attempts=None):
+def write_lines(key, rows, today, want=WANT, attempts=None):
     """Turn candidate measures into checked sentences, stopping once the edition is full.
 
     Every candidate that does not make it appends its reason to attempts, which the edition stores
@@ -301,7 +321,8 @@ def write_lines(key, rows, want=WANT, attempts=None):
             note(attempts, where, f"the model did not answer: {str(exc)[:160]}", fatal=True)
             log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")
             continue
-        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "")
+        starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
+        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "", starts)
         if reason:
             note(attempts, where, reason, sentence_text=text)
             log(f"[brief] {where}: skipped, {reason}")
@@ -578,7 +599,7 @@ def edition(db, key, out_dir, today, want=WANT, dry_run=False):
     used = {r["target"] for r in db.execute("SELECT target FROM brief")}
 
     attempts = []
-    lines = write_lines(key, pool(db, today), 1, attempts)
+    lines = write_lines(key, pool(db, today), today, 1, attempts)
     kv_set(db, f"brief:attempts:{today}", attempts)
     db.commit()
     unreachable = [a for a in attempts if a.get("unreachable")]

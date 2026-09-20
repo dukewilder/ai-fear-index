@@ -320,7 +320,9 @@ def redo_briefs(db):
 #    reasons are now written into the database, where they ride the data branch.
 # 4: those reasons named it. Every sentence had been dying of a NameError since the rules were
 #    rewritten, caught by a row-by-row except and reported as the model not answering.
-REDO_EDITION = ("2026-09-20", 4)
+# 5: the first real sentence read "California puts AI auditors under registration" for a law whose
+#    registry opens in 2029. A measure that names a later start now has to say the year.
+REDO_EDITION = ("2026-09-20", 5)
 
 
 def redo_today(db):

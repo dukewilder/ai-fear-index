@@ -12,7 +12,7 @@ import pathlib
 import re
 
 from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, kv_get, kv_set,
-                     name_key, now, sha, tidy_headline)
+                     name_key, now, sha, spell, tidy_headline)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
@@ -383,7 +383,7 @@ def export(db, out_dir, base=""):
              "series_label": "Bills, rules and orders about AI, running total over the last 90 days",
              "total_measures": len(measures), "controlled": len(controlled)}
     index["chain"] = [c for c in [
-        [compact(sum(int(v) for v in wiki30.values())), "Wikipedia views on the nine fears, last 30 days"]
+        [compact(sum(int(v) for v in wiki30.values())), f"Wikipedia views on the {spell(len(fears))} fears, last 30 days"]
         if wiki30 else None,
         [f"{len(measures):,}", "bills, rules and orders about AI since January 2025"] if measures else None,
         [f"{len(controlled):,}", "of them put AI under new government control"] if controlled else None,
@@ -415,8 +415,8 @@ def export(db, out_dir, base=""):
          "separate government controls across those bills"] if controlled else None,
         [f"{n_states}", ("states, plus Congress, " if has_fed else "states ") + "with AI measures on the books or in motion"]
         if n_states else None,
-        [f"{filings_naming:,}", "federal lobbying filings naming one of the nine fears, past year"] if filings_naming else None,
-        [f"{news_total:,}", "news articles on the nine fears, "
+        [f"{filings_naming:,}", f"federal lobbying filings naming one of the {spell(len(fears))} fears, past year"] if filings_naming else None,
+        [f"{news_total:,}", f"news articles on the {spell(len(fears))} fears, "
          + (f"30 days to {news_stop}" if news_stop else "last 30 days")] if news_total else None,
     ] if n]
 
@@ -499,9 +499,15 @@ def export(db, out_dir, base=""):
         "fears": fear_rows, "feed_types": feed_types, "feed": feed[:80], "funders": funders,
         "beneficiaries": beneficiaries, "controls": control_rows, "sources": source_rows,
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
+        "fear_word": spell(len(fears)),
     }
     (out / "site_data.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
     (out / "status.json").write_text(json.dumps(status, indent=1, default=str))
+    # The blind-spot list rides the data branch rather than the site: it is a note to whoever
+    # maintains the nine fears, not something a reader of the report needs.
+    spots = kv_get(db, "blindspots:report")
+    if spots:
+        (out / "blindspots.json").write_text(json.dumps(spots, indent=1, default=str))
     write_csvs(out / "public", measures, lob_recent, ranked + industry_ranked, com_ranked)
     save_snapshot(db, today, {"fear_rank": {r["slug"]: r["rank"] for r in fear_rows},
                               "fear_index": {r["slug"]: int(r["score"]) for r in fear_rows},
@@ -604,7 +610,7 @@ GRID_CHANNELS = [("bills", "Bills"), ("states", "States"), ("congress", "Congres
 
 
 def build_grid(order, stats, ends=None, today=None):
-    """The same nine fears down the side, every channel across the top, every cell a count."""
+    """The same fears down the side, every channel across the top, every cell a count."""
     tops = {key: max((channel_value(stats[f["slug"]], key) for f in order), default=0) for key, _ in GRID_CHANNELS}
     rows = []
     for f in order:

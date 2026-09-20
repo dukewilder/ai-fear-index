@@ -94,6 +94,15 @@ def tidy_headline(title, domain=""):
     return t.strip()
 
 
+WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+         "eleven", "twelve"]
+
+
+def spell(n):
+    """A small number in words, so the copy can say how many fears there are rather than assume."""
+    return WORDS[n] if 0 <= n < len(WORDS) else f"{n:,}"
+
+
 def annotate(level, title, message):
     """Surface a message in the GitHub Actions UI (error, warning, notice)."""
     msg = str(message).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}{% if home and d.site and d.site.tagline %}: {{ d.site.tagline }}{% endif %}</title>
-{% set blurb = description or 'Every fear about AI, and what it buys: nine fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' %}
+{% set blurb = description or 'Every fear about AI, and what it buys: ' ~ d.fear_word ~ ' fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' %}
 <meta name="description" content="{{ blurb }}">
 {% if canonical %}<link rel="canonical" href="{{ canonical }}">
 {% endif %}<meta property="og:title" content="{{ title }}">

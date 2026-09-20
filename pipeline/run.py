@@ -54,6 +54,13 @@ def main():
         from . import tag
         with source_run(db, "tag") as state:
             tag.run(db, state, mode)
+    # Once a day, count what the nine fears do not cover. The categories are hand-written, so a
+    # fear nobody has named is invisible unless something goes looking; this is what looks. It
+    # decides nothing and changes nothing, it writes a list.
+    if mode in ("daily", "backfill") and not args.only:
+        from . import blindspots
+        with source_run(db, "blindspots") as state:
+            blindspots.run(db, state, mode)
     from . import export
     data = export.export(db, args.out, args.base)
     if mode == "daily":

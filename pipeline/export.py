@@ -492,9 +492,16 @@ def export(db, out_dir, base=""):
             where = f"Read in full: {feeds}"
         source_rows.append([what, where, (s or {}).get("last_ok"), bool(s and s["ok"])])
     ok_count = sum(1 for s in status.values() if s["ok"])
+    # A collector that knows it has not finished says so in its own message. The method page
+    # claimed every bill; the record is a search still running, and a page about how the numbers
+    # work should say which searches have not caught up. Empty once they have.
+    filling = next((m.split("still backfilling:")[1].split(";")[0].strip()
+                    for m in (str((s or {}).get("message") or "") for s in status.values())
+                    if "still backfilling:" in m), "")
 
     data = {
         "built_at": iso(), "sources_count": str(ok_count), "period": "past year", "site_url": SITE_URL,
+        "filling": filling,
         "election_spent": money(election_spent) if election_spent else "",
         "funders_total": f"{len(ranked):,}", "beneficiaries_total": f"{len(agency_count):,}",
         "election_total": f"{len(com_ranked):,}", "election": election,

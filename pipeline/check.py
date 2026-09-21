@@ -133,17 +133,24 @@ FEAR_QUESTION = (
 # summaries included the CATCH Fentanyl Act and the Promoting Precision Agriculture Act, which
 # mention AI once each. A no takes the measure out of every count.
 ABOUT_QUESTION = (
-    "Is artificial intelligence a subject of this measure itself? Answer yes if it regulates, "
-    "restricts, requires, funds, studies or defines AI, machine learning, algorithms or automated "
-    "decision systems, AI chatbots, synthetic media such as deepfakes, digital replicas of a "
-    "person's voice or likeness, or data centers it says are for AI.\n"
-    "Answer no when any of these is true:\n"
-    "- AI appears only in passing: one of several technologies a program may use or study, a "
-    "finding, a definition used nowhere else, or a statement of purpose;\n"
-    "- the measure is about data centers, energy, computing, the internet or technology in general "
-    "without saying they are for AI;\n"
-    "- the measure is about something else, such as trade, health care or defense, and AI is one "
-    "line in it.")
+    "Is this measure itself about AI, or about one of the subjects this report counts with it? Answer "
+    "yes if it regulates, restricts, requires, funds, studies or defines any of these: AI, machine "
+    "learning, algorithms or automated decision systems; AI chatbots; deepfakes and other synthetic or "
+    "digitally altered images, video, audio or voices; rights over a person's voice and likeness (not "
+    "payments to athletes for their name, image and likeness); data centers or high performance "
+    "computing facilities, including their power, water, siting, rates or taxes.\n"
+    "Answer no when the subject appears only in passing: one of several technologies or fields a "
+    "program may use, fund or study; a finding, a definition or a statement of purpose; or one line "
+    "in a measure about something else, such as defense, trade or health care. An intimate-image or "
+    "privacy measure that does not cover altered or generated images is no.")
+# Bump to ask again every measure the question above has taken out, under its current wording.
+# 2: the first wording took out 171 data center bills whose text does not say the data centers are
+#    for AI, which the site counted at launch and which its data center control and power bills
+#    fear are built on. Which data center bills to count is the owner's call, so they are back as
+#    the first reading left them until it is made. It also took out likeness and synthetic voice
+#    bills (an ELVIS Act, robocalls in an artificial voice) that the report counts as synthetic media.
+ABOUT_VERSION = 2
+
 
 _lock = threading.Lock()
 _model = {"i": 0}
@@ -321,6 +328,30 @@ def recheck(db):
     return len(rows)
 
 
+def reask_about(db):
+    """Put back, once per wording, every measure the about question took out, to be asked again.
+
+    Only where the no is what took it out: a measure the tagger has read again since, on new text,
+    keeps the tagger's answer. Its old verdict goes either way, since it was on other text.
+    """
+    key = f"check:about:{ABOUT_VERSION}"
+    if kv_get(db, key):
+        return 0
+    back = [r["target"] for r in db.execute(
+        "SELECT c.target FROM checks c JOIN tag_runs t ON t.target = c.target "
+        "WHERE c.kind = 'about' AND c.verdict = 'no' AND t.ai_related = 0 "
+        "AND (t.tagged_at IS NULL OR t.tagged_at <= c.checked_at)")]
+    for target in back:
+        db.execute("UPDATE tag_runs SET ai_related = 1 WHERE target = ?", (target,))
+    db.execute("DELETE FROM checks WHERE kind = 'about' AND verdict IN ('no', 'hold')")
+    kv_set(db, key, True)
+    db.commit()
+    if back:
+        log(f"[check] {len(back)} measure{'' if len(back) == 1 else 's'} put back to be asked again "
+            f"whether {'it is' if len(back) == 1 else 'they are'} about AI")
+    return len(back)
+
+
 def release_holds(db):
     """Apply held refusals once a person has read them: the labels come off and the verdicts stand."""
     key = f"check:released:{RELEASE}"
@@ -341,6 +372,7 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
     """Check what has not been checked. Returns a short line for the status message."""
     ask_fn = ask_fn or ask
     released = release_holds(db)
+    reasked_about = reask_about(db)
     reasked = recheck(db)
     controls = {c["slug"]: c for c in config("controls")}
     fears = {f["slug"]: f for f in config("fears")}
@@ -400,6 +432,8 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
     db.commit()
     left = len(todo) - done
     return ((f"applied {released} held refusals; " if released else "")
+            + (f"put back {reasked_about} measure{'' if reasked_about == 1 else 's'} to ask again whether "
+               f"{'it is' if reasked_about == 1 else 'they are'} about AI; " if reasked_about else "")
             + (f"put back {reasked} labels to ask again; " if reasked else "")
             + f"checked {done} labels, took off {(0 if hold else refusals) + len(refused)}"
             + (f", held {refusals} refusals for review" if hold else "")

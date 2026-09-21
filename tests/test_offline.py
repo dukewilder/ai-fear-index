@@ -1418,6 +1418,34 @@ def check_status_and_coverage():
     assert counted == {"a2", "a3"}, counted
     check.run(adb, "k", ask_fn=judge)
     assert len(asked) == 2, "a measure already answered on the same text was asked again"
+    # What the report counts with AI is not the second reading's to narrow. The first wording took
+    # out 171 data center bills the site launched with, and an ELVIS Act; the question names them.
+    yes_part = check.ABOUT_QUESTION.split("Answer no")[0]
+    for subject in ("data centers", "voice and likeness", "synthetic", "automated decision"):
+        assert subject in yes_part, f"the about question no longer counts {subject}"
+    # Measures the first wording took out are put back and asked again, once. One the tagger has
+    # read again since, on new text, keeps the tagger's answer.
+    for mid, tagged in (("a5", "2026-09-21T10:00:00+00:00"), ("a6", "2026-09-21T13:00:00+00:00")):
+        upsert(adb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "session": "89R", "identifier": mid,
+                                 "title": "Relating to a moratorium on data centers",
+                                 "summary": "Pauses permits for new data centers and sets large-load electricity rates.",
+                                 "status": "pending", "introduced_date": "2025-03-01", "url": f"u-{mid}",
+                                 "jurisdiction_name": "Texas", "source": "Open States"})
+        adb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', 0, ?)", (mid, tagged))
+        adb.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) "
+                    "VALUES(?, 'about', 'ai', 'old', 'no', 'data centers not said to be for AI', 'fake', "
+                    "'2026-09-21T12:00:00+00:00')", (mid,))
+    adb.execute("DELETE FROM kv WHERE key = ?", (f"check:about:{check.ABOUT_VERSION}",))
+    adb.commit()
+    line = check.run(adb, "k", ask_fn=judge)
+    counted = {m["id"] for m in _in_scope(adb)}
+    assert "put back 1 measure to ask again whether it is about AI" in line, line
+    assert "a5" in counted and "a6" not in counted, counted
+    assert len(asked) == 3 and "moratorium on data centers" in asked[-1], "the one put back was not asked again"
+    assert not adb.execute("SELECT 1 FROM checks WHERE kind = 'about' AND verdict = 'no'").fetchall(), \
+        "an old refusal was kept"
+    check.run(adb, "k", ask_fn=judge)
+    assert len(asked) == 3 and "a5" in {m["id"] for m in _in_scope(adb)}, "measures were put back twice"
     print("a measure is counted as about AI only when AI is a subject of it: ok")
 
 

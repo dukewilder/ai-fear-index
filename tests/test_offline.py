@@ -1451,6 +1451,58 @@ def check_status_and_coverage():
     assert asked[3] == "automated decision" and asked[-1] == "data center", asked
     print("state searches already caught up run before any backfill: ok")
 
+    # A pass through a search resumes where it stopped, and the next pass reads from the day it began,
+    # so a bill changed while a backfill ran is still read. A page the results no longer reach ends it.
+    from pipeline.common import kv_get as _kv_get
+    _kv_set(db, "openstates_prefile", {q: {"page": 1, "done": True} for q in cos.QUERIES})
+    _kv_set(db, "openstates_resweep", cos.RESWEEP)
+    _kv_set(db, "openstates_cursors", {q: {"backfilling": False, "since": "2026-09-20", "page": 1}
+                                       for q in cos.QUERIES if q != "digital replica"})
+    _kv_set(db, "openstates_offset", cos.QUERIES.index("digital replica"))
+    got, clock = [], {"day": "2026-09-22"}
+
+    class Paged:
+        def __init__(self, *a, **k):
+            pass
+
+        def json(self, url, params=None, **kw):
+            got.append((params["q"], params["page"], params.get("updated_since")))
+            if params["q"] == "digital replica":
+                return {"results": [{"id": "x"}], "pagination": {"max_page": 3}}
+            if params["q"] == "chatbot" and params["page"] > 1:
+                raise _HttpError(400, url, "page out of range")
+            if params["q"] == "chatbot":
+                return {"results": [{"id": "y"}], "pagination": {"max_page": 2}}
+            return {"results": [], "pagination": {"max_page": 1}}
+    from pipeline.common import HttpError as _HttpError
+    saved = (cos.Http, cos.env, cos.iso, cos.store)
+    cos.Http, cos.env, cos.store = Paged, (lambda name: "k"), (lambda db_, b: 0)
+    cos.iso = lambda *a: f"{clock['day']}T10:00:00+00:00"
+    try:
+        # a budget that leaves the new search two pages after one each for the seven caught up
+        _kv_set(db, "openstates_spend", {"date": clock["day"], "n": cos.DAY_BUDGET - (len(cos.QUERIES) - 1) - 2})
+        cos.run(db, {}, "hourly")
+        cur = _kv_get(db, "openstates_cursors")
+        assert cur["digital replica"] == {"backfilling": True, "page": 3, "since": None, "started": "2026-09-22"}, cur
+        assert cur["chatbot"] == {"backfilling": False, "since": "2026-09-22", "page": 1}, \
+            f"a page past the end did not end the pass: {cur['chatbot']}"
+        clock["day"] = "2026-09-24"
+        got.clear()
+        cos.run(db, {}, "hourly")
+        cur = _kv_get(db, "openstates_cursors")
+        assert ("digital replica", 3, None) in got, got
+        assert cur["digital replica"] == {"backfilling": False, "since": "2026-09-22", "page": 1}, \
+            f"a finished backfill forgot the day it began: {cur['digital replica']}"
+        # every search already caught up is read once from the collector's first day
+        _kv_set(db, "openstates_resweep", 0)
+        got.clear()
+        cos.run(db, {}, "hourly")
+        assert ("artificial intelligence", 1, cos.FIRST_RUN) in got, got
+        assert _kv_get(db, "openstates_resweep") == cos.RESWEEP
+    finally:
+        cos.Http, cos.env, cos.iso, cos.store = saved
+    print("a pass through a state search resumes, and the next reads what changed while it ran: ok")
+
     # Bills pre-filed in late 2024 for a 2025 session are swept once, stopping at the first bill
     # acted on in 2025, and a refusal ends the sweep for that search rather than the run.
     from pipeline.common import HttpError as _HttpError

@@ -31,6 +31,15 @@ SECONDS = 780
 # One sweep per search, oldest first action first, stopping at the first bill acted on in 2025.
 PREFILE_SINCE = "2024-10-01"
 PREFILE_CAP = 30  # requests per run, ahead of the backfills
+# A backfill pages through a search newest change first and takes days. A bill changed while it ran
+# moved to a page it had already passed, and the backfill used to finish with "since" set to the day
+# it finished, so that change was never read: a bill signed mid-backfill kept its old status until
+# it changed again. Any pass through a search, a backfill or a day's changes, now resumes where it
+# stopped and hands the next pass the day it began. The collector first ran on 18 September 2026;
+# a backfill begun before its start was recorded, and every search already caught up, read from
+# then, once.
+FIRST_RUN = "2026-09-18"
+RESWEEP = 1
 
 
 def jurisdiction_code(j):
@@ -69,6 +78,11 @@ def run(db, state, mode):
         at = behind.index(QUERIES[offset])
         behind = behind[at:] + behind[:at]
     ordered = caught_up + behind
+    if kv_get(db, "openstates_resweep") != RESWEEP:
+        for c in cursors.values():
+            if not c.get("backfilling", True) and (c.get("since") or "") > FIRST_RUN:
+                c["since"] = FIRST_RUN
+        kv_set(db, "openstates_resweep", RESWEEP)
     try:
         swept, found = prefile_sweep(db, http, min(PREFILE_CAP, budget), started)
         requests_used += swept
@@ -78,9 +92,13 @@ def run(db, state, mode):
     stopped_at = None
     for i, query in enumerate(ordered):
         cursor = cursors.get(query, {})
-        page = cursor.get("page", 1) if cursor.get("backfilling", True) else 1
-        since = None if cursor.get("backfilling", True) else cursor.get("since")
+        backfilling = cursor.get("backfilling", True)
+        page = cursor.get("page", 1)
+        since = None if backfilling else cursor.get("since")
         run_started = iso()[:10]
+        # The day this pass through the search began. A pass can take several runs, and the next one
+        # reads from here, so a bill changed while it ran is read then rather than never.
+        began = cursor.get("started") or (run_started if page == 1 else FIRST_RUN)
         while requests_used < budget:
             if time.time() - started > SECONDS:
                 ran_out = True
@@ -93,7 +111,10 @@ def run(db, state, mode):
                 data = http.json(BASE, params=params)
             except HttpError as exc:
                 if exc.status == 400 and page > 1:
-                    break  # past the last page
+                    # Past the last page: the results shrank since the page count was read. That is
+                    # the end of this pass, and staying on the page would ask for it every run.
+                    cursors[query] = {"backfilling": False, "since": began, "page": 1}
+                    break
                 if "exceeded limit" in str(exc) or exc.status == 429:
                     # the daily allowance is gone; keep what we have and pick up tomorrow
                     capped = True
@@ -108,10 +129,12 @@ def run(db, state, mode):
             pag = data.get("pagination", {})
             max_page = pag.get("max_page") or page
             if not results or page >= max_page:
-                cursors[query] = {"backfilling": False, "since": run_started, "page": 1}
+                cursors[query] = {"backfilling": False, "since": began, "page": 1}
                 break
             page += 1
-            cursors[query] = {"backfilling": True, "page": page} if cursor.get("backfilling", True) else cursor
+            # where to pick up, for a backfill or for a day's changes too long for one run
+            cursors[query] = {"backfilling": backfilling, "page": page, "since": cursor.get("since"),
+                              "started": began}
         if ran_out:
             stopped_at = QUERIES.index(query)
             log(f"[openstates] out of time at '{query}'; the cursor keeps the place")

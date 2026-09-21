@@ -86,7 +86,7 @@
    the account's own word for this and cannot be used here: it is on the euphemism list, being
    the exact move the report exists to undo. "Hand power to" says the same thing and says it
    plainly, which is the point. #}
-<p class="sub">Follow @{{ d.site.x_handle }} on X for a daily brief on the bills, the money, and the offices they hand power to.</p>
+<p class="sub">Follow <a href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="x-inline">@{{ d.site.x_handle }}</a> on X for a daily brief on the bills, the money, and the offices they hand power to.</p>
 {# The latest card itself, not a line about it. It carries its own date in its own type, so there
    is no caption under it saying the same thing in smaller letters. #}
 {% if d.brief %}
@@ -100,7 +100,7 @@
 {% if d.site and (d.site.donate_url or d.site.donate_btc) %}
 <section class="block" id="keep"><div class="wrap">
 <h2 class="h">Pitch in to keep the report running</h2>
-{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
+<p class="sub">{{ d.site.donate_text or "It costs money to keep running." }}</p>
 {# Two ways to pay, side by side where there is room and stacked where there is not. Card first:
    it is how most people will do it, so it gets the filled button and the other gets an outline. #}
 <div class="pay{% if d.site.donate_url and d.site.donate_btc %} two{% endif %}">
@@ -114,14 +114,9 @@
 {% if d.site.donate_btc %}
 <div class="pay-way">
 <span class="pay-k">Bitcoin</span>
-<div class="pay-btc">
-{# A code to scan from a phone wallet, which is how most people send it from a desktop. On a phone
-   it is gone: the address below opens the wallet directly, and nobody scans their own screen. #}
-<div class="pay-qr" aria-hidden="true">{% include "btc-qr.svg" %}</div>
 <div class="pay-addr">
 <a class="btc-a" href="bitcoin:{{ d.site.donate_btc }}" data-goatcounter-click="donate-btc" data-addr>{{ d.site.donate_btc }}</a>
 <button class="copy" type="button" data-copy="{{ d.site.donate_btc }}">Copy address</button>
-</div>
 </div>
 </div>
 {% endif %}

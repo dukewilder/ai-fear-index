@@ -339,10 +339,13 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
         return f"says {loose.group(0)!r} instead of naming who is bound"
     if passed and starts and starts not in text:
         return f"passed but starts in {starts}, and the sentence does not say so"
-    if DUTY_OPENER.search(head) and not POWER.search(text):
-        return DUTY_FRAMED
+    # The quote is checked before the duty test, not after. A duty-framed sentence is kept in
+    # reserve and posted when nothing better was written, and it used to be kept without its
+    # quote ever being looked at, so the fallback could go out resting on words not in the bill.
     if not agreed({"controls": {"line": quote}}, body_norm, "controls"):
         return "the quote it leaned on is not in the measure"
+    if DUTY_OPENER.search(head) and not POWER.search(text):
+        return DUTY_FRAMED
     return ""
 
 

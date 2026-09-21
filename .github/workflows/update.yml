@@ -65,9 +65,18 @@ jobs:
       - name: Restore data
         run: |
           mkdir -p state
-          if git fetch --depth=1 origin data 2>/dev/null; then
-            git archive FETCH_HEAD | tar -x -C state
-          fi
+          # A failed fetch used to fall through to an empty folder, and the pass that followed
+          # rebuilt a database from nothing and force-pushed it over the real one, with no copy
+          # left to go back to. Three tries, then the job stops rather than start from zero.
+          ok=0
+          for i in 1 2 3; do
+            if git fetch --depth=1 origin data; then ok=1; break; fi
+            echo "::warning::fetching the data branch failed, attempt $i of 3"
+            sleep $((i * 20))
+          done
+          [ "$ok" = 1 ] || { echo "::error::could not fetch the data branch; refusing to start from an empty database"; exit 1; }
+          git archive FETCH_HEAD | tar -x -C state
+          test -s state/index.db || { echo "::error::the data branch has no index.db; refusing to start from an empty database"; exit 1; }
           ls -la state
       - name: First pass
         run: bash .github/pass.sh once
@@ -113,9 +122,18 @@ jobs:
       - name: Restore data
         run: |
           mkdir -p state
-          if git fetch --depth=1 origin data 2>/dev/null; then
-            git archive FETCH_HEAD | tar -x -C state
-          fi
+          # A failed fetch used to fall through to an empty folder, and the pass that followed
+          # rebuilt a database from nothing and force-pushed it over the real one, with no copy
+          # left to go back to. Three tries, then the job stops rather than start from zero.
+          ok=0
+          for i in 1 2 3; do
+            if git fetch --depth=1 origin data; then ok=1; break; fi
+            echo "::warning::fetching the data branch failed, attempt $i of 3"
+            sleep $((i * 20))
+          done
+          [ "$ok" = 1 ] || { echo "::error::could not fetch the data branch; refusing to start from an empty database"; exit 1; }
+          git archive FETCH_HEAD | tar -x -C state
+          test -s state/index.db || { echo "::error::the data branch has no index.db; refusing to start from an empty database"; exit 1; }
       - name: Pass, publish, wait, repeat
         env:
           LOOP_MINUTES: "320"

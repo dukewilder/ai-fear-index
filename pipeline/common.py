@@ -201,7 +201,7 @@ class Http:
             try:
                 resp = self.session.get(url, params=params, headers=headers, timeout=self.timeout)
             except requests.RequestException as exc:
-                last_error = f"{type(exc).__name__}: {exc}"
+                last_error = scrub(f"{type(exc).__name__}: {exc}")
                 time.sleep(min(60, 3 * 2 ** attempt + random.random()))
                 continue
             if resp.status_code in ok_statuses:
@@ -223,10 +223,30 @@ class Http:
             raise HttpError(resp.status_code, url, "not JSON: " + resp.text[:300])
 
 
+# Anything that looks like a credential in a query string, and the literal value of every key
+# this pipeline is given. The literal pass is the one that matters: a requests exception prints
+# the whole URL in its own words, key and all, and a status message is written into a database
+# that is published on a public branch. Scrubbing the URL argument alone left that path open.
+SECRET_PARAM = re.compile(
+    r"((?:api[_-]?key|apikey|key|token|access_token|client_secret|password)=)[^&\s'\"<>:,)]+", re.I)
+SECRET_ENVS = ("CONGRESS_API_KEY", "OPENSTATES_API_KEY", "FEC_API_KEY", "LDA_API_KEY",
+               "ANTHROPIC_API_KEY", "X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN",
+               "X_ACCESS_SECRET", "GH_TOKEN", "GITHUB_TOKEN", "CONTACT_EMAIL")
+
+
+def scrub(text):
+    """Take credentials out of anything that is about to be written down or published."""
+    text = SECRET_PARAM.sub(r"\1***", str(text if text is not None else ""))
+    for name in SECRET_ENVS:
+        value = os.environ.get(name, "")
+        if len(value) >= 6:
+            text = text.replace(value, "***")
+    return text
+
+
 class HttpError(RuntimeError):
     def __init__(self, status, url, body):
-        clean = re.sub(r"(api_key|apikey|key)=[^&\s]+", r"\1=***", url)
-        super().__init__(f"HTTP {status} for {clean}: {body}")
+        super().__init__(scrub(f"HTTP {status} for {url}: {body}"))
         self.status = status
 
 
@@ -513,13 +533,13 @@ def source_run(db, name):
     started = time.time()
     try:
         yield state
-        ok, message = 1, state["message"] or "ok"
+        ok, message = 1, scrub(state["message"] or "ok")
         log(f"[{name}] ok: {state['added']} new or updated, {time.time() - started:.0f}s. {state['message']}")
     except MissingKey as exc:
         ok, message = 0, f"skipped: {exc}"
         annotate("warning", f"{name} skipped", exc)
     except Exception as exc:  # keep going; the site shows the source as stale
-        ok, message = 0, f"{type(exc).__name__}: {exc}"[:800]
+        ok, message = 0, scrub(f"{type(exc).__name__}: {exc}")[:800]
         annotate("error", f"{name} failed", message)
         traceback.print_exc(file=sys.stdout)
     prev = db.execute("SELECT last_ok FROM status WHERE source=?", (name,)).fetchone()

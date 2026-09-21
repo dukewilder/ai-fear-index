@@ -26,4 +26,7 @@ jobs:
           REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          # Who opened it. Only the owner or a collaborator can make this pull anything off the
+          # site; anyone else gets the check as a comment and a human decides.
+          AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
         run: python -m pipeline.recheck

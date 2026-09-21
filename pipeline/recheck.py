@@ -67,6 +67,10 @@ def main():
     _, shown, url = match
     try:
         page = requests.get(url, timeout=40, headers={"User-Agent": user_agent()})
+        # A block page, a login wall or a 404 is not the source. Congress.gov answers this script
+        # with a 403 challenge page long enough to pass the length check below, and handing that to
+        # the model as "the source" invites it to rule the item unsupported.
+        page.raise_for_status()
         kind = (page.headers.get("Content-Type") or "").lower()
         source = strip_html(page.text)[:24000]
     except requests.RequestException as exc:
@@ -92,7 +96,14 @@ def main():
     text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
     verdict = json.loads(re.search(r"\{.*\}", text, re.S).group(0))
     v = verdict.get("verdict")
-    if v == "not_supported":
+    trusted = os.environ.get("AUTHOR_ASSOCIATION", "") in ("OWNER", "MEMBER", "COLLABORATOR")
+    if v == "not_supported" and not trusted:
+        # Anyone can open an issue, including a party the site names. The model's reading is
+        # posted so the report is answered, but nothing comes off the site until a person agrees.
+        comment(f"Checked against [the source]({url}): it may not support what the site shows. "
+                f"{verdict.get('reason', '')} Flagged for the maintainer to confirm; nothing changes "
+                f"on the site until then.")
+    elif v == "not_supported":
         path = CONFIG / "suppress.json"
         data = json.loads(path.read_text())
         if url not in data["urls"]:
@@ -103,7 +114,7 @@ def main():
                             "commit", "-am", f"Pull item reported in #{os.environ['ISSUE_NUMBER']}"], check=True)
             subprocess.run(["git", "push"], check=True)
         comment(f"Checked against [the source]({url}): it does not support what the site showed. "
-                f"{verdict.get('reason', '')} The item comes off the site on the next hourly update.")
+                f"{verdict.get('reason', '')} The item comes off the site when the next run starts.")
     elif v == "supported":
         quote = f' The source says: "{verdict["quote"]}"' if verdict.get("quote") else ""
         comment(f"Checked against [the source]({url}): it supports what the site shows. {verdict.get('reason', '')}{quote}")

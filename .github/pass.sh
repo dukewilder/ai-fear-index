@@ -20,40 +20,65 @@ LOOP_MINUTES="${LOOP_MINUTES:-330}"   # of a 360-minute job limit; the rest is f
 PERIOD="${PERIOD:-1200}"              # twenty minutes between passes
 DATA_EVERY="${DATA_EVERY:-3600}"      # the database is 23MB, so it is saved hourly, not every pass
 data_saved=0
+# Every failure here used to become a warning and the run finished green, so nothing ever told
+# anyone the site had stopped. A pass still carries on after one, but the run ends red and GitHub
+# sends its failure email. Only real breakage sets this: a crash, a failed save, a failed build.
+failed=0
+
+measures() {  # how many measures the database holds, 0 if there is none to read
+  python -c 'import sqlite3
+try:
+    print(sqlite3.connect("file:state/index.db?mode=ro", uri=True).execute("SELECT COUNT(*) FROM measures").fetchone()[0])
+except Exception:
+    print(0)' 2>/dev/null || echo 0
+}
+# What this job started with. A database that loses most of it during the job is not saved and
+# the site built from it is not published: the restore step refuses an empty start, and this is
+# the second lock on the same door, for whatever empties it after that.
+BASELINE=$(measures)
+
+intact() {
+  local now; now=$(measures)
+  if [ "$BASELINE" -gt 0 ] && [ "$now" -lt $(( BASELINE * 8 / 10 )) ]; then
+    echo "::error::the database fell from $BASELINE measures to $now during this job; not saving it or publishing from it"
+    failed=1
+    return 1
+  fi
+}
 
 save() {  # push a folder as a fresh orphan branch; the old history is left to GitHub's gc
   local folder="$1" branch="$2" label="$3"
   ( cd "$folder" && rm -rf .git && git init -q && git checkout -q --orphan "$branch" && git add -A \
     && git -c user.name="ai-fear-report" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
            commit -qm "$label $(date -u +%Y-%m-%dT%H:%MZ)" \
-    && git push -qf "$REMOTE" "$branch" ) || echo "::warning::could not save $branch"
+    && git push -qf "$REMOTE" "$branch" ) || { echo "::error::could not save $branch"; failed=1; }
   rm -rf "$folder/.git"
 }
 
 one_pass() {
   echo "::group::pass $1 at $(date -u +%H:%MZ)"
   python -m pipeline.run --mode "$MODE" --only "$ONLY" --db state/index.db --out state \
-    || echo "::warning::pass $1 ended in an error; whatever it saved before that is kept"
+    || { echo "::error::pass $1 ended in an error; whatever it saved before that is kept"; failed=1; }
   # One edition of the brief a day, written but not posted. It rides the data branch so the
   # next run knows what has already been said, and is copied onto the site to be looked at.
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     python -m pipeline.brief --db state/index.db --out state/brief \
       || echo "::warning::pass $1 wrote no brief"
   fi
-  if [ -f state/index.db ] && [ $(( $(date +%s) - data_saved )) -ge "$DATA_EVERY" ]; then
+  if [ -f state/index.db ] && [ $(( $(date +%s) - data_saved )) -ge "$DATA_EVERY" ] && intact; then
     save state data Data
     data_saved=$(date +%s)
   fi
   # One post a day, from POST_HOUR in New York onward, and once: the database remembers the
   # date it went. The window stays open for the rest of the day rather than closing at the end
   # of the hour, so an hour GitHub does not serve delays the edition instead of losing it.
-  # Unset POST_HOUR and nothing is ever posted, which is the state this ships in.
+  # Unset POST_HOUR and nothing is ever posted. update.yml sets it, so posting is on.
   if [ -n "${POST_HOUR:-}" ] && [ -n "${X_API_KEY:-}" ] \
      && [ "$(TZ=America/New_York date +%-H)" -ge "$POST_HOUR" ]; then
     rm -f posted.flag
     python -m pipeline.post --db state/index.db --brief state/brief --flag posted.flag \
       || echo "::warning::pass $1 could not post the brief"
-    if [ -f posted.flag ]; then
+    if [ -f posted.flag ] && intact; then
       save state data Data   # so the next pass knows it already went
       data_saved=$(date +%s)
     fi
@@ -65,9 +90,10 @@ one_pass() {
       # Pages keeps the custom domain in this file, and every pass replaces the branch
       printf 'aifearreport.com\n' > dist/CNAME
       [ -d state/brief ] && cp -r state/brief dist/brief
-      save dist gh-pages Site
+      intact && save dist gh-pages Site
     else
-      echo "::warning::pass $1 built no site; the last one stays up"
+      echo "::error::pass $1 built no site; the last one stays up"
+      failed=1
     fi
   fi
   echo "::endgroup::"
@@ -75,7 +101,7 @@ one_pass() {
 
 mode="${1:-once}"
 [ "$mode" = "more" ] || one_pass 1
-[ "$mode" = "once" ] && exit 0
+[ "$mode" = "once" ] && exit "$failed"
 
 deadline=$(( ${STARTED:-$(date +%s)} + LOOP_MINUTES * 60 ))
 pass=1
@@ -89,5 +115,6 @@ while :; do
   one_pass "$pass"
 done
 # The data branch is what the next run starts from, so it is saved whatever the clock says.
-[ -f state/index.db ] && save state data Data
+[ -f state/index.db ] && intact && save state data Data
 echo "$pass passes; the next run takes it from here"
+exit "$failed"

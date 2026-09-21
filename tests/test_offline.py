@@ -1342,7 +1342,8 @@ def check_status_and_coverage():
             pass
 
         def json(self, url, params=None, **kw):
-            asked.append(params["q"])
+            if params.get("sort") != "first_action_asc":  # the pre-filed sweep is tested below
+                asked.append(params["q"])
             return {"results": [], "pagination": {"max_page": 1}}
     saved = (cos.Http, cos.env)
     cos.Http, cos.env = FakeOS, (lambda name: "k")
@@ -1353,6 +1354,35 @@ def check_status_and_coverage():
     assert asked[:3] == ["artificial intelligence", "deepfake", "chatbot"], asked
     assert asked[3] == "automated decision" and asked[-1] == "data center", asked
     print("state searches already caught up run before any backfill: ok")
+
+    # Bills pre-filed in late 2024 for a 2025 session are swept once, stopping at the first bill
+    # acted on in 2025, and a refusal ends the sweep for that search rather than the run.
+    from pipeline.common import HttpError as _HttpError
+    _kv_set(db, "openstates_prefile", {})
+    pages = {1: [{"first_action_date": "2024-11-12", "id": "p1"}, {"first_action_date": "2024-12-02", "id": "p2"}],
+             2: [{"first_action_date": "2024-12-20", "id": "p3"}, {"first_action_date": "2025-01-14", "id": "p4"},
+                 {"first_action_date": "2025-01-15", "id": "p5"}]}
+    stored_ids = []
+
+    class Sweep:
+        def json(self, url, params=None, **kw):
+            if params["q"] == "deepfake":
+                raise _HttpError(400, url, "sort not supported")
+            if params["q"] != "artificial intelligence":
+                return {"results": [], "pagination": {"max_page": 1}}
+            assert params["sort"] == "first_action_asc" and params["created_since"] < "2025"
+            return {"results": pages[params["page"]], "pagination": {"max_page": 3}}
+    saved_store = cos.store
+    cos.store = lambda db, b: stored_ids.append(b["id"]) or 1
+    try:
+        used, found = cos.prefile_sweep(db, Sweep(), 30, __import__("time").time())
+    finally:
+        cos.store = saved_store
+    assert stored_ids == ["p1", "p2", "p3"], stored_ids
+    from pipeline.common import kv_get as _kv_get
+    swept = _kv_get(db, "openstates_prefile")
+    assert swept["artificial intelligence"]["done"] and swept["deepfake"]["done"], swept
+    print("bills pre-filed for a 2025 session are swept once: ok")
 
 
 def check_links_open_right(dist):

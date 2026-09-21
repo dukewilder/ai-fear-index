@@ -24,6 +24,11 @@ RETRY_HOURS = 3     # a refusal is their rolling day, not ours, so wait it out a
 # minutes of one run's hour spent waiting. The cursors already make this resumable, so it stops
 # at the clock and picks up where it left off rather than running the job out of time.
 SECONDS = 780
+# Bills pre-filed in late 2024 for a session that began in 2025. The searches ask only for records
+# created since January, so Texas's, Virginia's and Florida's pre-filed bills were never returned.
+# One sweep per search, oldest first action first, stopping at the first bill acted on in 2025.
+PREFILE_SINCE = "2024-10-01"
+PREFILE_CAP = 30  # requests per run, ahead of the backfills
 
 
 def jurisdiction_code(j):
@@ -62,6 +67,12 @@ def run(db, state, mode):
         at = behind.index(QUERIES[offset])
         behind = behind[at:] + behind[:at]
     ordered = caught_up + behind
+    try:
+        swept, found = prefile_sweep(db, http, min(PREFILE_CAP, budget), started)
+        requests_used += swept
+        added += found
+    except Exception as exc:  # the searches below still run
+        log(f"[openstates] pre-filed sweep failed: {str(exc)[:200]}")
     stopped_at = None
     for i, query in enumerate(ordered):
         cursor = cursors.get(query, {})
@@ -154,3 +165,44 @@ def store(db, b):
         "url": b.get("openstates_url"), "sponsors": ", ".join(s for s in sponsors if s),
         "source": "Open States", "updated": b.get("updated_at"), "first_seen": iso(),
     })
+
+
+def prefile_sweep(db, http, cap, started):
+    """Read the pre-filed bills each search has not reached. Returns (requests, rows stored)."""
+    state = kv_get(db, "openstates_prefile", {})
+    used, stored = 0, 0
+    for query in [q for q in QUERIES if q != "data center"]:
+        cur = state.get(query, {"page": 1, "done": False})
+        while not cur["done"] and used < cap and time.time() - started < SECONDS:
+            try:
+                data = http.json(BASE, params={"q": query, "sort": "first_action_asc", "per_page": 20,
+                                               "page": cur["page"], "include": ["abstracts", "sponsorships"],
+                                               "created_since": PREFILE_SINCE})
+            except HttpError as exc:
+                if "exceeded limit" in str(exc) or exc.status == 429:
+                    state[query] = cur
+                    kv_set(db, "openstates_prefile", state)
+                    return used, stored
+                # past the last page, or a request this API refuses: either way, not again
+                log(f"[openstates] pre-filed sweep of '{query}' ends: {str(exc)[:160]}")
+                cur["done"] = True
+                break
+            used += 1
+            results = data.get("results", [])
+            for b in results:
+                if (b.get("first_action_date") or "")[:10] >= SINCE:
+                    cur["done"] = True  # the rest were filed in the report's own period
+                    break
+                stored += store(db, b)
+            db.commit()
+            if not cur["done"]:
+                last = (data.get("pagination") or {}).get("max_page") or cur["page"]
+                if not results or cur["page"] >= last:
+                    cur["done"] = True
+                else:
+                    cur["page"] += 1
+        state[query] = cur
+    kv_set(db, "openstates_prefile", state)
+    if used:
+        log(f"[openstates] pre-filed sweep: {used} requests, {stored} bills stored")
+    return used, stored

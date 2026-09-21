@@ -57,9 +57,11 @@ def run(db, state, mode):
     by_summary, capped = 0, False
     try:
         # The first scan reads every summary this Congress has; after that, what changed since.
-        full = not kv_get(db, f"congress_summaries:{congress}:2")
+        full = not kv_get(db, f"congress_summaries:{congress}:3")
         seen = {(b.get("type") or "").upper() + str(b.get("number")) for b in matched}
-        for kind, number in summary_matches(http, key, congress, None if full else params.get("fromDateTime")):
+        # The full scan names its start: asked with no date, the API answered with one short page.
+        begin = f"{2 * congress + 1787}-01-01T00:00:00Z"
+        for kind, number in summary_matches(http, key, congress, begin if full else params.get("fromDateTime")):
             if kind + str(number) in seen or f"us-{congress}-{kind.lower()}-{number}" in stored:
                 continue
             if by_summary >= SUMMARY_CAP:
@@ -70,7 +72,7 @@ def run(db, state, mode):
             added += store_bill(db, http, key, congress, kind, number)
             db.commit()
         if full and not capped:
-            kv_set(db, f"congress_summaries:{congress}:2", iso())
+            kv_set(db, f"congress_summaries:{congress}:3", iso())
     except Exception as exc:  # the title scan still stands
         log(f"[congress] summary scan failed: {str(exc)[:200]}")
     kv_set(db, "congress_since", started)
@@ -89,6 +91,10 @@ def summary_matches(http, key, congress, since=None):
         data = http.json(f"{BASE}/summaries/{congress}?sort=updateDate+desc", params={**params, "offset": offset})
         items = data.get("summaries", [])
         pages += 1
+        if pages == 1:
+            pag = data.get("pagination") or {}
+            log(f"[congress] summaries since {since or 'the start'}: {pag.get('count')} on file, "
+                f"{len(items)} on the first page, next page {'given' if pag.get('next') else 'not given'}")
         for item in items:
             bill = item.get("bill") or {}
             kind, number = (bill.get("type") or "").upper(), bill.get("number")

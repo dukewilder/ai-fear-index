@@ -23,11 +23,37 @@ import sys
 
 from .common import (EUPHEMISM, STATES, Entities, annotate, config, connect, env, kv_set, log,
                      measures_in_scope, name_key, now)
+from . import tag
 from .export import gave
-from .tag import agreed, call, norm
+from .tag import agreed, norm
 
-MODEL_NOTE = "claude-haiku-4-5-20251001"
+# The brief is the one thing the report writes every day that everyone reads, and the smaller model
+# kept putting the power in an afterthought on the end of a duty: "California requires operators to
+# submit to audits, giving the Attorney General power to demand the reports". The third reading
+# already asks the stronger model this key can use. So does the brief, falling back to the smaller
+# one if the key cannot use it.
+MODELS = ["claude-sonnet-5", "claude-haiku-4-5-20251001"]
+_model = {"i": 0}
+
+
+def call(key, system, user, max_tokens=400):
+    while True:
+        model = MODELS[_model["i"]]
+        try:
+            return tag.call(key, system, user, max_tokens, model=model)
+        except RuntimeError as exc:
+            said = str(exc)
+            refused = re.match(r"Claude API (403|404)\b", said) or \
+                (said.startswith("Claude API 400") and "model" in said.lower())
+            if refused and _model["i"] + 1 < len(MODELS):
+                _model["i"] += 1
+                log(f"[brief] {model} is not available to this key, using {MODELS[_model['i']]}")
+                continue
+            raise
+
+
 WANT = 3          # lines in an edition: enough to show a pattern, few enough to read
+RETRIES = 2       # attempts after the first, each told every fault found so far
 POOL_DAYS = 45    # measures move slower than a day, so an edition draws from a rolling pool
 MAX_SENTENCE = 210  # a sentence that names the power needs more room than one that names a duty
 
@@ -157,19 +183,24 @@ RULES = (
     "Write one sentence, at most 30 words. {tense}\n"
     "If the measure says it starts in a later year, put that year in the sentence. A law on the "
     "books that bites in 2029 is still the story, and saying from 2029 is more of it, not less.\n"
-    "Say which government office gains a power, and what it can now do. Name the office that "
-    "would decide, inspect, licence, demand, or be reported to, inside the sentence. If the "
-    "measure names no office, the power is the state's: say the state or the jurisdiction by name.\n"
+    "Say which government office gains a power, and what it can now do. Start with the "
+    "jurisdiction, and let the next words be the office and its power, in one of two shapes: "
+    "<jurisdiction> gives <office> the power to <what it can now do>, or <jurisdiction> puts "
+    "<what> under <office>. The office is the one that would decide, inspect, licence, demand, or "
+    "be reported to. Use the office the measure names, in the measure's words, and never one "
+    "from these instructions. If the measure names no office, the power is the jurisdiction's "
+    "own, and the sentence says what the jurisdiction now controls.\n"
     "A duty on a company is a power for whoever it answers to, and it is the power that goes in "
     "the sentence. Not required to restore the water, but put under the department that decides "
-    "whether it has. Not required to submit to audits the attorney general can ask to see, but "
-    "gives the attorney general the power to demand the audit reports.\n"
+    "whether it has. Not required to submit to audits an office can ask to see, but gives that "
+    "office the power to demand the audit reports.\n"
     "An auditor, assessor, certifier, or any other firm a company has to hire holds no power in "
     "this sentence. The office that can demand its work or act on it holds the power, and the "
     "sentence is about that office. Keep any limit the measure puts on the power, such as for "
     "cause or after notice: dropping it makes the power larger than the measure makes it.\n"
-    "So do not open with the jurisdiction and then requires, mandates, directs or orders followed "
-    "by a company. Open with the office and what it can now do, or with what is put under it.\n"
+    "So the verb after the jurisdiction is never requires, mandates, directs or orders, and the "
+    "power never comes last in a clause beginning giving, allowing or letting. The power is the "
+    "main verb.\n"
     "If a duty falls on everyone in order to identify some people, the sentence says everyone: a "
     "rule that checks whether a user is a child checks every user. If the measure deletes a "
     "condition that had narrowed who a duty applied to, it is widening that duty and the sentence "
@@ -199,16 +230,24 @@ RULES = (
 )
 
 
-LAW = ("This measure has passed. Write it in the present tense: it requires, it puts, it bans.")
+LAW = ("This measure has passed. Write it in the present tense: it gives, it puts, it bans.")
 PENDING = ("This measure has not passed. It was introduced and is somewhere in the process, so every "
-           "verb is conditional: it would require, it would put. Nobody is bound by it yet, so do not "
+           "verb is conditional: it would give, it would put. Nobody is bound by it yet, so do not "
            "write that anyone must do anything, or that anything is already the case.")
 
 
 def sentence(key, row, refused=""):
     rules = RULES.format(tense=LAW if (row["status"] or "") == "passed" else PENDING)
-    again = (f"\n\nA first attempt at this sentence was refused: {refused}. Write it again without "
-             f"that fault, keeping every rule above.") if refused else ""
+    faults = [refused] if isinstance(refused, str) and refused else list(refused or [])
+    if len(faults) == 1:
+        again = (f"\n\nA first attempt at this sentence was refused: {faults[0]}. Write it again "
+                 f"without that fault, keeping every rule above.")
+    elif faults:
+        again = ("\n\nEarlier attempts at this sentence were refused, in order: "
+                 + "; then ".join(faults)
+                 + ". Write it again without any of those faults, keeping every rule above.")
+    else:
+        again = ""
     out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{rules}{again}\n\n"
                             'Return JSON: {"sentence": "...", "quote": "..."}', max_tokens=400)
     return (out.get("sentence") or "").strip(), (out.get("quote") or "").strip()
@@ -238,6 +277,11 @@ def sponsors_word(text, office="", loose=False):
 # the start year when a measure bites later, and the model puts it there, so the dating words pass.
 EXPLAINING = re.compile(r",\s+(?!(?:beginning|starting|commencing)\b)\w+ing\b[^.]*\.$"
                         r"|\bnot (just|only|merely)\b|\bit is not\b", re.I)
+# The same trailing clause, carrying the power itself: "California requires operators to submit to
+# audits, giving the Attorney General power to demand the reports". Refused as explaining, it was
+# written again with the same clause, because "explains rather than reports" did not say what to move.
+TUCKED = re.compile(r",\s+(?:giving|granting|handing|letting|allowing|authori[sz]ing|leaving|"
+                    r"putting|making)\b[^.]*\.$", re.I)
 
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
@@ -264,7 +308,11 @@ DUTY_FRAMED = "written as a duty on a company, not the power it creates"
 # Looked for in the main clause rather than the first few words, because "Health and Human Services
 # Department, Food and Drug Administration requires operators to file reports" is the same sentence
 # with a longer name on the front.
-DUTY_OPENER = re.compile(r"\b(requires?|mandates?|obligates?|directs?|orders?|compels?)\b", re.I)
+# The passive counts: "New York members of the legislature would be required to disclose" is the same
+# duty with its subject moved, and it led an edition because only the active form was looked for.
+DUTY_OPENER = re.compile(r"\b(requires?|mandates?|obligates?|directs?|orders?|compels?|"
+                         r"(?:be|is|are|been|being)\s+(?:required|mandated|obligated|directed|ordered|"
+                         r"compelled)\s+to)\b", re.I)
 
 # Who a sentence puts the power under when it is not the government. A company told to hire an
 # auditor answers to the office that can demand the auditor's report, not to the auditor. The launch
@@ -329,6 +377,28 @@ def private_holder(text):
         if power or gov:
             return ""
     return ""
+
+
+# Words every office name shares, so finding them in a measure proves nothing about which office.
+OFFICE_WORDS = {"department", "office", "bureau", "division", "board", "commission", "agency",
+                "authority", "council", "registry", "administration", "secretary", "director",
+                "administrator", "commissioner", "general", "state", "public"}
+
+
+def borrowed_office(text, raw, jurisdiction=""):
+    """An office the sentence names that the measure does not, or an empty string.
+
+    The rules show the shape of a sentence with an office in it, and a model given an example
+    will sometimes keep the example's office. The one the sentence names has to be in the
+    measure, word for word, give or take an ending.
+    """
+    gov = government_named(text)
+    if not gov:
+        return ""
+    said = norm(f"{raw} {jurisdiction}").split()
+    words = {w.lower() for w in re.findall(r"[A-Za-z]{4,}", gov)} - OFFICE_WORDS - POWER_GLUE
+    missing = [w for w in words if not any(s.startswith(w[:6]) for s in said)]
+    return gov if missing else ""
 
 
 def hired_fault(text):
@@ -453,6 +523,11 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     if word:
         return f"sponsor's word {word!r}"
     if EXPLAINING.search(text):
+        tucked = TUCKED.search(text)
+        if tucked:
+            clause = " ".join(tucked.group(0).strip(" ,.").split()[:6])
+            return (f"puts the power in a clause on the end ({clause}...); make it the main verb, "
+                    f"straight after the jurisdiction")
         return "explains rather than reports"
     loose = re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I)
     if loose:
@@ -464,6 +539,10 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     hired = hired_fault(text)
     if hired:
         return hired
+    if raw:
+        borrowed = borrowed_office(text, raw, jurisdiction)
+        if borrowed:
+            return f"names the {borrowed}, which the measure does not; use the office the measure names, in its words"
     # The quote is checked before the duty test, not after. A duty-framed sentence is kept in
     # reserve and posted when nothing better was written, and it used to be kept without its
     # quote ever being looked at, so the fallback could go out resting on words not in the bill.
@@ -529,22 +608,30 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
         reason = fault(text, quote)
         if reason:
             note(attempts, where, reason, sentence_text=text)
-            log(f"[brief] {where}: refused, {reason}; asking once more")
+            log(f"[brief] {where}: refused, {reason}; asking again")
             tries = [(text, quote, reason)]
-            # A second attempt told what was wrong. Most refusals are one fixable fault: the
+            # Another attempt told what was wrong. Most refusals are one fixable fault: the
             # sponsor's "child safety", three characters over the limit, a would on a measure that
             # passed. Dropping the measure for them cost the launch edition its three best leads.
-            try:
-                text, quote = sentence(key, row, refused=reason)
-                reason = fault(text, quote)
-            except (NameError, AttributeError, TypeError, KeyError, IndexError):
-                raise
-            except Exception as exc:
-                reason = f"the model did not answer the second time: {str(exc)[:120]}"
-            if reason:
+            # Fixing one fault can trip another, so there are two more attempts, each told every
+            # fault so far: the launch lead lost "child safety" and then tucked the power into a
+            # clause on the end.
+            for _ in range(RETRIES):
+                try:
+                    text, quote = sentence(key, row, refused=[why for _, _, why in tries])
+                    reason = fault(text, quote)
+                except (NameError, AttributeError, TypeError, KeyError, IndexError):
+                    raise
+                except Exception as exc:
+                    reason = f"the model did not answer again: {str(exc)[:120]}"
+                    note(attempts, where, f"again: {reason}")
+                    break
+                if not reason:
+                    break
                 note(attempts, where, f"again: {reason}", sentence_text=text)
-                log(f"[brief] {where}: skipped, {reason}")
                 tries.append((text, quote, reason))
+            if reason:
+                log(f"[brief] {where}: skipped, {reason}")
                 for t, q, why in tries:
                     if why == DUTY_FRAMED and second is None:
                         # True, checkable, and the wrong way round. Worth keeping in reserve: an

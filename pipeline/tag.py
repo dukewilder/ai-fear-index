@@ -28,13 +28,13 @@ class TimedOut(Exception):
 _lock = threading.Lock()
 
 
-def call(key, system, user, max_tokens=700):
+def call(key, system, user, max_tokens=700, model=None):
     last = ""
     for attempt in range(6):
         try:
             r = requests.post(API, timeout=120, headers={
                 "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": MODEL, "max_tokens": max_tokens, "system": system,
+                json={"model": model or MODEL, "max_tokens": max_tokens, "system": system,
                       "messages": [{"role": "user", "content": user}]})
         except requests.RequestException as exc:
             last = str(exc)

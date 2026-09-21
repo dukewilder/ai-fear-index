@@ -852,6 +852,87 @@ def check_power_is_the_office():
     print("the lead is about the office gaining the power, not a firm a company hires: ok")
 
 
+def check_brief_attempts():
+    """What the second run of the launch edition got wrong, one check each.
+
+    The smaller model dropped "child safety" and then tucked the power into a clause on the end
+    ("..., giving the Attorney General power to demand audit reports for cause"), was told only that
+    it "explains rather than reports", and the measure was dropped. The edition then led with New
+    York legislators who "would be required to" disclose AI-drafted remarks, a duty in the passive
+    that the duty check did not recognise.
+    """
+    from pipeline import brief, tag
+    tucked = ("California requires an operator of a companion chatbot, beginning July 1, 2027, to submit to "
+              "independent audits, giving the Attorney General power to demand audit reports for cause.")
+    summary = ("This bill would require an operator to submit to independent audits of its compliance. The bill "
+               "would authorize the Attorney General to, for cause, request and obtain a copy of an audit "
+               "report from the operator, beginning July 1, 2027.")
+    raw = f"Companion chatbots.\n{summary}"
+    why = brief.why_not(tucked, "require an operator to submit to independent audits", brief.norm(raw), True,
+                        "", "2027", "California", raw=raw, offices=[])
+    assert "clause on the end" in why and "giving the Attorney General" in why, why
+    assert brief.why_not("California puts chatbots under audits, reflecting a national trend.", "x", "x",
+                         True) == "explains rather than reports"
+    passive = ("New York members of the legislature would be required to verbally disclose before remarks "
+               "entered into the official record whether such remarks were drafted by artificial intelligence.")
+    assert brief.DUTY_OPENER.search(brief.tense_of(passive, "New York")), "a passive duty was read as a power"
+    for fine in ("California would bar chatbots directed at children from simulating romance.",
+                 "California would bar a release without the required risk assessment."):
+        assert not brief.DUTY_OPENER.search(brief.tense_of(fine, "California")), fine
+    # an office the measure never names is refused, whatever the sentence around it
+    assert brief.borrowed_office("Texas gives the Attorney General the power to demand the forecasts.",
+                                 "This bill would require a utility to file forecasts with the Public Utility "
+                                 "Commission.", "Texas") == "Attorney General"
+    assert brief.borrowed_office("Texas puts every forecast under the Public Utilities Commission.",
+                                 "file forecasts with the Public Utility Commission", "Texas") == ""
+
+    # three attempts, the last told both faults, and the third one used
+    row = {"id": "m1", "jurisdiction_name": "California", "identifier": "SB 1119", "status": "passed",
+           "title": "Companion chatbots.", "office": "", "offices": "", "controls": "mandatory-reporting",
+           "fears": "", "url": "u", "summary": summary}
+    answers = [("California requires companion chatbot operators from July 1, 2027 to submit to independent "
+                "child safety audits, giving the Attorney General power to demand audit reports for cause.",
+                "require an operator to submit to independent audits"),
+               (tucked, "require an operator to submit to independent audits"),
+               ("California gives the Attorney General the power to demand, for cause, the audit reports of "
+                "companion chatbot operators, beginning 2027.",
+                "authorize the Attorney General to, for cause, request and obtain a copy")]
+    said = []
+
+    def fake(key, system, user, max_tokens=400):
+        said.append(user)
+        s, q = answers[len(said) - 1]
+        return {"sentence": s, "quote": q}
+    real, brief.call = brief.call, fake
+    try:
+        attempts = []
+        lines = brief.write_lines("k", [row], "2026-09-21", 1, attempts)
+    finally:
+        brief.call = real
+    assert len(said) == 3, f"asked {len(said)} times"
+    assert "child safety" in said[2] and "clause on the end" in said[2], "the third attempt was not told both faults"
+    assert lines and lines[0]["sentence"] == answers[2][0], attempts
+
+    # the stronger model first, and the smaller one when the key cannot use it
+    used = []
+
+    def api(key, system, user, max_tokens=700, model=None):
+        used.append(model)
+        if model == brief.MODELS[0]:
+            raise RuntimeError('Claude API 404: {"type":"error","error":{"type":"not_found_error","message":"model"}}')
+        return {"sentence": "ok"}
+    real_tag, tag.call = tag.call, api
+    brief._model["i"] = 0
+    try:
+        assert brief.call("k", "s", "u") == {"sentence": "ok"}
+        assert brief.call("k", "s", "u") == {"sentence": "ok"}
+    finally:
+        tag.call = real_tag
+        brief._model["i"] = 0
+    assert used == [brief.MODELS[0], brief.MODELS[1], brief.MODELS[1]], used
+    print("the brief is written by the stronger model, told every fault, and reads a passive duty: ok")
+
+
 def check_lobbying_money():
     """A year of lobbying is four quarters of reports, and a client's money is counted once.
 
@@ -1230,6 +1311,7 @@ def main():
     check_third_reading()
     check_second_attempt()
     check_power_is_the_office()
+    check_brief_attempts()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()

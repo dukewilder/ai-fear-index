@@ -436,7 +436,12 @@ def redo_briefs(db):
 # 9: that one led with "California puts companion chatbots under independent auditors". The power in
 #    the law is the Attorney General's, to demand the audit reports, and the plate left that out. The
 #    lead now says what the office can do, and a firm a company hires cannot stand in for it.
-REDO_EDITION = ("2026-09-21", 9)
+# 10: written again, the California lead dropped "child safety" and then tucked the power into a
+#    closing clause ("giving the Attorney General power to demand audit reports"), and was dropped.
+#    The edition fell to New York legislators who "would be required to" disclose AI-drafted remarks.
+#    The brief now asks the stronger model, gives it three attempts told every fault, names the
+#    tucked clause as the fault, and reads the passive as the duty it is.
+REDO_EDITION = ("2026-09-21", 10)
 
 
 def redo_today(db):

@@ -94,7 +94,8 @@ def timeline_svg(t):
         p.append(f'<rect class="tl-money" x="{qx(quarter) - 8}" y="{86 - height}" width="16" height="{height}" '
                  f'data-tip="{esc(tip)}"><title>{esc(tip)}</title></rect>')
     for quarter, count in enumerate(t.get("messages") or []):
-        tip = f"{quarters[quarter]}: {raw_b.get(str(quarter), 0)} bills"
+        n = raw_b.get(str(quarter), 0)
+        tip = f"{quarters[quarter]}: {n} bill{'' if n == 1 else 's'}"
         for k in range(count):
             p.append(f'<circle class="tl-msg" cx="{qx(quarter)}" cy="{155 - 11 * k}" r="5" data-tip="{esc(tip)}">'
                      f'<title>{esc(tip)}</title></circle>')

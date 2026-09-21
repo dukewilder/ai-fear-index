@@ -21,8 +21,8 @@ import pathlib
 import re
 import sys
 
-from .common import (EUPHEMISM, SINCE, Entities, annotate, config, connect, env, kv_set, log,
-                     name_key, now)
+from .common import (EUPHEMISM, STATES, Entities, annotate, config, connect, env, kv_set, log,
+                     measures_in_scope, name_key, now)
 from .export import gave
 from .tag import agreed, call, norm
 
@@ -120,7 +120,11 @@ def pool(db, today, days=POOL_DAYS, limit=12):
         "  AND m.id NOT IN (SELECT target FROM brief) "
         "  AND moved >= ? AND moved <= ? "
         "ORDER BY moved DESC", (since, today)).fetchall()
-    rows = [r for r in rows if english(r)]
+    # Only what the site shows. A suppressed measure, one filed before the report starts, or the
+    # older copy of a carried-over bill could otherwise lead the card while the page has no row
+    # for it, and the card says nothing the site cannot show.
+    shown = in_scope(db)
+    rows = [r for r in rows if r["id"] in shown and english(r)]
     recent = [r["jurisdiction"] for r in db.execute(
         "SELECT b.edition, m.jurisdiction_name AS jurisdiction FROM brief b JOIN measures m ON m.id = b.target "
         "ORDER BY b.edition DESC LIMIT 4")]
@@ -436,17 +440,18 @@ def count(n, one, many=None, cap=False):
 
 
 def places(db, kind, value, keep=None):
-    """Say states when they are all states. Congress and a federal agency are not."""
+    """Say states when they are all states. Congress, a federal agency and Puerto Rico are not.
+
+    Counted by jurisdiction code, the federal government once. Counting names made it five places,
+    one for every agency that had issued a rule, and called Puerto Rico a state.
+    """
     keep = in_scope(db) if keep is None else keep
-    rows = [r for r in db.execute(
-        "SELECT DISTINCT m.id, m.jurisdiction, m.jurisdiction_name FROM measures m "
+    codes = {r["jurisdiction"] or "" for r in db.execute(
+        "SELECT DISTINCT m.id, m.jurisdiction FROM measures m "
         "JOIN tags t ON t.target = m.id WHERE t.kind = ? AND t.value = ?", (kind, value))
-        if r["id"] in keep]
-    where = {r["jurisdiction_name"] for r in rows}
-    # The jurisdiction code is the answer. The name's ending was a guess, and it guessed state for
-    # the Executive Office of the President and for a bureau inside a department.
-    federal = any((r["jurisdiction"] or "") in FEDERAL for r in rows)
-    return len(where), ("jurisdiction" if federal else "state")
+        if r["id"] in keep}
+    where = {c for c in codes if c not in FEDERAL} | ({"us"} if codes & set(FEDERAL) else set())
+    return len(where), ("state" if where and where <= STATES else "jurisdiction")
 
 
 def patterns(db, today, recent):
@@ -499,10 +504,12 @@ def patterns(db, today, recent):
 
     # Normalized and taken over the page's own set, the same way the front page counts offices.
     # Counting distinct strings made this line say 195 while the page said 190, and split one
-    # office across two spellings when deciding which is named most often.
+    # office across two spellings when deciding which is named most often. Only measures that
+    # carry a control count, as on the page: an office gains nothing from one that imposes nothing.
+    controlled = set().union(*[ids for (kind, slug), ids in tally.items() if kind == "control" and slug in names])
     named, by_office = {}, collections.defaultdict(set)
     for t in db.execute("SELECT target, value FROM tags WHERE kind='agency'"):
-        if t["target"] not in keep:
+        if t["target"] not in controlled:
             continue
         k = name_key(t["value"])
         if not k:
@@ -513,7 +520,8 @@ def patterns(db, today, recent):
         k = max(by_office, key=lambda x: len(by_office[x]))
         out.append({"key": f"offices:{len(named)}", "weight": 4,
                     "sentence": f"{count(len(named), 'named office', 'named offices', cap=True)} would gain a "
-                                f"power over AI. The one named most often is the {named[k]}, in "
+                                f"power over AI. The one named most often is the "
+                                f"{re.sub(r'^the ', '', named[k], flags=re.I)}, in "
                                 f"{count(len(by_office[k]), 'measure')}.",
                     "meta": "", "office": "",  # the sentence already names it
                     "head": f"{len(named)} offices would gain a power over AI"})
@@ -667,15 +675,12 @@ FEDERAL = ("us", "fed", "us-exec")
 def in_scope(db):
     """The measures the front page counts, which is the set every number on the plate is taken over.
 
-    Read, judged to be about AI, filed since the report starts or a rule or order, and not on the
-    suppression list. The plate goes out on X while the page it describes is one click away, so a
-    count taken over a wider set than the page uses is a contradiction waiting to be noticed.
+    The one list both use, from common.measures_in_scope: read, judged to be about AI, filed since
+    the report starts or a rule or order, not suppressed, and a carried-over bill once. The plate
+    goes out on X while the page it describes is one click away, so a count taken over a wider set
+    than the page uses is a contradiction waiting to be noticed.
     """
-    suppressed = set(config("suppress").get("urls", []))
-    return {r["id"] for r in db.execute(
-        "SELECT m.id, m.url FROM measures m JOIN tag_runs tr ON tr.target = m.id "
-        "WHERE tr.ai_related = 1 AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))",
-        (SINCE,)) if r["url"] not in suppressed}
+    return {m["id"] for m in measures_in_scope(db)}
 
 
 def totals(db):
@@ -688,14 +693,16 @@ def totals(db):
     """
     keep = in_scope(db)
     known = {c["slug"] for c in config("controls")}
-    controlled, offices = set(), set()
+    controlled, named = set(), collections.defaultdict(set)
     for t in db.execute("SELECT target, kind, value FROM tags WHERE kind IN ('control','agency')"):
         if t["target"] not in keep:
             continue
         if t["kind"] == "control" and t["value"] in known:
             controlled.add(t["target"])
         elif t["kind"] == "agency" and name_key(t["value"]):
-            offices.add(name_key(t["value"]))
+            named[name_key(t["value"])].add(t["target"])
+    # An office counts when a measure that carries a control names it, which is the page's rule.
+    offices = {k for k, ids in named.items() if ids & controlled}
     return {"measures": len(keep), "controlled": len(controlled), "offices": len(offices)}
 
 
@@ -743,8 +750,10 @@ def compose(lead, spare, tot, cfg, fears):
     parts += [" ".join(first)]
     for p in spare:
         parts += ["", p["sentence"]]
-    parts += ["", f"{tot['measures']:,} measures tracked. {tot['controlled']} carry a control. "
-                  f"{tot['offices']} offices hold one."]
+    # Would hand, not hold: most of these have not passed, and nobody holds what a measure still in
+    # committee would give them.
+    parts += ["", f"{tot['measures']:,} measures tracked. {tot['controlled']:,} carry a control, and "
+                  f"they would hand new power to {tot['offices']:,} offices."]
     return "\n".join(parts).strip()
 
 

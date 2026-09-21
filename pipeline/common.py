@@ -473,6 +473,28 @@ def retag_for_fears(db):
     return n
 
 
+# Bump to read again the Federal Register documents whose title names AI but which the tagger
+# judged not about AI. Executive Orders 14179 and 14319 were missing from the record that way.
+RETAG_AI_TITLES = 1
+
+
+def retag_ai_titles(db):
+    """Queue those documents once, for a tagger that no longer lets a title naming AI be overruled."""
+    key = f"retag:ai-titles:{RETAG_AI_TITLES}"
+    if kv_get(db, key):
+        return 0
+    ids = [r["id"] for r in db.execute(
+        "SELECT m.id, m.title FROM measures m JOIN tag_runs t ON t.target = m.id "
+        "WHERE m.id LIKE 'fr-%' AND t.ai_related = 0") if AI_TEXT.search(r["title"] or "")]
+    for mid in ids:
+        db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target = ?", (mid,))
+    kv_set(db, key, True)
+    db.commit()
+    if ids:
+        log(f"[repair] {len(ids)} Federal Register documents titled with AI queued to be read again")
+    return len(ids)
+
+
 def connect(path):
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=60)
@@ -485,6 +507,7 @@ def connect(path):
     redo_today(db)
     retag_for_fears(db)
     drop_position_controls(db)
+    retag_ai_titles(db)
     return db
 
 
@@ -564,6 +587,60 @@ def name_key(name):
     text = re.sub(r"[^a-z0-9 ]+", " ", text)
     text = SUFFIXES.sub(" ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+# ---------------------------------------------------------------- the record the site counts
+
+STATES = frozenset("al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms mo mt ne "
+                   "nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy".split())
+FEDERAL = frozenset(("us", "us-exec"))
+# Places Open States covers that are not states. A count that calls Puerto Rico a state is wrong
+# by one in a way anyone can check, so these are counted and named on their own.
+TERRITORIES = {"pr": "Puerto Rico", "dc": "the District of Columbia"}
+
+
+def one_record_per_bill(rows):
+    """A bill carried into a legislature's next session, counted once.
+
+    Open States files a carried-over bill again under the new session with a new id: Hawaii's 2025
+    bills come back in 2026, Oklahoma's too, and Virginia's 2026 bills in 2027, each with the same
+    number, title and date introduced. Taken as they came, 25 bills were counted twice. The record
+    from the latest session is the one kept, because it is the one still moving.
+    """
+    best = {}
+    for i, r in enumerate(rows):
+        if r["kind"] in ("rule", "order") or not r["identifier"]:
+            key = ("id", r["id"])
+        else:
+            key = (r["jurisdiction"], re.sub(r"\s+", "", r["identifier"].upper()),
+                   " ".join((r["title"] or "").lower().split()), r["introduced_date"] or "")
+        rank = (str(r["session"] or ""), r["latest_action_date"] or "", r["updated"] or "", r["id"])
+        if key not in best or rank > best[key][1]:
+            best[key] = (i, rank)
+    return [rows[i] for i in sorted(i for i, _ in best.values())]
+
+
+def measures_in_scope(db):
+    """Every measure the site counts, which is every measure the daily card counts.
+
+    Read and judged to be about AI, filed since the report starts or a federal rule or order, not
+    on the suppression list, and a carried-over bill once. The front page and the card both count
+    over this one list, so they cannot disagree by reading two different sets.
+    """
+    suppressed = set(config("suppress").get("urls", []))
+    rows = [dict(r) for r in db.execute(
+        "SELECT m.* FROM measures m JOIN tag_runs tr ON tr.target = m.id WHERE tr.ai_related = 1 "
+        "AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))", (SINCE,))]
+    return one_record_per_bill([r for r in rows if r["url"] not in suppressed])
+
+
+def where_counted(codes):
+    """How many states, which other places, and whether the federal government: "50 states, Puerto
+    Rico and the federal government" rather than "51 states". Returns the three parts."""
+    codes = set(codes)
+    states = len(codes & STATES)
+    others = [TERRITORIES[c] for c in sorted(codes & set(TERRITORIES))]
+    return states, others, bool(codes & FEDERAL)
 
 
 class Entities:

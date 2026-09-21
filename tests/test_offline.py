@@ -443,17 +443,43 @@ def check_places_word():
         db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", "c", "q", "t", iso()))
     db.commit()
     assert brief.places(db, "control", "c") == (3, "state"), "three states are three states"
-    upsert(db, "measures", {"id": "m4", "kind": "order", "jurisdiction": "us-exec",
-                            "jurisdiction_name": "Executive Office of the President", "session": "",
-                            "identifier": "EO 1", "title": "t", "summary": "s", "status": "passed",
-                            "url": "u4", "introduced_date": day, "source": "test", "first_seen": iso()})
-    db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("m4", "h", 1, iso()))
-    db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("m4", "control", "c", "q", "t", iso()))
-    db.commit()
+
+    def add(mid, kind, code, name, ident):
+        upsert(db, "measures", {"id": mid, "kind": kind, "jurisdiction": code, "jurisdiction_name": name,
+                                "session": "", "identifier": ident, "title": f"t {mid}", "summary": "s",
+                                "status": "passed", "url": f"u{mid}", "introduced_date": day, "source": "test",
+                                "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", "c", "q", "t", iso()))
+        db.commit()
+    add("m4", "order", "us-exec", "Executive Office of the President", "EO 1")
     n, word = brief.places(db, "control", "c")
     assert (n, word) == (4, "jurisdiction"), \
         f"an executive order counted as a state: the plate would have said {n} {word}s"
-    print("an executive order is not a state: ok")
+    # The federal government is one place however many offices issued its measures. Counting names
+    # made it one place per agency: Congress, the President and the FDA were three jurisdictions.
+    add("m5", "rule", "us-exec", "Health and Human Services Department, Food and Drug Administration", "FR 1")
+    add("m6", "bill", "us", "Congress", "H.R. 1")
+    n, word = brief.places(db, "control", "c")
+    assert (n, word) == (4, "jurisdiction"), f"the federal government counted as {n - 3} places"
+    print("an executive order is not a state, and the federal government is one place: ok")
+
+    # Puerto Rico is not a state, on the plate or on the page
+    db2 = _connect(pathlib.Path(_tempfile.mkdtemp()) / "places2.db")
+    for mid, code, name in [("p1", "ca", "California"), ("p2", "pr", "Puerto Rico")]:
+        upsert(db2, "measures", {"id": mid, "kind": "bill", "jurisdiction": code, "jurisdiction_name": name,
+                                 "session": "2025", "identifier": "SB 1", "title": "t", "summary": "s",
+                                 "status": "pending", "url": f"u{mid}", "introduced_date": day, "source": "test",
+                                 "first_seen": iso()})
+        db2.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        db2.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", "c", "q", "t", iso()))
+    db2.commit()
+    assert brief.places(db2, "control", "c") == (2, "jurisdiction"), "Puerto Rico was called a state"
+    from pipeline.export import where_phrase
+    assert where_phrase({"ca", "ny", "pr", "us", "us-exec"}) == "2 states, Puerto Rico and the federal government"
+    assert where_phrase({"ca", "us"}) == "1 state and Congress"
+    assert where_phrase({"us-exec"}) == "the federal government"
+    print("Puerto Rico is named, not counted as a state: ok")
 
 
 def check_headline_keeps_the_power():
@@ -511,6 +537,29 @@ def check_headline_keeps_the_power():
     finally:
         brief.call = real
     print("the plate keeps who holds the power: ok")
+
+
+def check_lobbying_money():
+    """A year of lobbying is four quarters of reports, and a client's money is counted once.
+
+    The window took in the quarter still running, which has a handful of early filings, so "past
+    year" was three quarters and a stub. And a client lobbying in-house reports what it paid its
+    outside firms among its own expenses, while each firm reports the same money as income: summing
+    every filing counted it twice.
+    """
+    from pipeline.export import recent_quarters, reported
+    assert sorted(recent_quarters(4, dt.date(2026, 9, 21))) == [(2025, 3), (2025, 4), (2026, 1), (2026, 2)], \
+        "the lobbying year includes the quarter still running"
+    assert (2026, 3) not in recent_quarters(4, dt.date(2026, 10, 5)), "a quarter counted before its reports are due"
+    assert (2026, 3) in recent_quarters(4, dt.date(2026, 10, 21)), "a quarter left out after its reports were due"
+
+    def filing(client, own, amount, quarter="Q1"):
+        return {"client_key": client, "year": 2026, "quarter": quarter, "amount": amount, "self": own}
+    rows = [filing("msft", True, 2_300_000), filing("msft", False, 90_000), filing("msft", False, 60_000),
+            filing("ari", False, 50_000), filing("msft", False, 70_000, "Q2")]
+    assert reported(rows) == 2_300_000 + 50_000 + 70_000, \
+        f"outside firms' fees were added on top of the client's own report: {reported(rows):,}"
+    print("a lobbying year is four quarters of reports, counted once: ok")
 
 
 def check_lobbying_keywords():
@@ -864,6 +913,7 @@ def main():
     check_overdue_daily_source()
     check_places_word()
     check_headline_keeps_the_power()
+    check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()
     tmp = pathlib.Path(tempfile.mkdtemp())
@@ -888,6 +938,16 @@ def main():
                             ("agency", ["California Attorney General", "Federal Trade Commission",
                                         "the FEDERAL  TRADE COMMISSION"][i % 3])]:
             db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, kind, value, "quote", "test", iso()))
+    # A bill carried into the next session. Open States files it again with a new id, and it was
+    # counted twice on the page and on the plate. It carries an office of its own, so a count that
+    # reads both copies also shows up in the offices.
+    carried = dict(db.execute("SELECT * FROM measures WHERE id='os-test0'").fetchone())
+    carried.update({"id": "os-test0-carried", "session": "2026", "latest_action_date": today.isoformat()})
+    upsert(db, "measures", carried)
+    db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("os-test0-carried", "h", 1, iso()))
+    for kind, value in (("fear", "loss-of-control"), ("control", "mandatory-reporting"),
+                        ("agency", "California Attorney General")):
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-test0-carried", kind, value, "quote", "test", iso()))
     # A measure the front page does not show: read, judged not about AI, and tagged all the same.
     # Anything counting over the whole tags table rather than the page's own set picks it up.
     upsert(db, "measures", {"id": "os-offpage", "kind": "bill", "jurisdiction": "ca",
@@ -930,6 +990,8 @@ def main():
     db.commit()
     data = export.export(db, tmp)
     assert data["index"]["value"] != "0", data["index"]
+    assert data["index"]["total_measures"] == 40, \
+        f"a carried-over bill was counted twice: {data['index']['total_measures']} measures, not 40"
     # The plate goes out on X while the page it describes is one click away. They are counted by
     # two different pieces of code, so the numbers are held against each other here.
     from pipeline.brief import totals as plate_totals  # noqa: E402
@@ -937,7 +999,7 @@ def main():
     chain = {label: value for value, label in data["index"]["chain"]}
     for word, key in (("bills, rules and orders", "measures"),
                       ("new government control", "controlled"),
-                      ("handed new power", "offices")):
+                      ("would hand new power", "offices")):
         label = next((l for l in chain if word in l), None)
         assert label, f"the front page stopped saying {word!r}; the plate still counts it"
         assert chain[label] == f"{plate[key]:,}", \

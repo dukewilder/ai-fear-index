@@ -12,7 +12,7 @@ import time
 
 import requests
 
-from .common import SINCE, config, env, iso, kv_get, kv_set, log, sha, states_a_position
+from .common import AI_TEXT, SINCE, config, env, iso, kv_get, kv_set, log, sha, states_a_position
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
@@ -204,6 +204,13 @@ def run(db, state, mode):
         is_measure = kind == "measure"
         proposal = propose(key, fears, controls, doc, is_measure)
         ai = bool(proposal.get("ai_related"))
+        # A Federal Register document is only stored when its title or abstract names AI, and a
+        # presidential document has no abstract, so the model judges an executive order on its title
+        # alone. It judged two orders titled with artificial intelligence, 14179 and 14319, not about
+        # AI, and they were missing from the record. A title that names AI settles it.
+        title = next((l[7:] for l in doc.split("\n") if l.startswith("Title: ")), "")
+        if not ai and target.startswith("fr-") and AI_TEXT.search(title):
+            ai = True
         verdict = verify(key, fears, controls, doc, proposal) if ai else {}
         return target, h, ai, verdict, norm(body)
 

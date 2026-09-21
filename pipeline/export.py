@@ -12,8 +12,8 @@ import pathlib
 import re
 import urllib.parse
 
-from .common import (REPO_URL, SITE_URL, SINCE, Entities, config, fear_keywords, fears_mentioned, iso, kv_get, kv_set,
-                     name_key, now, sha, spell, tidy_headline)
+from .common import (FEDERAL, REPO_URL, SITE_URL, STATES, Entities, config, fear_keywords, fears_mentioned, iso,
+                     kv_get, kv_set, measures_in_scope, name_key, now, sha, spell, tidy_headline, where_counted)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
@@ -108,6 +108,32 @@ def nice_name(name):
     return " ".join(words)
 
 
+def and_list(parts):
+    """a, b and c"""
+    parts = [p for p in parts if p]
+    if len(parts) < 2:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def federal_word(codes):
+    """Congress when every federal measure in the set is a bill, the federal government when an
+    agency rule or an executive order is among them. Neither when there are none."""
+    fed = set(codes) & FEDERAL
+    return "" if not fed else "Congress" if fed == {"us"} else "the federal government"
+
+
+def where_phrase(codes):
+    """Where a set of measures was filed, with states counted as states.
+
+    "51 states" was 50 states and Puerto Rico, and "plus Congress" covered executive orders. States
+    are counted, any other place is named, and the federal government is only called Congress when
+    Congress is all of it.
+    """
+    states, others, _ = where_counted(codes)
+    return and_list([count(states, "state") if states else ""] + others + [federal_word(codes)])
+
+
 def slugify(text):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", (text or "").lower())).strip("-")[:60] or "org"
 
@@ -117,15 +143,37 @@ def quarter_of(date_str):
     return d.year, (d.month - 1) // 3 + 1
 
 
-def recent_quarters(n=4):
-    y, q = now().year, (now().month - 1) // 3 + 1
+def recent_quarters(n=4, today=None):
+    """The last n quarters whose reports are due, which is what "past year" means for lobbying.
+
+    A quarter's reports are due twenty days after it ends. Counting the quarter in progress, which
+    holds a handful of early filings, made the year three quarters of filings and a stub, and the
+    most recent finished quarter is left out until its deadline has passed.
+    """
+    today = today or now().date()
+    y, q = today.year, (today.month - 1) // 3 + 1
     out = []
-    for _ in range(n):
-        out.append((y, q))
+    while len(out) < n:
         q -= 1
         if q == 0:
             y, q = y - 1, 4
+        end = dt.date(y, 12, 31) if q == 4 else dt.date(y, 3 * q + 1, 1) - dt.timedelta(days=1)
+        if today >= end + dt.timedelta(days=21):
+            out.append((y, q))
     return set(out)
+
+
+def reported(filings):
+    """Dollars reported on a set of filings, without counting a client's money twice.
+
+    A client that lobbies in-house files its own report, and the Lobbying Disclosure Act has it
+    include what it paid outside firms that quarter. Those firms file too, each reporting the same
+    money as income. Where a client's own report is in the set, its firms' reports for that quarter
+    add nothing to the total. They are still filings, and still counted as filings.
+    """
+    own = {(r["client_key"], r["year"], r["quarter"]) for r in filings if r.get("self")}
+    return sum(r["amount"] or 0 for r in filings
+               if r.get("self") or (r["client_key"], r["year"], r["quarter"]) not in own)
 
 
 def export(db, out_dir, base=""):
@@ -143,16 +191,14 @@ def export(db, out_dir, base=""):
     for t in db.execute("SELECT target, kind, value FROM tags"):
         if t["kind"] in ("fear", "control", "agency"):
             tags[t["target"]][t["kind"]].add(t["value"])
-    measures = [dict(r) for r in db.execute(
-        "SELECT m.* FROM measures m JOIN tag_runs tr ON tr.target = m.id WHERE tr.ai_related = 1 "
-        "AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))", (SINCE,))]
+    # The same list the daily card counts over: suppressions applied, a carried-over bill once.
+    measures = measures_in_scope(db)
     for m in measures:
         tg = tags.get(m["id"], {"fear": set(), "control": set(), "agency": set()})
         m["fears"] = sorted(s for s in tg["fear"] if s in fear_by)
         m["controls"] = sorted(s for s in tg["control"] if s in control_by)
         m["agencies"] = sorted(tg["agency"])
     suppressed = set(config("suppress").get("urls", []))
-    measures = [m for m in measures if m["url"] not in suppressed]
     controlled = [m for m in measures if m["controls"]]
 
     # ---------------- lobbying, de-duplicated to the latest filing per registrant, client, quarter
@@ -165,6 +211,7 @@ def export(db, out_dir, base=""):
     for r in lob:
         r["fears"] = fears_mentioned(r["issues"], kw)
         r["entity"] = ents.match_name(r["client"])
+        r["self"] = bool(r["client_key"]) and name_key(r["registrant"]) == r["client_key"]
 
     # ---------------- funders: AI lobbying plus election money
     orgs = {}
@@ -184,10 +231,12 @@ def export(db, out_dir, base=""):
         if not r["fears"] or not (r["entity"] or r["client_key"]):
             continue
         o = org(r["entity"] or r["client_key"], r["client"], r["entity"])
-        o["lobbying"] += r["amount"] or 0
+        o["filings"].append(r)
         o["n"] = o.get("n", 0) + 1
         o["fears"].update(r["fears"])
         o["type"] = o["type"] or "Lobbying client"
+    for o in orgs.values():
+        o["lobbying"] = reported(o["filings"])
     # Two different things get called lobbying. An advocacy group's filing is money spent
     # on the fear itself; a trade group's filing covers everything it works on that quarter
     # and merely mentions one. Ranking them together buries the first under the second.
@@ -268,9 +317,11 @@ def export(db, out_dir, base=""):
                   | {o["slug"] for o in com_ranked[:30]})
 
     # ---------------- agencies that would gain authority
+    # Counted over the measures that carry a control. An office named in a measure that imposes
+    # nothing is not holding a new power, and the front page says these offices would hold one.
     agency_count, agency_name = collections.Counter(), {}
     agency_controls = collections.defaultdict(collections.Counter)
-    for m in measures:
+    for m in controlled:
         for a in m["agencies"]:
             k = name_key(a)
             if not k:
@@ -287,7 +338,7 @@ def export(db, out_dir, base=""):
             top_c = agency_controls[k].most_common(1)
             rows.append({"rank": i, "name": name, "slug": None,
                          "type": "Attorney general" if "attorney general" in k else "Agency",
-                         "gains": (control_by[top_c[0][0]]["chip"].lower() if top_c else "new authority"),
+                         "gains": control_by[top_c[0][0]]["chip"] if top_c else "",
                          "score": str(n), "unit": "bills"})
         return rows
 
@@ -312,13 +363,14 @@ def export(db, out_dir, base=""):
     wiki30, wiki_end = window_30(db, "wiki", today)
     post_fears = collections.Counter(t["value"] for t in db.execute(
         "SELECT value FROM tags WHERE kind='fear' AND target LIKE 'post:%'"))
-    filings_by_fear, advocacy_by_fear = collections.Counter(), collections.Counter()
+    filings_by_fear, mission_filings = collections.Counter(), collections.defaultdict(list)
     for r in lob_recent:
         mission = bool(r["entity"]) and ents.by_slug[r["entity"]]["type"] in MISSION_TYPES
         for slug in r["fears"]:
             filings_by_fear[slug] += 1
             if mission:
-                advocacy_by_fear[slug] += r["amount"] or 0
+                mission_filings[slug].append(r)
+    advocacy_by_fear = {slug: reported(rs) for slug, rs in mission_filings.items()}
     fear_stats = {}
     for f in fears:
         slug = f["slug"]
@@ -327,11 +379,12 @@ def export(db, out_dir, base=""):
             "measures": ms, "controls": sum(len(m["controls"]) for m in ms),
             "with_controls": sum(1 for m in ms if m["controls"]),
             "passed": sum(1 for m in ms if m["status"] == "passed"),
-            "states": sorted({m["jurisdiction"] for m in ms if m["jurisdiction"] not in ("us", "us-exec")}),
-            "congress": sum(1 for m in ms if m["jurisdiction"] in ("us", "us-exec")),
-            "federal": any(m["jurisdiction"] in ("us", "us-exec") for m in ms),
+            "states": sorted({m["jurisdiction"] for m in ms if m["jurisdiction"] in STATES}),
+            "codes": sorted({m["jurisdiction"] for m in ms}),
+            "congress": sum(1 for m in ms if m["jurisdiction"] in FEDERAL),
+            "federal": any(m["jurisdiction"] in FEDERAL for m in ms),
             "new_week": sum(1 for m in ms if (m["introduced_date"] or "") >= week_ago),
-            "filings": filings_by_fear[slug], "advocacy": advocacy_by_fear[slug], "statements": post_fears[slug],
+            "filings": filings_by_fear[slug], "advocacy": advocacy_by_fear.get(slug, 0), "statements": post_fears[slug],
             "news30": int(news30.get(slug, 0)), "wiki30": int(wiki30.get(slug, 0)),
             # An article on file and no readership yet are different things. A fear added today has
             # both a Wikipedia article and nothing collected from it until the next daily pass, and
@@ -377,13 +430,13 @@ def export(db, out_dir, base=""):
     kv_set(db, runs_key, runs_today)
     new_week = sum(1 for m in measures if (m["introduced_date"] or "") >= week_ago)
     jurisdictions = {m["jurisdiction"] for m in measures}
-    n_states = len([j for j in jurisdictions if j not in ("us", "us-exec")])
-    has_fed = any(j in ("us", "us-exec") for j in jurisdictions)
+    n_states, other_places, _ = where_counted(jurisdictions)
+    beyond = and_list(other_places + [federal_word(jurisdictions)])
     index = {"value": f"{len(measures):,}", "suffix": "",
              "text": "bills, rules and orders about AI since January 2025",
              "second": f"{len(controlled):,}",
              "second_text": "of them would put AI, the people building it or the people using it under new government control",
-             "where": (count(n_states, "state") if n_states else "") + (" and Congress" if has_fed and n_states else "Congress" if has_fed else ""),
+             "where": where_phrase(jurisdictions),
              "change": f"▲ {new_week:,} new this week" if new_week else None, "trend": trend, "series": series,
              "series_label": "Bills, rules and orders about AI, running total over the last 90 days",
              "total_measures": len(measures), "controlled": len(controlled)}
@@ -391,8 +444,8 @@ def export(db, out_dir, base=""):
         [compact(sum(int(v) for v in wiki30.values())), f"Wikipedia views on the {spell(len(fears))} fears, last 30 days"]
         if wiki30 else None,
         [f"{len(measures):,}", "bills, rules and orders about AI since January 2025"] if measures else None,
-        [f"{len(controlled):,}", "of them put AI under new government control"] if controlled else None,
-        [f"{len(agency_count):,}", "agencies and officials handed new power"] if agency_count else None,
+        [f"{len(controlled):,}", "of them would put AI under new government control"] if controlled else None,
+        [f"{len(agency_count):,}", "agencies and officials they would hand new power"] if agency_count else None,
     ] if c]
     polls = live_polls(config("polls"), today)
     site = config("site")
@@ -421,8 +474,8 @@ def export(db, out_dir, base=""):
         [money(spent[0][0]), spent[0][1]] if spent[0][0] else None,
         [money(spent[1][0]), spent[1][1]] if spent[1][0] else None,
         [f"{sum(len(m['controls']) for m in measures):,}",
-         "separate government controls across those bills"] if controlled else None,
-        [f"{n_states}", ("states, plus Congress, " if has_fed else "states ") + "with AI measures on the books or in motion"]
+         f"separate government controls across the {len(controlled):,} measures that carry one"] if controlled else None,
+        [f"{n_states}", "states" + (f", plus {beyond}," if beyond else "") + " with AI measures on the books or in motion"]
         if n_states else None,
         [f"{filings_naming:,}", f"federal lobbying filings naming one of the {spell(len(fears))} fears, past year"] if filings_naming else None,
         [f"{news_total:,}", f"news articles on the {spell(len(fears))} fears, "
@@ -452,7 +505,10 @@ def export(db, out_dir, base=""):
     state_rows = []
     for j, ms in by_state.items():
         fear_mix = collections.Counter(fs for m in ms for fs in m["fears"])
-        state_rows.append({"code": j, "name": ms[0]["jurisdiction_name"], "n": len(ms),
+        # Rules and orders come from several offices under one code, and the row took the name of
+        # whichever came first: a list of executive orders labelled Food and Drug Administration.
+        name = "Federal agencies and the President" if j == "us-exec" else ms[0]["jurisdiction_name"]
+        state_rows.append({"code": j, "name": name, "n": len(ms),
                            "bills": f"{len(ms):,}", "controlled": str(sum(1 for m in ms if m["controls"])),
                            "passed": str(sum(1 for m in ms if m["status"] == "passed")),
                            "top_fear": fear_by[fear_mix.most_common(1)[0][0]]["name"] if fear_mix else None})
@@ -469,7 +525,7 @@ def export(db, out_dir, base=""):
         fp["receipt"] = " ".join(x for x in [
             f"{fp['name']}: {fp['score']} of 100 on the Fear Index.",
             count(len(st["measures"]), "bill") + " since January 2025"
-            + (" in " + count(len(st["states"]), "state") + "." if st["states"] else ".") if st["measures"] else "",
+            + (f" in {where_phrase(st['codes'])}." if st["codes"] else ".") if st["measures"] else "",
             f"{st['controls']:,} new government controls written into them." if st["controls"] else "",
             f"{st['filings']:,} federal lobbying filings name it." if st["filings"] else "",
             f"{st['wiki30']:,} Wikipedia views this month." if st["wiki30"] else "",
@@ -637,7 +693,8 @@ def channel_value(st, key):
     return st.get(key, 0) or 0
 
 
-GRID_CHANNELS = [("bills", "Bills"), ("states", "States"), ("congress", "Congress"), ("filings", "Lobbying filings"),
+# "Federal" rather than "Congress": the column counts executive orders and agency rules as well.
+GRID_CHANNELS = [("bills", "Bills"), ("states", "States"), ("congress", "Federal"), ("filings", "Lobbying filings"),
                  ("statements", "Statements"), ("news30", "News, 30 days"), ("wiki30", "Wikipedia, 30 days")]
 
 
@@ -941,8 +998,8 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         bits = []
         if st["measures"]:
             bits.append(count(len(st["measures"]), "bill"))
-        if st["states"]:
-            bits.append("in " + count(len(st["states"]), "state"))
+        if st["codes"]:
+            bits.append("in " + where_phrase(st["codes"]))
         if st["filings"]:
             bits.append(f"{st['filings']:,} lobbying filings")
         line = f"{best['name']}: " + (", ".join(bits) if bits else f"index {st['index']}")
@@ -955,12 +1012,14 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
             att.append(f"{st['news30']:,} news articles")
         rows.append(["Attention", ", ".join(att) + " this month"])
     if st["measures"]:
-        where = ", in " + count(len(st["states"]), "state") if st["states"] else ""
-        rows.append(["Bills", f"{len(st['measures']):,} since January 2025{where}" + (", plus Congress" if st["federal"] else "")])
+        where = where_phrase(st["codes"])
+        rows.append(["Bills", f"{len(st['measures']):,} since January 2025" + (f", in {where}" if where else "")])
     if st["controls"]:
         rows.append(["Controls", f"{st['controls']:,} written into those bills"])
     gains, gain_name = collections.Counter(), {}
     for m in st["measures"]:
+        if not m["controls"]:
+            continue  # the same rule as the front page count: an office holds a power only if there is one
         for a in m["agencies"]:
             k = name_key(a)
             if k:
@@ -979,7 +1038,8 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
     # larger type. Which office gains what stays in the table below, where there is room for it.
     bought = []
     if st["measures"]:
-        where = f" in {count(len(st['states']), 'state')}" if st["states"] else ""
+        where = where_phrase(st["codes"])
+        where = f" in {where}" if where else ""
         # Named, not "it". This line is the one that gets read on its own and screenshotted on
         # its own, and an "it" pointing back at a chyron above it does not survive either.
         bought.append(f"{count(len(st['measures']), 'bill')}{where} cite {sentence_name(best)}")
@@ -987,9 +1047,11 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         # Who ends up holding them. The bills and the controls say the fear turned into law; this
         # says it turned into somebody's authority, which is the whole of what this report is for.
         # It sat in the table below in small type, against a single office named in three of them.
-        held = {name_key(a) for m in st["measures"] for a in m["agencies"] if name_key(a)}
+        # Would, not held: most of these measures have not passed, and nobody holds a power a
+        # measure in committee would hand them. Counted over the measures that carry a control.
+        held = {name_key(a) for m in st["measures"] if m["controls"] for a in m["agencies"] if name_key(a)}
         bought.append(f"They carry {count(st['controls'], 'new government control')}"
-                      + (f", held by {count(len(held), 'office')}" if held else ""))
+                      + (f" and would hand new power to {count(len(held), 'office')}" if held else ""))
     # The quote up there carries its own attribution, so the table only names the source when there
     # is no quote. What gets quoted is a publisher's headline where there is one and the leading
     # measure's own title where there is not, so a quiet news week still leads with the counts.
@@ -1010,12 +1072,13 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
     st = fear_stats[f["slug"]]
     axis = quarter_axis()
     idx = {k: i for i, k in enumerate(axis)}
-    money_q = collections.Counter()
+    by_q = collections.defaultdict(list)
     for r in lob:
         if f["slug"] in r["fears"] and r["quarter"]:
             k = (r["year"], int(r["quarter"][1]))
             if k in idx:
-                money_q[idx[k]] += r["amount"] or 0
+                by_q[idx[k]].append(r)
+    money_q = collections.Counter({q: reported(rs) for q, rs in by_q.items()})
     top_m = max(money_q.values() or [0])
     funding = [[q, max(2, round(40 * v / top_m))] for q, v in sorted(money_q.items()) if v > 0] if top_m else []
     bills_q = collections.Counter()
@@ -1034,7 +1097,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
             wiki_q[idx[k]] += r["value"]
     top_w = max(wiki_q.values() or [0])
     concern = [[q, round(100 * v / top_w)] for q, v in sorted(wiki_q.items())] if top_w else []
-    lanes = ["Lobbying filings naming it", "Bills citing it", "Wikipedia views"]
+    lanes = ["Money on filings naming it", "Bills citing it", "Wikipedia views"]
     quarters = [f"Q{q} {y}" for y, q in axis]
     timeline = {"aria": f"Lobbying money, bills and public attention for {f['name']} by quarter",
                 "years": [str(axis[0][0]), str(axis[4][0]), str(axis[8][0])], "funding": funding,
@@ -1045,12 +1108,13 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
                 "first_label": compact(wiki_q[min(wiki_q)]) if wiki_q else "",
                 "last_label": compact(wiki_q[max(wiki_q)]) if wiki_q else "", "events": []}
     window = recent_quarters(4)
-    pushers = collections.defaultdict(lambda: {"amount": 0.0, "n": 0, "name": "", "entity": None})
+    pushers = collections.defaultdict(lambda: {"amount": 0.0, "n": 0, "name": "", "entity": None, "filings": []})
     for r in lob:
         if f["slug"] in r["fears"] and r["quarter"] and (r["year"], int(r["quarter"][1])) in window:
             key = r["entity"] or r["client_key"]
             p = pushers[key]
-            p["amount"] += r["amount"] or 0
+            p["filings"].append(r)
+            p["amount"] = reported(p["filings"])
             p["n"] += 1
             p["name"] = ents.by_slug[r["entity"]]["name"] if r["entity"] else nice_name(r["client"])
             p["entity"] = r["entity"]
@@ -1073,15 +1137,23 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
         r["rank"] = i
     push_rows, industry_rows = push_rows[:6], industry_rows[:6]
     lob_year = sum(p["amount"] for p in pushers.values())
-    agencies = collections.Counter()
-    names = {}
+    # The front page's rule: offices named in measures that carry a control, one office however
+    # it is spelled, and the control it is named beside most often.
+    agencies, names = collections.Counter(), {}
+    beside = collections.defaultdict(collections.Counter)
     for m in st["measures"]:
+        if not m["controls"]:
+            continue
         for a in m["agencies"]:
             k = name_key(a)
+            if not k:
+                continue
             agencies[k] += 1
-            names.setdefault(k, a)
+            names.setdefault(k, a.strip())
+            beside[k].update(m["controls"])
     ben_rows = [{"rank": i, "name": names[k], "slug": None, "type": "Attorney general" if "attorney general" in k else "Agency",
-                 "gains": "new authority", "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(agencies.most_common(5), 1)]
+                 "gains": control_by[beside[k].most_common(1)[0][0]]["chip"] if beside[k] else "",
+                 "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(agencies.most_common(5), 1)]
     bills = sorted(st["measures"], key=lambda m: (len(m["controls"]), m["introduced_date"] or ""), reverse=True)[:10]
     bill_rows = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 160),
                   "status": STATUS_LABEL.get(m["status"], "Pending"), "url": m["url"],
@@ -1097,8 +1169,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
         evidence.append([f"{st['news30']:,}", "news articles about it in the last 30 days"])
     if st["measures"]:
         evidence.append([f"{len(st['measures']):,}", "bills, rules and orders cite it since January 2025"
-                         + (", in " + count(len(st["states"]), "state") if st["states"] else "")
-                         + (" and Congress" if st["federal"] and st["states"] else ", in Congress" if st["federal"] else "")])
+                         + (f", in {where_phrase(st['codes'])}" if st["codes"] else "")])
     if st["controls"]:
         evidence.append([f"{st['controls']:,}", "new government controls written into those bills"])
     if st["filings"]:
@@ -1129,12 +1200,13 @@ def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group
     by_ident = {m["identifier"]: m for m in measures if m["jurisdiction"] == "us"}
     filings = [r for r in lob if (r["entity"] or r["client_key"]) == o["key"]]
     filings.sort(key=lambda r: r["posted"] or "", reverse=True)
-    fear_amounts = collections.Counter()
+    per_fear = collections.defaultdict(list)
     window = recent_quarters(4)
     for r in filings:
         if r["quarter"] and (r["year"], int(r["quarter"][1])) in window:
             for s in r["fears"]:
-                fear_amounts[s] += r["amount"] or 0
+                per_fear[s].append(r)
+    fear_amounts = collections.Counter({s: reported(rs) for s, rs in per_fear.items()})
     top = max(fear_amounts.values() or [1])
     fear_names = {f["slug"]: f["name"] for f in config("fears")}
     fears = [{"slug": s, "name": fear_names.get(s, s.replace("-", " ").capitalize()),

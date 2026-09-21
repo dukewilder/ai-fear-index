@@ -1,4 +1,6 @@
 """Federal rules, proposed rules, and presidential documents about AI from the Federal Register API."""
+import re
+
 from .common import SINCE, Http, iso, kv_get, kv_set, looks_ai, upsert
 
 BASE = "https://www.federalregister.gov/api/v1/documents.json"
@@ -42,11 +44,20 @@ def run(db, state, mode):
     state["message"] = f"{read} documents read since {since}" + (f"; dropped {dropped} not about AI" if dropped else "")
 
 
+# The Rules section of the Register also carries notices about rules: a public briefing, a meeting,
+# a correction, a comment period reopened. None of them is a rule, and the type field alone stored
+# a briefing notice as a final rule that had passed. The action line says what the document is.
+NOT_A_RULE = re.compile(r"\b(notification|notice of (a )?(public )?(briefing|meeting|hearing)|public briefing|"
+                        r"meeting|correction|extension of (the )?comment period|reopening of (the )?comment period)\b",
+                        re.I)
+
+
 def prune(db):
-    """Drop stored documents that only mention AI deep in the body, so they cost nothing to tag."""
+    """Drop stored documents that only mention AI deep in the body, so they cost nothing to tag, and
+    notices that were stored as rules before the action line was read."""
     gone = []
-    for r in db.execute("SELECT id, title, summary FROM measures WHERE id LIKE 'fr-%'"):
-        if not looks_ai(r["title"], r["summary"]):
+    for r in db.execute("SELECT id, title, summary, latest_action, kind FROM measures WHERE id LIKE 'fr-%'"):
+        if not looks_ai(r["title"], r["summary"]) or (r["kind"] == "rule" and NOT_A_RULE.search(r["latest_action"] or "")):
             gone.append(r["id"])
     for chunk in (gone[i:i + 400] for i in range(0, len(gone), 400)):
         marks = ",".join("?" for _ in chunk)
@@ -60,6 +71,8 @@ def store(db, d):
     if not looks_ai(d.get("title"), d.get("abstract")):
         return 0  # the term only appears deep in the body
     dtype = d.get("type") or ""
+    if dtype != "Presidential Document" and NOT_A_RULE.search(d.get("action") or ""):
+        return 0  # a notice about a rule, not a rule
     eo = d.get("executive_order_number")
     if dtype == "Presidential Document":
         kind, ident_label, status = "order", (f"Executive Order {eo}" if eo else (d.get("subtype") or "Presidential document")), "passed"

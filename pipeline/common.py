@@ -13,6 +13,7 @@ import sqlite3
 import sys
 import time
 import traceback
+import urllib.parse
 
 import requests
 
@@ -676,6 +677,30 @@ class Entities:
                 return None
             d = d.split(".", 1)[1]
         return None
+
+
+# Pages on an organization's own site that repost other outlets' coverage of it. AI Now files CNN
+# and Guardian stories under /news/press/, and CSET files New York Times and CNN pieces under
+# /article/. Shown as the organization's statements, a CNN headline quoting AI Now's director
+# doubting doom claims was published as AI Now warning of loss of control.
+CLIPPINGS = re.compile(r"(^|\.)ainowinstitute\.org/news/press/|(^|\.)cset\.georgetown\.edu/article/|"
+                       r"/in-the-news/|/media-coverage/|/press-coverage/|/news-coverage/", re.I)
+
+
+def own_post(entity, url, ents=None):
+    """True when a feed entry is the organization's own words: a page on its own site that is not
+    a repost of somebody else's story about it."""
+    ents = ents or Entities()
+    ent = ents.by_slug.get(entity) or {}
+    parts = urllib.parse.urlparse(url or "")
+    host = parts.netloc.lower().split(":")[0].removeprefix("www.")
+    if not host or CLIPPINGS.search(host + parts.path):
+        return False
+    homes = set(d.lower().removeprefix("www.") for d in ent.get("domains", []))
+    for page in (ent.get("homepage"), ent.get("rss")):
+        if page:
+            homes.add(urllib.parse.urlparse(page).netloc.lower().split(":")[0].removeprefix("www."))
+    return any(host == d or host.endswith("." + d) for d in homes if d)
 
 
 def fear_keywords():

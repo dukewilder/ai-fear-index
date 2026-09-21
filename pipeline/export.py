@@ -13,7 +13,8 @@ import re
 import urllib.parse
 
 from .common import (FEDERAL, REPO_URL, SITE_URL, STATES, Entities, config, fear_keywords, fears_mentioned, iso,
-                     kv_get, kv_set, measures_in_scope, name_key, now, sha, spell, tidy_headline, where_counted)
+                     kv_get, kv_set, measures_in_scope, name_key, now, own_post, sha, spell, tidy_headline,
+                     where_counted)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
@@ -361,8 +362,12 @@ def export(db, out_dir, base=""):
     # ---------------- fears: every channel counted, then scored
     news30, news_end = window_30(db, "news", today)
     wiki30, wiki_end = window_30(db, "wiki", today)
+    # Statements that still exist, were judged about AI, and are the organization's own words. The
+    # count read every label on a post, including labels on posts long since deleted.
     post_fears = collections.Counter(t["value"] for t in db.execute(
-        "SELECT value FROM tags WHERE kind='fear' AND target LIKE 'post:%'"))
+        "SELECT t.value, p.entity, p.url FROM tags t JOIN posts p ON t.target = 'post:' || p.id "
+        "JOIN tag_runs tr ON tr.target = t.target WHERE t.kind='fear' AND tr.ai_related = 1")
+        if own_post(t["entity"], t["url"], ents))
     filings_by_fear, mission_filings = collections.Counter(), collections.defaultdict(list)
     for r in lob_recent:
         mission = bool(r["entity"]) and ents.by_slug[r["entity"]]["type"] in MISSION_TYPES
@@ -775,7 +780,10 @@ def own_words(db, measures, fear_by, control_by, suppressed=(), per_fear=None, l
         if m["url"] in suppressed:
             continue
         chips = [control_by[c]["chip"] for c in m["controls"] if c in control_by]
-        who = [a.strip() for a in m["agencies"] if name_key(a)]
+        # One office named, and the card names it. Several, and it says how many: the arrow pointed at
+        # whichever came first in the alphabet, which is not the office holding the power.
+        offices = sorted({name_key(a): a.strip() for a in m["agencies"] if name_key(a)}.values())
+        who = offices if len(offices) == 1 else [f"{len(offices)} offices"] if offices else []
         for slug, quote in ev.get(m["id"], []):
             if slug not in fear_by or (per_fear and slug != per_fear):
                 continue
@@ -863,6 +871,8 @@ def build_feed(db, ents, measures, lob, receipts, today):
         named = sorted(post_tags.get(p["id"], []))
         if not named:
             continue  # AI-related is not the bar here; naming one of the fears on file is
+        if not own_post(p["entity"], p["url"], ents):
+            continue  # another outlet's story reposted on the organization's site
         ent = ents.by_slug.get(p["entity"], {})
         items.append({"type": "statement", "label": "Statement", "text": f"{ent.get('name', p['entity'])}: {cut(p['title'] or '', 160)}",
                       "url": p["url"], "time_iso": p["published"], "time": p["published"][:10],

@@ -8,5 +8,79 @@
     "https://www.federalregister.gov/documents/2025/01/15/2025-00637/public-briefing-on-framework-for-artificial-intelligence-diffusion": "A notice of a public briefing, filed in the Rules section. It is not a rule and was stored as a passed one.",
     "https://www.federalregister.gov/documents/2025/01/15/2025-00636/framework-for-artificial-intelligence-diffusion": "Rescinded by the Bureau of Industry and Security in May 2025 before it was enforced. It showed as passed and under Already law.",
     "https://www.federalregister.gov/documents/2025/01/17/2025-01395/advancing-united-states-leadership-in-artificial-intelligence-infrastructure": "Executive Order 14141, revoked by Executive Order 14318 in July 2025. It counted among the measures that have passed."
-  }
+  },
+  "labels": [
+    {
+      "url": "https://www.congress.gov/bill/119th-congress/senate-bill/4214",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "The quote is the data center moratorium. The bill makes nobody get permission to build or deploy an AI system."
+    },
+    {
+      "url": "https://www.congress.gov/bill/119th-congress/senate-bill/4214",
+      "kind": "control",
+      "value": "mandatory-reporting",
+      "why": "The quote is the Department of Energy reporting. The control is a developer or deployer reporting to government."
+    },
+    {
+      "url": "https://www.congress.gov/bill/119th-congress/house-bill/4801",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "An optional sandbox: firms may apply to test AI under waived rules. Nothing requires permission to build or deploy."
+    },
+    {
+      "url": "https://www.congress.gov/bill/119th-congress/house-bill/4801",
+      "kind": "control",
+      "value": "mandatory-reporting",
+      "why": "The application is for the optional sandbox, not a duty on anyone deploying AI."
+    },
+    {
+      "url": "https://openstates.org/ca/bills/20252026/AB1405/",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "Registration of AI auditors, not of anyone building or deploying an AI system."
+    },
+    {
+      "url": "https://openstates.org/ca/bills/20252026/AB1405/",
+      "kind": "control",
+      "value": "labeling-mandates",
+      "why": "An auditor's registration number on its own advertising, not a label on AI content or an AI interaction."
+    },
+    {
+      "url": "https://www.federalregister.gov/documents/2026/07/14/2026-14132/enhanced-favorable-treatment-for-the-united-arab-emirates-under-the-export-administration",
+      "kind": "control",
+      "value": "export-controls",
+      "why": "The rule loosens export controls for the UAE: more license exceptions, fewer restrictions."
+    },
+    {
+      "url": "https://openstates.org/oh/bills/136/HB628/",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "A license for organizations that verify AI risk, not for anyone building or deploying AI."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/SB4/",
+      "kind": "control",
+      "value": "labeling-mandates",
+      "why": "An affirmative defense for a disclosed deepfake, which rewards a label rather than requiring one."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/HB672/",
+      "kind": "control",
+      "value": "labeling-mandates",
+      "why": "An affirmative defense for a disclosed deepfake, which rewards a label rather than requiring one."
+    },
+    {
+      "url": "https://openstates.org/sc/bills/2025-2026/S902/",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "A certificate to operate a data center, not permission to build or deploy an AI system."
+    },
+    {
+      "url": "https://openstates.org/nh/bills/2026/SB640/",
+      "kind": "control",
+      "value": "license-to-build",
+      "why": "The professional license in the title is for the services, not for the AI."
+    }
+  ]
 }

@@ -314,7 +314,7 @@ def without_names(text, office="", loose=False):
     return out
 
 
-def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction=""):
+def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction="", raw=""):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
     Named rather than returned as a bare False, so a run that throws every candidate away says
@@ -346,7 +346,7 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     # The quote is checked before the duty test, not after. A duty-framed sentence is kept in
     # reserve and posted when nothing better was written, and it used to be kept without its
     # quote ever being looked at, so the fallback could go out resting on words not in the bill.
-    if not agreed({"controls": {"line": quote}}, body_norm, "controls"):
+    if not agreed({"controls": {"line": quote}}, body_norm, "controls", raw=raw):
         return "the quote it leaned on is not in the measure"
     if DUTY_OPENER.search(head) and not POWER.search(text):
         return DUTY_FRAMED
@@ -399,7 +399,7 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
             continue
         starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
         reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "",
-                         starts, row["jurisdiction_name"] or "")
+                         starts, row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}")
         if reason:
             note(attempts, where, reason, sentence_text=text)
             log(f"[brief] {where}: skipped, {reason}")

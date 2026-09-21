@@ -5,8 +5,8 @@ import urllib.parse
 
 import feedparser
 
-from .common import (Entities, Http, HttpError, iso, iso_from_struct, kv_get, kv_set, log, looks_ai, sha,
-                     strip_html, upsert)
+from .common import (Entities, Http, HttpError, iso, iso_from_struct, kv_get, kv_set, log, looks_ai, own_post,
+                     sha, strip_html, upsert)
 
 DISCOVERY_BUDGET = 360  # seconds per run; unfinished sites are picked up next run
 LINK_TAG = re.compile(r"<link[^>]+>", re.I)
@@ -73,6 +73,8 @@ def run(db, state, mode):
             link = e.get("link") or ""
             if not link or not looks_ai(title, summary):
                 continue
+            if not own_post(ent["slug"], link, ents):
+                continue  # another outlet's story, not the organization's own words
             ts = e.get("published_parsed") or e.get("updated_parsed")
             if not ts:
                 undated += 1
@@ -83,6 +85,7 @@ def run(db, state, mode):
                 "url": link, "published": published, "feed": feed_url, "first_seen": iso()})
         db.commit()
     stale = drop_undated(db)
+    stale += drop_not_own(db, ents)
     kv_set(db, "feeds", feeds)
     db.commit()
     state["added"] = added
@@ -92,6 +95,18 @@ def run(db, state, mode):
                         + (f"; removed {stale} wrongly dated" if stale else "")
                         + (f"; no feed published by {len(nofeed)}: {', '.join(nofeed[:12])}" if nofeed else "")
                         + (f"; feed would not load for {len(broke)}: {', '.join(broke[:8])}" if broke else ""))
+
+
+def drop_not_own(db, ents):
+    """Remove posts stored before other outlets' stories were told apart from an organization's own,
+    with the labels on them, so they leave the feed and the statement counts together."""
+    gone = [r["id"] for r in db.execute("SELECT id, entity, url FROM posts")
+            if not own_post(r["entity"], r["url"], ents)]
+    for pid in gone:
+        db.execute("DELETE FROM posts WHERE id=?", (pid,))
+        db.execute("DELETE FROM tags WHERE target=?", ("post:" + pid,))
+        db.execute("DELETE FROM tag_runs WHERE target=?", ("post:" + pid,))
+    return len(gone)
 
 
 def drop_undated(db):

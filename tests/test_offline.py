@@ -539,6 +539,37 @@ def check_headline_keeps_the_power():
     print("the plate keeps who holds the power: ok")
 
 
+def check_label_rules():
+    """The quote check refuses what a reader would refuse.
+
+    A recital of the law already in force, a legislature named as an agency, a state bill carrying
+    "state laws overridden by Washington", an agency's report to its own legislature called a
+    company's duty to report, and a quote that only matches half a word.
+    """
+    from pipeline.tag import agreed, norm
+    raw = ("Existing law requires the Department of Technology to conduct an inventory of automated decision "
+           "systems. This bill would require a developer to register a frontier model with the Attorney General "
+           "and would require the Department of Technology to submit a report to the Legislature. It would "
+           "prohibit the use of drones and aircraft for surveillance, and would preempt any ordinance adopted "
+           "by a city or county on the same subject.")
+    body = norm(raw)
+
+    def ok(kind, label, quote, code="ca", jur="California"):
+        return bool(agreed({kind: {label: quote}}, body, kind, jur, raw=raw, code=code))
+    assert not ok("controls", "mandatory-reporting", "requires the Department of Technology to conduct an inventory"), \
+        "a label rested on the law already in force"
+    assert ok("controls", "license-to-build", "require a developer to register a frontier model")
+    assert not ok("controls", "mandatory-reporting", "require the Department of Technology to submit a report to the Legislature"), \
+        "an agency reporting to its legislature was counted as a company's duty to report"
+    assert not ok("controls", "preemption", "would preempt any ordinance adopted by a city or county"), \
+        "a state bill carried the control named for Washington overriding the states"
+    assert ok("controls", "preemption", "would preempt any ordinance adopted by a city or county", code="us")
+    assert not ok("controls", "labeling-mandates", "prohibit the use of drones and ai"), "half a word matched"
+    assert not ok("agencies", "Kansas Legislature (via task force)", "the Attorney General"), "a legislature counted as an agency"
+    assert ok("agencies", "California Attorney General", "the Attorney General")
+    print("the quote check refuses recitals, legislatures, half words and misplaced controls: ok")
+
+
 def check_lobbying_money():
     """A year of lobbying is four quarters of reports, and a client's money is counted once.
 
@@ -913,6 +944,7 @@ def main():
     check_overdue_daily_source()
     check_places_word()
     check_headline_keeps_the_power()
+    check_label_rules()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()

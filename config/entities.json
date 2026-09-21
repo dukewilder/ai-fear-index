@@ -249,7 +249,8 @@
       "public first action"
     ],
     "domains": [
-      "publicfirst.us"
+      "publicfirst.us",
+      "publicfirstaction.us"
     ],
     "homepage": "https://publicfirst.us/",
     "rss": "https://publicfirst.us/news?format=rss",
@@ -372,7 +373,8 @@
     ],
     "domains": [
       "controlai.com",
-      "controlai.news"
+      "controlai.news",
+      "controlai.org"
     ],
     "homepage": "https://controlai.com/",
     "rss": "https://controlai.news/feed"
@@ -389,6 +391,24 @@
       "pauseai.info"
     ],
     "homepage": "https://pauseai.info/"
+  },
+  {
+    "slug": "ai-policy-network",
+    "name": "The AI Policy Network",
+    "type": "Advocacy group",
+    "aliases": [
+      "the ai policy network",
+      "ai policy network",
+      "ai policy network action"
+    ]
+  },
+  {
+    "slug": "palisade",
+    "name": "Palisade Research",
+    "type": "Advocacy group",
+    "aliases": [
+      "palisade research"
+    ]
   },
   {
     "slug": "open-philanthropy",

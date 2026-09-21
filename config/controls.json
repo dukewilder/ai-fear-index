@@ -67,7 +67,7 @@
     "slug": "preemption",
     "name": "State laws overridden by Washington",
     "chip": "State laws overridden",
-    "definition": "Overrides, preempts, or blocks state or local AI laws, or conditions funding on states not regulating AI.",
+    "definition": "A federal measure that overrides, preempts, or blocks state or local AI laws, or conditions federal funding on states not regulating AI.",
     "pattern": "override what a state or city may decide about AI for itself",
     "head": "state AI laws overridden"
   },

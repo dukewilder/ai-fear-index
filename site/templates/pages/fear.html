@@ -51,8 +51,8 @@
 
 {% if f.industry %}
 <section class="block"><div class="wrap">
-<h2 class="h">Industry at the table</h2>
-<p class="sub">Everyone else whose lobbying filings name this fear, past year: companies, trade groups, think tanks, unions.</p>
+<h2 class="h">Everyone else lobbying</h2>
+<p class="sub">Companies, trade groups, think tanks, unions and other groups whose lobbying filings name this fear, past year.</p>
 <ol class="rank">{% for o in f.industry %}{{ org_row(o, 'messages') }}{% endfor %}</ol>
 </div></section>
 {% endif %}

@@ -110,10 +110,49 @@ MIN_WORDS = {"fears": 4, "controls": 4, "agencies": 2}
 NOT_AGENCIES = {"congress", "us congress", "u s congress", "united states congress", "senate", "house",
                 "house of representatives", "state legislature", "legislature", "general assembly",
                 "state government", "federal government", "state", "government"}
+# A legislature is not an agency gaining power, whatever it is called. Matching whole names let
+# through "Kansas Legislature (via task force)", a legislative reference bureau, a House committee
+# and a joint commission of the Virginia General Assembly.
+LEGISLATIVE = re.compile(r"\b(legislature|legislative|general assembly|senate|house of representatives|"
+                         r"house of delegates|state assembly|assembly committee|house committee|city council|"
+                         r"joint commission on technology and science)\b", re.I)
+# A summary often recites the law already in force before it says what the measure does. A
+# sentence that opens "Existing law" starts the recital, and it runs until one opens "This bill".
+RECITAL_START = re.compile(r"^\W*(?:under\s+)?(?:existing|current)\s+(?:federal\s+|state\s+)?law\b", re.I)
+BILL_START = re.compile(r"^\W*(?:this|the)\s+(?:bill|act|measure|resolution|joint resolution)\b", re.I)
+# Mandatory reporting is a developer or deployer reporting to government. An agency sending its
+# own study to the legislature is government reporting to itself.
+GOV_REPORT = re.compile(r"\breport\w*\s+(?:\w+\s+){0,6}?to\s+(?:the\s+)?(?:\w+\s+)?"
+                        r"(?:legislature|general assembly|congress|governor)\b", re.I)
+REPORTER = re.compile(r"\b(developer|deployer|compan|operator|provider|business|manufacturer|platform|"
+                      r"employer|insurer|vendor|licensee)", re.I)
 
 
-def agreed(verdict, body_norm, kind, jurisdiction=""):
-    """Keep only labels the measure's own words back up, quoted and checked here."""
+def words(quote):
+    """The words a reader would count. An enumerator like (a)(1)(A) is not four of them."""
+    return len(re.findall(r"[A-Za-z]+", re.sub(r"\([^)]{0,4}\)", " ", quote or "")))
+
+
+def recital_only(quote_norm, raw):
+    """True when every sentence the quote sits in describes law already in force."""
+    hits, reciting = [], False
+    for sentence in re.split(r"(?<=[.;:])\s+(?=[A-Z(])", raw or ""):
+        if RECITAL_START.search(sentence):
+            reciting = True
+        elif BILL_START.search(sentence):
+            reciting = False
+        if f" {quote_norm} " in f" {norm(sentence)} ":
+            hits.append(reciting)
+    return bool(hits) and all(hits)
+
+
+def agreed(verdict, body_norm, kind, jurisdiction="", raw="", code=""):
+    """Keep only labels the measure's own words back up, quoted and checked here.
+
+    raw is the title and summary as written, for telling a recital of existing law from what the
+    measure does; code is the jurisdiction code, for the one control that only a federal measure
+    can carry. Both are optional so a caller without them still gets every other check.
+    """
     found = verdict.get(kind)
     if not isinstance(found, dict):
         return {}  # the model answered with a list or a string; nothing is verified, so nothing counts
@@ -122,15 +161,30 @@ def agreed(verdict, body_norm, kind, jurisdiction=""):
         if not isinstance(label, str) or not isinstance(quote, str):
             continue
         q = norm(quote)
-        if len(q.split()) < MIN_WORDS.get(kind, 4) or q not in body_norm:
+        # Whole words. As a run of characters, "drones and ai" was found in "drones and aircraft".
+        if not q or words(quote) < MIN_WORDS.get(kind, 4) or f" {q} " not in f" {body_norm} ":
             continue
+        if raw and recital_only(q, raw):
+            continue  # the law already in force, not what this measure would do
         if kind == "agencies":
             # a legislature is not an agency gaining power, and neither is the jurisdiction itself
             name = norm(label)
-            if name in NOT_AGENCIES or name == norm(jurisdiction) or len(name.split()) < 2:
+            if name in NOT_AGENCIES or name == norm(jurisdiction) or len(name.split()) < 2 \
+                    or LEGISLATIVE.search(label):
+                continue
+        if kind == "controls":
+            if label == "preemption" and code and code not in ("us", "us-exec"):
+                continue  # state laws overridden by Washington: a state's own measure cannot be that
+            if label == "mandatory-reporting" and GOV_REPORT.search(quote) and not REPORTER.search(quote):
                 continue
         out[label.strip()] = quote.strip()
     return out
+
+
+def pulled_labels():
+    """Labels taken off by hand, as (url, kind, value): read, and found to say the opposite of
+    what the measure does. Each carries its reason in config/suppress.json."""
+    return {(x["url"], x["kind"], x["value"]) for x in config("suppress").get("labels", [])}
 
 
 def prune_tags(db):
@@ -139,15 +193,32 @@ def prune_tags(db):
     Measures are only re-read when their text changes, so without this a label that a
     later rule would reject keeps appearing on the site forever.
     """
-    bodies, gone = {}, []
-    for r in db.execute("SELECT id, jurisdiction_name, title, summary FROM measures"):
-        bodies[r["id"]] = (norm(f"{r['title'] or ''}\n{r['summary'] or ''}"), r["jurisdiction_name"] or "")
+    bodies, posts, gone = {}, {}, []
+    for r in db.execute("SELECT id, jurisdiction, jurisdiction_name, title, summary, url FROM measures"):
+        raw = f"{r['title'] or ''}\n{r['summary'] or ''}"
+        bodies[r["id"]] = (norm(raw), r["jurisdiction_name"] or "", raw, r["jurisdiction"] or "",
+                           states_a_position(r["title"]), r["url"])
+    for r in db.execute("SELECT id, title, summary FROM posts"):
+        raw = f"{r['title'] or ''}\n{r['summary'] or ''}"
+        posts["post:" + r["id"]] = (norm(raw), raw)
+    pulled = pulled_labels()
     for r in db.execute("SELECT rowid, target, kind, value, evidence FROM tags"):
-        body, jur = bodies.get(r["target"], (None, ""))
-        if body is None:
-            continue  # a post, whose text is not stored alongside
         kind = {"fear": "fears", "control": "controls", "agency": "agencies"}.get(r["kind"], r["kind"])
-        if not agreed({kind: {r["value"]: r["evidence"]}}, body, kind, jur):
+        label = {kind: {r["value"]: r["evidence"]}}
+        if r["target"].startswith("post:"):
+            # A statement names fears and nothing else, and it has to still exist. Labels on posts
+            # were never checked here, so ones on deleted posts stayed in the counts.
+            p = posts.get(r["target"])
+            if p is None or r["kind"] != "fear" or not agreed(label, p[0], kind, raw=p[1]):
+                gone.append(r["rowid"])
+            continue
+        b = bodies.get(r["target"])
+        if b is None:
+            gone.append(r["rowid"])  # the measure it was on is gone
+            continue
+        body, jur, raw, code, position, url = b
+        if (position and r["kind"] in ("control", "agency")) or (url, r["kind"], r["value"]) in pulled \
+                or not agreed(label, body, kind, jur, raw=raw, code=code):
             gone.append(r["rowid"])
     for chunk in (gone[i:i + 400] for i in range(0, len(gone), 400)):
         db.execute(f"DELETE FROM tags WHERE rowid IN ({','.join('?' for _ in chunk)})", chunk)
@@ -183,6 +254,9 @@ def targets(db, limit):
 
 
 def run(db, state, mode):
+    # The re-check first. It needs no model, so neither a missing key nor the daily cap should
+    # leave a label the current rules reject on the site until tomorrow.
+    dropped = prune_tags(db)
     key = env("ANTHROPIC_API_KEY")
     fears, controls = config("fears"), config("controls")
     day = iso()[:10]
@@ -190,9 +264,9 @@ def run(db, state, mode):
     used_today = spent.get("n", 0) if spent.get("date") == day else 0
     limit = max(0, min(LIMITS.get(mode, 150), DAY_CAP - used_today))
     if not limit:
-        state["message"] = f"daily cap of {DAY_CAP} items reached; resumes tomorrow"
+        state["message"] = (f"daily cap of {DAY_CAP} items reached; resumes tomorrow"
+                            + (f"; dropped {dropped} unsupported labels" if dropped else ""))
         return
-    dropped = prune_tags(db)
     work, backlog = targets(db, limit)
     done, errors = 0, 0
     started = time.time()
@@ -212,11 +286,13 @@ def run(db, state, mode):
         if not ai and target.startswith("fr-") and AI_TEXT.search(title):
             ai = True
         verdict = verify(key, fears, controls, doc, proposal) if ai else {}
-        return target, h, ai, verdict, norm(body)
+        return target, h, ai, verdict, norm(body), body, proposal
 
     with cf.ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(one, w): w for w in work}
         jurisdictions = {w[1]: w[2].split("\n", 1)[0].removeprefix("Jurisdiction: ") for w in work}
+        about = {r["id"]: (r["jurisdiction"] or "", r["url"]) for r in db.execute("SELECT id, jurisdiction, url FROM measures")}
+        pulled = pulled_labels()
         # A measure that asks, urges or objects imposes nothing, so it carries no control. It can
         # still name a fear: what it is worried about is the point of saying it at all.
         positions = {w[1] for w in work
@@ -224,12 +300,12 @@ def run(db, state, mode):
         for fut in cf.as_completed(futures):
             _, target, _, h, _ = futures[fut]
             try:
-                target, h, ai, verdict, doc_norm = fut.result()
+                target, h, ai, verdict, doc_norm, raw, proposal = fut.result()
                 err = None
             except TimedOut:
                 continue
             except Exception as exc:
-                ai, verdict, doc_norm, err = None, {}, "", str(exc)[:300]
+                ai, verdict, doc_norm, raw, proposal, err = None, {}, "", "", {}, str(exc)[:300]
                 errors += 1
                 if errors <= 3:
                     log(f"[tag] {target}: {err}")
@@ -237,10 +313,21 @@ def run(db, state, mode):
                 if err is None:
                     try:
                         db.execute("DELETE FROM tags WHERE target=?", (target,))
+                        code, url = about.get(target, ("", ""))
                         for kind in ("fears", "controls", "agencies"):
-                            if kind == "controls" and target in positions:
+                            # A measure that only takes a position imposes nothing and hands no
+                            # office anything, so it carries neither a control nor an office.
+                            if kind in ("controls", "agencies") and target in positions:
                                 continue
-                            for label, quote in agreed(verdict, doc_norm, kind, jurisdictions.get(target, "")).items():
+                            # Two passes that agree: the second can only confirm what the first
+                            # proposed. It used to be able to add a label nobody had proposed.
+                            asked = {norm(x) for x in (proposal.get(kind) or []) if isinstance(x, str)}
+                            for label, quote in agreed(verdict, doc_norm, kind, jurisdictions.get(target, ""),
+                                                       raw=raw, code=code).items():
+                                if norm(label) not in asked:
+                                    continue
+                                if (url, kind[:-1] if kind != "agencies" else "agency", label.strip()) in pulled:
+                                    continue
                                 db.execute("INSERT OR REPLACE INTO tags(target,kind,value,evidence,model,tagged_at) "
                                            "VALUES(?,?,?,?,?,?)",
                                            (target, kind[:-1] if kind != "agencies" else "agency",

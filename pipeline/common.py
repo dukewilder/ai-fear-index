@@ -430,7 +430,10 @@ def redo_briefs(db):
 # 7: the gates themselves refused good sentences. ", beginning 2027" at the end was read as an
 #    explaining clause, and "From 2027, California would put" was read as present tense because the
 #    date came first. The rules ask for the year; the gates now let it through.
-REDO_EDITION = ("2026-09-21", 7)
+# 8: the third reading now covers fears too, and the disclosure and reporting definitions were
+#    widened to take in real mandates on private parties they had refused. The launch counts change,
+#    so the edition is written once more to match them.
+REDO_EDITION = ("2026-09-21", 8)
 
 
 def redo_today(db):

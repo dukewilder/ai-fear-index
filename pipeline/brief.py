@@ -121,7 +121,7 @@ def pool(db, today, days=POOL_DAYS, limit=12):
         "SELECT m.id, m.kind, m.jurisdiction_name, m.identifier, m.title, m.summary, m.status, m.url, "
         "  COALESCE(m.latest_action_date, m.updated, m.first_seen) AS moved, "
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='control') AS controls, "
-        "  (SELECT GROUP_CONCAT(value, '|') FROM tags t WHERE t.target=m.id AND t.kind='fear') AS fears, "
+        "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='fear') AS fears, "
         "  (SELECT t.value FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency' "
         "   ORDER BY LENGTH(t.value) LIMIT 1) AS office, "
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency') AS offices "

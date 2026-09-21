@@ -35,17 +35,17 @@
     "slug": "mandatory-reporting",
     "name": "Mandatory reporting to government",
     "chip": "Mandatory reporting",
-    "definition": "Requires developers or deployers to report, disclose, register, or submit plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand.",
+    "definition": "Requires developers, deployers, or operators of AI systems, or owners or operators of data centers, to report, disclose, register, or submit plans, incidents, audits, impact assessments, or other information to a government body, or to produce them on government demand.",
     "pattern": "require a company to file reports with a government body, or hand them over on demand",
     "head": "reports companies must file with the government"
   },
   {
     "slug": "labeling-mandates",
-    "name": "Labels and watermarks on AI content",
-    "chip": "Labeling mandate",
-    "definition": "Requires labels, watermarks, provenance data, or disclosures on AI-generated content or AI interactions.",
-    "pattern": "require a label, watermark, or disclosure on AI content or on talking to an AI",
-    "head": "labels required on AI content"
+    "name": "Labels and notices of AI use",
+    "chip": "Label or AI notice",
+    "definition": "Requires labels, watermarks, provenance data, or disclosures on AI-generated content or AI interactions, or requires a company, employer, insurer, landlord, or other private party to tell the people it uses AI on that it is using it.",
+    "pattern": "require a label, watermark, or disclosure on AI content, or a notice to the people AI is used on",
+    "head": "labels and notices of AI use"
   },
   {
     "slug": "new-agency-powers",

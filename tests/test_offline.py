@@ -650,6 +650,38 @@ def check_third_reading():
     assert answer["verdict"] == "yes" and model == check.MODELS[1] and calls == check.MODELS[:2], calls
     print("a third reading takes off what the measure does not do, and only checked labels lead: ok")
 
+    # Fears are read too, on measures and on organizations' statements, and a label refused under a
+    # definition since widened is put back once to be asked again
+    db3 = _connect(pathlib.Path(_tempfile.mkdtemp()) / "fears.db")
+    upsert(db3, "measures", {"id": "f1", "kind": "bill", "jurisdiction": "tx", "jurisdiction_name": "Texas",
+                             "session": "2025", "identifier": "HB 1", "title": "AI workforce training grants",
+                             "summary": "Creates grants to train workers in AI.", "status": "pending", "url": "uf1",
+                             "introduced_date": day, "latest_action_date": day, "source": "test", "first_seen": iso()})
+    db3.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("f1", "h", 1, iso()))
+    db3.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("f1", "fear", "job-loss", "train workers in AI", "t", iso()))
+    upsert(db3, "posts", {"id": "p1", "entity": "fli", "title": "Superintelligence could escape control",
+                          "summary": "We warn that superintelligent AI could escape human control.",
+                          "url": "https://futureoflife.org/x", "published": iso(), "feed": "f", "first_seen": iso()})
+    db3.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("post:p1", "h", 1, iso()))
+    db3.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("post:p1", "fear", "loss-of-control",
+                                                         "superintelligent AI could escape human control", "t", iso()))
+    db3.execute("INSERT INTO checks VALUES(?,?,?,?,?,?,?,?)", ("f1", "control", "labeling-mandates",
+                                                               "tell applicants AI is used", "no", "narrow", "m", iso()))
+    db3.commit()
+    seen = []
+
+    def reads(key, prompt):
+        seen.append(prompt)
+        no = "train workers in AI" in prompt
+        return {"verdict": "no" if no else "yes", "reason": "a training grant" if no else "stated"}, "fake-model"
+    check.run(db3, "k", ask_fn=reads)
+    kinds = {r["target"] + ":" + r["kind"] for r in db3.execute("SELECT target, kind FROM tags")}
+    assert "f1:fear" not in kinds and "post:p1:fear" in kinds, f"fears were not read: {kinds}"
+    assert any(p.startswith("STATEMENT") and "Future of Life Institute" in p for p in seen), \
+        "a statement was not read as a statement from its organization"
+    assert any("tell applicants AI is used" in p for p in seen), "a label refused under the old wording was not asked again"
+    print("fears on measures and statements are read, and widened labels are asked again: ok")
+
     # A run that refuses far more than the hand check ever found holds its refusals for a person
     db2 = _connect(pathlib.Path(_tempfile.mkdtemp()) / "hold.db")
     for i in range(70):

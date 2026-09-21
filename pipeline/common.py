@@ -420,7 +420,10 @@ def redo_briefs(db):
 # 4: the third reading's first pass refused 349 of 749 control and office labels. Its circuit
 #    breaker held them; read by hand they were right, so they are applied, and the edition is
 #    written once more so the post counts what the page counts.
-REDO_EDITION = ("2026-09-21", 4)
+# 5: that edition led with New York legislators disclosing AI-drafted remarks, after the three
+#    measures ahead of it were each refused for one fixable fault. A refused sentence is now written
+#    once more with the fault named before its measure is dropped.
+REDO_EDITION = ("2026-09-21", 5)
 
 
 def redo_today(db):

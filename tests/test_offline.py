@@ -683,6 +683,39 @@ def check_third_reading():
     print("a revoked executive order comes off, and the order revoking it stays: ok")
 
 
+def check_second_attempt():
+    """A sentence refused for one fixable fault is written once more with the fault named.
+
+    The launch edition lost its three best leads this way: the sponsor's "child safety", three
+    characters over the limit, a would on a measure that had passed.
+    """
+    from pipeline import brief
+    row = {"id": "m1", "jurisdiction_name": "California", "identifier": "SB 1119", "status": "pending",
+           "title": "Companion chatbots.", "office": "California Attorney General", "controls": "mandatory-reporting",
+           "fears": "", "url": "u", "summary": "This bill would require an operator to submit to independent audits "
+                                             "and to make the audit reports available to the Attorney General."}
+    said = []
+
+    def fake(key, system, user, max_tokens=400):
+        said.append(user)
+        if "was refused" not in user:
+            return {"sentence": "California would put companion chatbots under independent child safety audits "
+                                "reported to the Attorney General.",
+                    "quote": "require an operator to submit to independent audits"}
+        return {"sentence": "California would put companion chatbot operators under independent audits whose "
+                            "reports the Attorney General can demand.",
+                "quote": "require an operator to submit to independent audits"}
+    real, brief.call = brief.call, fake
+    try:
+        attempts = []
+        lines = brief.write_lines("k", [row], dt.date.today().isoformat(), 1, attempts)
+    finally:
+        brief.call = real
+    assert len(said) == 2 and "child safety" in said[1], "the second attempt was not told what was wrong"
+    assert lines and "child safety" not in lines[0]["sentence"], f"the fixed sentence was not used: {attempts}"
+    print("a refused sentence gets one more attempt with its fault named: ok")
+
+
 def check_lobbying_money():
     """A year of lobbying is four quarters of reports, and a client's money is counted once.
 
@@ -1059,6 +1092,7 @@ def main():
     check_headline_keeps_the_power()
     check_label_rules()
     check_third_reading()
+    check_second_attempt()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()

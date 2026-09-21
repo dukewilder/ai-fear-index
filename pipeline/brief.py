@@ -200,9 +200,11 @@ PENDING = ("This measure has not passed. It was introduced and is somewhere in t
            "write that anyone must do anything, or that anything is already the case.")
 
 
-def sentence(key, row):
+def sentence(key, row, refused=""):
     rules = RULES.format(tense=LAW if (row["status"] or "") == "passed" else PENDING)
-    out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{rules}\n\n"
+    again = (f"\n\nA first attempt at this sentence was refused: {refused}. Write it again without "
+             f"that fault, keeping every rule above.") if refused else ""
+    out = call(key, SYSTEM, f"TEXT\n{doc(row)}\n\n{rules}{again}\n\n"
                             'Return JSON: {"sentence": "...", "quote": "..."}', max_tokens=400)
     return (out.get("sentence") or "").strip(), (out.get("quote") or "").strip()
 
@@ -407,16 +409,35 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
             log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")
             continue
         starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
-        reason = why_not(text, quote, body, (row["status"] or "") == "passed", row["office"] or "",
-                         starts, row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}")
+
+        def fault(t, q):
+            return why_not(t, q, body, (row["status"] or "") == "passed", row["office"] or "", starts,
+                           row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}")
+        reason = fault(text, quote)
         if reason:
             note(attempts, where, reason, sentence_text=text)
-            log(f"[brief] {where}: skipped, {reason}")
-            if reason == DUTY_FRAMED and second is None:
-                # True, checkable, and the wrong way round. Worth keeping in reserve: an edition
-                # of counts says less than a sentence in the sponsor's grammar.
-                second = (row, where, text, quote)
-            continue
+            log(f"[brief] {where}: refused, {reason}; asking once more")
+            tries = [(text, quote, reason)]
+            # A second attempt told what was wrong. Most refusals are one fixable fault: the
+            # sponsor's "child safety", three characters over the limit, a would on a measure that
+            # passed. Dropping the measure for them cost the launch edition its three best leads.
+            try:
+                text, quote = sentence(key, row, refused=reason)
+                reason = fault(text, quote)
+            except (NameError, AttributeError, TypeError, KeyError, IndexError):
+                raise
+            except Exception as exc:
+                reason = f"the model did not answer the second time: {str(exc)[:120]}"
+            if reason:
+                note(attempts, where, f"again: {reason}", sentence_text=text)
+                log(f"[brief] {where}: skipped, {reason}")
+                tries.append((text, quote, reason))
+                for t, q, why in tries:
+                    if why == DUTY_FRAMED and second is None:
+                        # True, checkable, and the wrong way round. Worth keeping in reserve: an
+                        # edition of counts says less than a sentence in the sponsor's grammar.
+                        second = (row, where, t, q)
+                continue
         note(attempts, where, "used")
         places.add(row["jurisdiction_name"])
         lines.append(made(row, text, quote))

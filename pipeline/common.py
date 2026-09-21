@@ -417,7 +417,10 @@ def redo_briefs(db):
 # 3: the third reading went in (pipeline.check). Controls and offices are now asked whether the
 #    measure does what the label says, and only confirmed ones can lead. The edition is written once
 #    more so the post and the page count the same labels at launch.
-REDO_EDITION = ("2026-09-21", 3)
+# 4: the third reading's first pass refused 349 of 749 control and office labels. Its circuit
+#    breaker held them; read by hand they were right, so they are applied, and the edition is
+#    written once more so the post counts what the page counts.
+REDO_EDITION = ("2026-09-21", 4)
 
 
 def redo_today(db):

@@ -29,10 +29,15 @@ MODELS = ["claude-sonnet-5", "claude-haiku-4-5-20251001"]
 SECONDS = 900       # per run; the first run has the whole record to read, every run after a handful
 DAY_CAP = 3000      # checks per day, so a loop gone wrong cannot run up the bill
 WORKERS = 4
-# A circuit breaker. The labels taken off by hand ran at one in six overall, higher in the rare
-# groups. A run refusing far more than that has more likely misread its instructions than found
-# that much wrong, so its refusals are held for a person instead of taking half the site down.
-HOLD_OVER, HOLD_MIN = 0.4, 60
+# A circuit breaker for a check that has misread its instructions: a run refusing more than this
+# share of 60 or more labels applies none of them and holds them for a person. The first full pass
+# refused 47%, and read by hand the refusals were right: mostly government bodies told to study,
+# report, advise or run a grant, which the tagger had counted as offices gaining power, and
+# disclosures to consumers counted as reporting to government. So the line sits well above that.
+HOLD_OVER, HOLD_MIN = 0.65, 60
+# Bump to apply refusals a run held, once a person has read them. 1: the first full pass, 349
+# refusals of 749, read and found right on 2026-09-21.
+RELEASE = 1
 
 # The heavy, rare controls first: they decide which measure leads the post, and they were the ones
 # most often wrong. Offices next, since the front page counts them.
@@ -143,7 +148,15 @@ def ask(key, user, max_tokens=250):
             if r.status_code != 200:
                 raise RuntimeError(f"Claude API {r.status_code}: {r.text[:300]}")
             text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-            return parse_json(text), model
+            try:
+                return parse_json(text), model
+            except ValueError:
+                # One in twenty answers on the first pass had no JSON in it: an explanation that ran
+                # past the token limit before the object. Asked once more, with room and a reminder.
+                if max_tokens >= 600:
+                    raise
+                max_tokens, user = 600, user + "\n\nAnswer with the JSON object only, starting with {."
+                continue
         else:
             raise RuntimeError(f"Claude API kept failing: {last}")
 
@@ -202,9 +215,26 @@ def remove(db, target, kind, value):
     db.execute("DELETE FROM tags WHERE target=? AND kind=? AND value=?", (target, kind, value))
 
 
+def release_holds(db):
+    """Apply held refusals once a person has read them: the labels come off and the verdicts stand."""
+    key = f"check:released:{RELEASE}"
+    if kv_get(db, key):
+        return 0
+    held = db.execute("SELECT target, kind, value FROM checks WHERE verdict = 'hold'").fetchall()
+    for r in held:
+        remove(db, r["target"], r["kind"], r["value"])
+    db.execute("UPDATE checks SET verdict = 'no' WHERE verdict = 'hold'")
+    kv_set(db, key, True)
+    db.commit()
+    if held:
+        log(f"[check] {len(held)} held refusals applied")
+    return len(held)
+
+
 def run(db, key, seconds=SECONDS, ask_fn=None):
     """Check what has not been checked. Returns a short line for the status message."""
     ask_fn = ask_fn or ask
+    released = release_holds(db)
     controls = {c["slug"]: c for c in config("controls")}
     todo, refused, shown = queue(db, controls)
     for r in refused:
@@ -260,7 +290,8 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
     kv_set(db, "check_spend", {"date": day, "n": used + done})
     db.commit()
     left = len(todo) - done
-    return (f"checked {done} labels, took off {(0 if hold else refusals) + len(refused)}"
+    return ((f"applied {released} held refusals; " if released else "")
+            + f"checked {done} labels, took off {(0 if hold else refusals) + len(refused)}"
             + (f", held {refusals} refusals for review" if hold else "")
             + (f", {left} still to check" if left > 0 else "")
             + (f", {failed} errors" if failed else "")

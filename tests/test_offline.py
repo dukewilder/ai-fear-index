@@ -659,7 +659,11 @@ def check_third_reading():
     from pipeline import review
     body, items = review.build(db2, dt.date.today())
     assert "Held: 70 refusals" in body and items >= 70, "the held refusals are not on the weekly list"
-    print("a wave of refusals is held for a person, and listed: ok")
+    db2.execute("DELETE FROM kv WHERE key LIKE 'check:released:%'")
+    assert check.release_holds(db2) == 70 and not db2.execute("SELECT COUNT(*) FROM tags").fetchone()[0], \
+        "released refusals did not come off"
+    assert check.release_holds(db2) == 0, "a release ran twice"
+    print("a wave of refusals is held for a person, listed, and applied once released: ok")
 
     # An executive order the Register marks as revoked comes off the record
     from pipeline import collect_fedreg

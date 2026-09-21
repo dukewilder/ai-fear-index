@@ -30,7 +30,7 @@
 {%- endmacro %}
 
 {% macro control_row(c) -%}
-<li class="row" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.pending }} pending{% if c.fears %} · justified by {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
+<li class="row" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.pending }} pending{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
 {%- endmacro %}
 
 {% macro state_row(s) -%}

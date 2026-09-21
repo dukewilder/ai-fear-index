@@ -618,7 +618,7 @@ SOURCES = [
     ("news", "Headlines", "NEWS_FEEDS"),   # filled in from config/news.json, so the page cannot drift from it
     ("wikipedia", "Public attention", "Wikipedia pageviews"),
     ("rss", "Organization statements", "Newsroom feeds of tracked organizations"),
-    ("tag", "Fear and control labels", "Claude, two passes that must agree on a quoted line"),
+    ("tag", "Fear and control labels", "Claude, each label resting on a quote that code finds word for word in the measure"),
 ]
 SCHEDULE = [
     ["Every 20 minutes", "News, statements, federal rules and the feed"],
@@ -847,10 +847,16 @@ def build_feed(db, ents, measures, lob, receipts, today):
         if (r["posted"] or "") >= horizon:
             refs = f", naming {r['bill_refs']}" if r["bill_refs"] else ""
             items.append({"type": "lobbying", "label": "Lobbying filing",
-                          "text": f"{nice_name(r['client']) or 'A lobbying client'} reported {money(r['amount'])} in lobbying that mentions AI{refs}",
+                          # The amount is the filing's total for the quarter across every issue on
+                          # it, not the part spent on AI, which no filing breaks out.
+                          "text": f"{nice_name(r['client']) or 'A lobbying client'} filed a lobbying report that mentions AI, "
+                                  f"{money(r['amount'])} for the quarter across all its issues{refs}",
                           "url": r["url"], "time_iso": r["posted"][:19] + "+00:00", "time": r["posted"][:10],
                           "fears": r["fears"], "org": r["entity"] or slugify(nice_name(r["client"]))})
     for r in receipts:
+        # The same line rule as the totals: a committee's bank paying it interest is not a donor.
+        if r.get("line_number") and not gave(r["line_number"], ents.match_name(r["counterparty"] or "")):
+            continue
         if (r["date"] or "") >= horizon:
             items.append({"type": "donation", "label": "Donation",
                           "text": f"{nice_name(r['counterparty'])} gave {money(r['amount'])} to {nice_name(r['committee_name'])}",
@@ -889,6 +895,8 @@ def bill_headline(title):
 
 
 FEED_HOST = re.compile(r"^(?:www|rss|feeds?|api)\.")
+# A feed served from one domain for articles published on another.
+FEED_ALIASES = {"bbci.co.uk": ("bbc.com", "bbc.co.uk")}
 
 
 def read_directly():
@@ -902,8 +910,9 @@ def read_directly():
     """
     hosts = set()
     for src in config("news"):
-        host = urllib.parse.urlparse(src["url"]).netloc.lower()
-        hosts.add(FEED_HOST.sub("", host))
+        host = FEED_HOST.sub("", urllib.parse.urlparse(src["url"]).netloc.lower())
+        hosts.add(host)
+        hosts.update(FEED_ALIASES.get(host, ()))
     return hosts
 
 

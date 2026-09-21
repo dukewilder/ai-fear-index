@@ -36,13 +36,13 @@
      "name": d.site.name if d.site and d.site.name else "AI Fear Report",
      "description": blurb, "inLanguage": "en-US"},
     {"@type": "Dataset", "@id": canonical + "#dataset",
-     "name": (d.site.name if d.site and d.site.name else "AI Fear Report") + ": AI fears, the money behind them, and the laws they justify",
+     "name": (d.site.name if d.site and d.site.name else "AI Fear Report") + ": AI fears, the money behind them, and the laws that cite them",
      "description": blurb, "url": canonical, "isAccessibleForFree": True,
      "license": "https://creativecommons.org/publicdomain/zero/1.0/",
      "creator": {"@type": "Organization", "name": d.site.name if d.site and d.site.name else "AI Fear Report", "url": canonical},
      "temporalCoverage": "2025-01-01/..",
      "keywords": ["artificial intelligence", "AI regulation", "AI legislation", "AI policy",
-                  "lobbying", "state legislation", "Congress", "AI safety", "data centers",
+                  "lobbying", "state legislation", "Congress", "AI risk", "data centers",
                   "deepfakes", "age verification", "super PAC", "FEC"],
      "distribution": [{"@type": "DataDownload", "encodingFormat": "text/csv",
                        "contentUrl": d.links.csv}] if d.links and d.links.csv else [],
@@ -128,7 +128,7 @@
 <div class="foot-id">
 {% set fbits = (d.site.name if d.site and d.site.name else "AI Fear Report").split(" ", 1) %}
 <a class="brand" href="{{ url('home') }}"><span class="badge">{{ fbits[0] }}</span>{{ fbits[1] if fbits|length > 1 else "" }}</a>
-<p class="colophon">Compiled from public records. Every number links to its source. Updated around the clock, unattended.</p>
+<p class="colophon">Compiled from public records. Bills, filings and committees link to their sources. Updated around the clock, unattended.</p>
 </div>
 <nav class="foot-links" aria-label="Elsewhere">
 {# Both sections are on this page, whichever page it is, so the footer points at them here

@@ -18,7 +18,7 @@
 {% if o.lobbying %}
 <section class="block"><div class="wrap">
 <h2 class="h">Lobbying that mentions AI</h2>
-<p class="sub">Every filing on file, whether or not it names one of the fears. A filing reports one total for everything the registrant lobbied on that quarter.</p>
+<p class="sub">The latest filings on file, whether or not they name one of the fears. A filing reports one total for everything the registrant lobbied on that quarter.</p>
 <ul class="list" style="margin-top:12px">{% for l in o.lobbying %}<li class="item"><span class="item-top"><a class="row-name" href="{{ l.url }}" rel="noopener" target="_blank">{{ l.bill }}</a><span class="val small">{{ l.amount }}</span></span><span class="meta" style="margin-top:0">{{ l.period }}</span>{% if l.fears or l.controls %}<span class="chips">{% for f in l.fears %}<span class="chip">{{ f }}</span>{% endfor %}{% for c in l.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
 </div></section>
 {% endif %}

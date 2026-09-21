@@ -404,7 +404,11 @@ def redo_briefs(db):
 # 9: the edition that went out said California would exempt data centers from environmental review.
 #    The measure puts them under the Governor's authority to certify them as exempt, which is an
 #    office deciding who is exempt, not a requirement going away. The plate dropped the office.
-REDO_EDITION = ("2026-09-20", 9)
+# 2026-09-21: the launch edition. It was written around midnight by code that counted carried-over
+#    bills twice, said offices "hold" powers that bills in committee would hand them, and could
+#    lead with a label since taken off by hand. Written again by the code that fixed all three,
+#    well before it posts at nine.
+REDO_EDITION = ("2026-09-21", 1)
 
 
 def redo_today(db):

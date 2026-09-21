@@ -233,9 +233,9 @@ def page_specs(d):
     for o in d["org_pages"]:
         specs.append({"kind": "org", "route": f"org/{o['slug']}", "out": f"org/{o['slug']}/index.html",
                       "template": "org.html",
-                      "title": f"{o['name']}: AI lobbying, {name}",
+                      "title": f"{o['name']}: {'election money' if o.get('group') == 'election' else 'AI lobbying'}, {name}",
                       "ctx": {"o": o}})
-    for kind, title in (("feed", "Feed: every AI bill and rule as it arrives"),
+    for kind, title in (("feed", "Feed: AI bills, rules and filings as they arrive"),
                         ("method", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
                       "title": f"{title}, {name}", "ctx": {}})
@@ -246,20 +246,22 @@ def page_specs(d):
         s["description"] = None
         if s["kind"] == "fear":
             f = s["ctx"]["f"]
-            s["description"] = (f"{f['name']}: how loud the fear is, who pays to lobby on it, and the "
-                                f"laws it is used to justify. Scores {f['score']} of 100 on the Fear "
-                                f"Index. {f.get('line') or ''}").strip()
+            s["description"] = (f"{f['name']}: how loud the fear is, who lobbies on it, and the bills "
+                                f"that cite it. Scores {f['score']} of 100 on the Fear Index. "
+                                f"{f.get('line') or ''}").strip()
         elif s["kind"] == "home":
-            s["description"] = (f"Every fear about AI, tracked against what it buys. "
-                                f"{d['index']['value']} {d['index']['text']}, with the lobbying money "
-                                f"and the government offices behind each one, updated around the clock.")
+            s["description"] = (f"How fears about AI show up in bills, lobbying and election money. "
+                                f"{d['index']['value']} {d['index']['text']}, the government controls "
+                                f"they carry and the offices they would hand power to, updated around the clock.")
         elif s["kind"] == "org":
             o = s["ctx"]["o"]
-            s["description"] = (f"{o['name']}: which AI fears it argues for, what it spends lobbying on "
-                                f"them, and the measures its money is attached to.")
+            s["description"] = (f"{o['name']}: money raised for AI politics this cycle and the donors "
+                                f"behind it, from FEC filings." if o.get("group") == "election" else
+                                f"{o['name']}: federal lobbying filings that name the fears tracked here, "
+                                f"the amounts they report, and the bills they list.")
         elif s["kind"] == "feed":
-            s["description"] = ("Every AI bill, rule, and public statement as it arrives, tagged with "
-                                "the fear it cites and the control it would impose.")
+            s["description"] = ("AI bills, rules, lobbying filings, donations and statements as they "
+                                "arrive, tagged with the fears they cite and the controls they would impose.")
         elif s["kind"] == "method":
             s["description"] = ("Where every number on this site comes from: the government sources, "
                                 "how measures are tagged, and what each label means.")

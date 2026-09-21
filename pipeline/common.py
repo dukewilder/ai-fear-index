@@ -441,7 +441,10 @@ def redo_briefs(db):
 #    The edition fell to New York legislators who "would be required to" disclose AI-drafted remarks.
 #    The brief now asks the stronger model, gives it three attempts told every fault, names the
 #    tucked clause as the fault, and reads the passive as the duty it is.
-REDO_EDITION = ("2026-09-21", 10)
+# 11: the stronger model was given the smaller one's 400 tokens and answered seven candidates in a
+#    row with no JSON, so the edition led with the eighth. It now has room, a reminder, and the
+#    smaller model behind it when an answer comes back without the JSON.
+REDO_EDITION = ("2026-09-21", 11)
 
 
 def redo_today(db):

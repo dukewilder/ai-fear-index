@@ -33,14 +33,20 @@ from .tag import agreed, norm
 # already asks the stronger model this key can use. So does the brief, falling back to the smaller
 # one if the key cannot use it.
 MODELS = ["claude-sonnet-5", "claude-haiku-4-5-20251001"]
-_model = {"i": 0}
+_model = {"i": 0, "unparsed": 0}
+# Room for the answer and whatever the model works through before it. The first run on the stronger
+# model gave it the smaller one's 400 tokens, and seven candidates in a row came back with no JSON
+# in them: it ran out before the object. Only the answer is kept, so the room costs nothing.
+BUDGET = 4000
+JSON_ONLY = "\n\nAnswer with the JSON object only, starting with {."
 
 
 def call(key, system, user, max_tokens=400):
+    prompt = user + JSON_ONLY
     while True:
         model = MODELS[_model["i"]]
         try:
-            return tag.call(key, system, user, max_tokens, model=model)
+            return tag.call(key, system, prompt, max(max_tokens, BUDGET), model=model)
         except RuntimeError as exc:
             said = str(exc)
             refused = re.match(r"Claude API (403|404)\b", said) or \
@@ -50,6 +56,17 @@ def call(key, system, user, max_tokens=400):
                 log(f"[brief] {model} is not available to this key, using {MODELS[_model['i']]}")
                 continue
             raise
+        except ValueError as exc:
+            # An answer with no JSON in it. The smaller model has answered in JSON every time, so
+            # it takes this one, and after two of these in a run it takes the rest: a model that
+            # will not answer in the form asked costs a slow call per sentence and returns nothing.
+            if _model["i"] + 1 >= len(MODELS):
+                raise
+            _model["unparsed"] += 1
+            log(f"[brief] {model} answered without the JSON asked for ({exc}), so {MODELS[-1]} answers")
+            if _model["unparsed"] >= 2:
+                _model["i"] = len(MODELS) - 1
+            return tag.call(key, system, prompt, max(max_tokens, BUDGET), model=MODELS[-1])
 
 
 WANT = 3          # lines in an edition: enough to show a pattern, few enough to read
@@ -189,7 +206,8 @@ RULES = (
     "<what> under <office>. The office is the one that would decide, inspect, licence, demand, or "
     "be reported to. Use the office the measure names, in the measure's words, and never one "
     "from these instructions. If the measure names no office, the power is the jurisdiction's "
-    "own, and the sentence says what the jurisdiction now controls.\n"
+    "own, and the jurisdiction is the one acting: it makes someone do something, or bars them "
+    "from it, in the measure's own terms.\n"
     "A duty on a company is a power for whoever it answers to, and it is the power that goes in "
     "the sentence. Not required to restore the water, but put under the department that decides "
     "whether it has. Not required to submit to audits an office can ask to see, but gives that "

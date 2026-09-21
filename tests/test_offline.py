@@ -922,14 +922,36 @@ def check_brief_attempts():
             raise RuntimeError('Claude API 404: {"type":"error","error":{"type":"not_found_error","message":"model"}}')
         return {"sentence": "ok"}
     real_tag, tag.call = tag.call, api
-    brief._model["i"] = 0
+    brief._model.update(i=0, unparsed=0)
     try:
         assert brief.call("k", "s", "u") == {"sentence": "ok"}
         assert brief.call("k", "s", "u") == {"sentence": "ok"}
     finally:
         tag.call = real_tag
-        brief._model["i"] = 0
+        brief._model.update(i=0, unparsed=0)
     assert used == [brief.MODELS[0], brief.MODELS[1], brief.MODELS[1]], used
+
+    # An answer with no JSON goes to the smaller model, and after two the smaller one takes the rest.
+    # The first run on the stronger model lost seven candidates in a row to this.
+    used, budgets = [], []
+
+    def unparsed(key, system, user, max_tokens=700, model=None):
+        used.append(model)
+        budgets.append(max_tokens)
+        assert user.endswith("starting with {."), "the reminder to answer in JSON is missing"
+        if model == brief.MODELS[0]:
+            raise ValueError("no JSON in reply")
+        return {"line": "ok"}
+    tag.call = unparsed
+    try:
+        for _ in range(3):
+            assert brief.call("k", "s", "u", max_tokens=150) == {"line": "ok"}
+    finally:
+        tag.call = real_tag
+        brief._model.update(i=0, unparsed=0)
+    S, H = brief.MODELS
+    assert used == [S, H, S, H, H], used
+    assert min(budgets) >= 1000, f"the answer is still given {min(budgets)} tokens"
     print("the brief is written by the stronger model, told every fault, and reads a passive duty: ok")
 
 

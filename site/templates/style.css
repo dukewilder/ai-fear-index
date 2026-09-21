@@ -327,7 +327,6 @@ a.copy.donate{text-decoration:none}
    in the light theme and dark text 2.5 in the dark one; ink clears 5 in both. */
 .tile.l3{background:var(--heat3);border-color:var(--heat3);color:var(--ink)}
 .tile.l4{background:var(--heat4);border-color:var(--heat4);color:var(--heat4t)}
-.tile.filling{border:1.5px dashed var(--ink)}
 .tile:hover,.tile[aria-current=true],.tile-fed:hover,.tile-fed[aria-current=true]{outline:2px solid var(--ink);outline-offset:1px;z-index:1;color:inherit}
 .tile.l3:hover,.tile.l3[aria-current=true]{color:var(--ink)}
 .tile.l4:hover,.tile.l4[aria-current=true]{color:var(--heat4t)}
@@ -338,14 +337,31 @@ a.copy.donate{text-decoration:none}
 .tmap-key i{display:inline-block;width:20px;height:11px;border:1px solid var(--rule)}
 .tmap-key span:first-child{margin-right:3px}
 .tmap-key [data-map-top]{margin-left:3px}
-.tmap-note{margin-left:14px}
 .tmap-key .l0{background:var(--heat0)}.tmap-key .l1{background:var(--heat1)}.tmap-key .l2{background:var(--heat2)}
 .tmap-key .l3{background:var(--heat3)}.tmap-key .l4{background:var(--heat4)}
-.tmap-out{min-height:46px;margin:12px 0 0;font-size:14px;line-height:1.5;color:var(--soft)}
-.tmap-out b{color:var(--ink)}
-.tmap-out a{margin-left:2px;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+/* The card under the map. An empty slot with a hairline until a state is picked, then a panel with
+   the accent edge the quote cards carry, and a ring that fades on each pick so the change is seen.
+   It keeps its height between picks, so the list under it does not jump as the pointer moves. */
+.tmap-out{display:flex;flex-direction:column;justify-content:center;min-height:168px;margin:14px 0 0;padding:14px 16px 16px;border:1px solid var(--rule);background:transparent}
+.tmap-out.on{justify-content:flex-start;border:1px solid var(--ink);border-left:3px solid var(--accent);background:var(--panel)}
+.tmap-hint{margin:0;text-align:center;font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tmap-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.tmap-name{margin:0;font-family:var(--disp);font-size:28px;line-height:1.02;font-weight:800;letter-spacing:.005em;text-transform:uppercase}
+.tmap-rank{font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tmap-line{margin:8px 0 0;max-width:52ch;font-size:15px;line-height:1.45;color:var(--soft)}
+.tmap-line b{margin-right:3px;font-family:var(--mono);font-size:24px;line-height:1;font-weight:700;color:var(--ink)}
+.tmap-stats{display:flex;flex-wrap:wrap;gap:6px 20px;margin:10px 0 0;padding:0;list-style:none}
+.tmap-stats li{display:flex;align-items:baseline;gap:6px;font-size:13px;color:var(--muted)}
+.tmap-stats b{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ink)}
+.tmap-fear{margin:8px 0 0;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tmap-go{display:inline-flex;align-self:flex-start;align-items:center;min-height:44px;margin-top:12px;padding:0 16px;background:var(--ink);color:var(--paper);font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;text-decoration:none}
+.tmap-go:hover{background:var(--accent);color:var(--heat4t)}
+@keyframes tmap-ring{from{box-shadow:0 0 0 4px var(--accent)}to{box-shadow:0 0 0 0 transparent}}
+.tmap-out.flash{animation:tmap-ring .7s ease-out}
+@media (prefers-reduced-motion:reduce){.tmap-out.flash{animation:none}}
+@media (max-width:559px){.tmap-go{align-self:stretch;justify-content:center}}
 .tmap-top{margin-top:20px}
-@media (max-width:559px){.tmap-grid{gap:2px}.tile i{display:none}.tile b{font-size:9.5px;letter-spacing:0}.tile.filling{border-width:1px}}
+@media (max-width:559px){.tmap-grid{gap:2px}.tile i{display:none}.tile b{font-size:9.5px;letter-spacing:0}}
 .tip{position:absolute;z-index:30;padding:5px 9px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);font:500 12px var(--mono);white-space:nowrap;pointer-events:none}
 
 @media (min-width:760px){

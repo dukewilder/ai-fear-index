@@ -511,8 +511,7 @@ def export(db, out_dir, base=""):
     # Ranked, mapped and paged by the measures that would put AI under new government control, the
     # number the report is about. Every tile on the map has a page, including a place with nothing
     # found yet, which says so rather than leaving a square that goes nowhere.
-    places = place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None,
-                         filling=filling_in(db), today=today)
+    places = place_pages(db, measures, fear_by, control_by, suppressed, today=today)
     state_rows = [p["row"] for p in places if p["n"]]
     state_rows.sort(key=lambda r: (-r["c"], -r["n"], r["name"]))
     for i, r in enumerate(state_rows, 1):
@@ -1271,20 +1270,12 @@ def place_slug(code):
     return PLACE_SLUG.get(code, code)
 
 
-def filling_in(db):
-    """Places still being read bill by bill because the search cannot see their bills, and so
-    thinner on this site than they are. Empty once each has been read through."""
-    from .collect_openstates import blind_state
-    st = blind_state(db) or {}
-    return sorted({k.split(":", 1)[0] for k, v in (st.get("sweeps") or {}).items() if not v.get("done")})
-
-
 def heat(v, top):
     """0 to 4, log scaled to the leader, the way the fear grid shades its cells."""
     return 0 if not v or not top else min(4, 1 + int(3.99 * math.log1p(v) / math.log1p(top)))
 
 
-def place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None, filling=(), today=None):
+def place_pages(db, measures, fear_by, control_by, suppressed, today=None):
     """One page for every state, DC and Puerto Rico, and for Congress and the federal agencies.
 
     Counted over the measures the front page counts, with offices counted the front page's way: named
@@ -1361,7 +1352,7 @@ def place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None, 
             "code": code, "slug": slug, "name": name, "abbr": code.upper() if code in TILES else "",
             "col": tile[0] if tile else None, "row_n": tile[1] if tile else None, "federal": code in FEDERAL,
             "n": n, "c": c, "passed": len(passed), "law": len(law), "offices": len(offices),
-            "filling": code in filling, "kind": kind,
+            "kind": kind,
             "top_fear": fear_rows[0]["name"] if fear_rows else None,
             "evidence": evidence, "receipt": receipt, "beneficiaries": ben_rows, "already_law": law_rows,
             "law_total": len(law), "quotes": own_words(db, ms, fear_by, control_by, suppressed, limit=5) if ms else [],
@@ -1372,7 +1363,7 @@ def place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None, 
                                sum(1 for m in law if fs in m["fears"])] for fs in fear_mix}},
             "row": {"code": code, "slug": slug, "name": name, "n": n, "c": c,
                     "bills": f"{n:,}", "controlled": f"{c:,}", "passed": f"{len(passed):,}",
-                    "top_fear": fear_rows[0]["name"] if fear_rows else None, "filling": code in filling},
+                    "top_fear": fear_rows[0]["name"] if fear_rows else None},
         })
     return out
 
@@ -1385,14 +1376,18 @@ def place_map(places):
     top = max((p["c"] for p in tiles), default=0)
     return {"tiles": [{"code": p["code"], "slug": p["slug"], "abbr": p["abbr"], "name": p["name"],
                        "col": p["col"], "row": p["row_n"], "n": p["n"], "c": p["c"], "law": p["law"],
-                       "passed": p["passed"], "top_fear": p["top_fear"], "filling": p["filling"],
+                       "passed": p["passed"], "top_fear": p["top_fear"],
                        "level": heat(p["c"], top)} for p in tiles],
             "federal": [{"code": p["code"], "slug": p["slug"], "name": p["name"], "n": p["n"], "c": p["c"],
                          "law": p["law"], "passed": p["passed"]} for p in places if p["federal"]],
             "top": top,
             # every tile's counts by fear, for the map's own switches: [all, carrying a control, law]
             "counts": {p["code"]: p["counts"] for p in tiles},
-            "fed_counts": {p["code"]: p["counts"] for p in places if p["federal"]}}
+            "fed_counts": {p["code"]: p["counts"] for p in places if p["federal"]},
+            # what the card under the map says about a place beyond the counts: where it ranks, how
+            # many offices would gain power, how many measures passed in all, and its loudest fear
+            "info": {p["code"]: [p.get("rank"), p["offices"], p["passed"], p["top_fear"] or ""] for p in places},
+            "of": max((p.get("of") or 0 for p in places), default=0)}
 
 
 def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group="funders"):

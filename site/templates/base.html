@@ -358,41 +358,77 @@
       });
       if (topEl) topEl.textContent = top;
       if (cap) cap.textContent = CAPS[metric] + (fearName() ? ", citing " + fearName().toLowerCase() : "");
-      if (picked) read(picked);
+      if (picked) read(picked, false);
     }
     function words(n, one, many) { return n + " " + (n === 1 ? one : many); }
-    function read(t) {
-      var c = counts(t.getAttribute("data-code")), name = t.getAttribute("data-name");
-      out.textContent = "";
-      var b = document.createElement("b");
-      b.textContent = name + (fearName() ? ", citing " + fearName().toLowerCase() : "");
-      out.appendChild(b);
-      var line = c[0]
-        ? ": " + c[1] + " of " + words(c[0], "AI measure", "AI measures") + " would put AI under new government control, " +
-          (c[2] === 1 ? "1 of them already law. " : c[2] + " of them already law. ")
-        : ": no AI measures found" + (fearName() ? " citing it" : "") + " yet. ";
-      out.appendChild(document.createTextNode(line));
-      if (t.classList.contains("filling")) out.appendChild(document.createTextNode("Still being read in. "));
-      var a = document.createElement("a");
-      a.href = t.getAttribute("href");
-      a.textContent = "Open " + name + " \u2192";
-      out.appendChild(a);
+    function el(tag, cls, text) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
     }
-    function pick(t) {
+    // The card under the map: the place, where it ranks, how many of its measures would put AI under
+    // new government control, how many of those are law, how many offices would gain power, and a
+    // button to open it. A pick by click, tap or keyboard flashes it, so a reader can see it change.
+    function read(t, flash) {
+      var code = t.getAttribute("data-code"), name = t.getAttribute("data-name"), c = counts(code),
+          info = (data.info || {})[code] || [null, 0, 0, ""], f = fearName();
+      out.textContent = "";
+      out.classList.add("on");
+      var head = el("div", "tmap-head");
+      head.appendChild(el("p", "tmap-name", name));
+      // the rank is over every measure carrying a control, so it is left off while one fear is picked
+      if (info[0] && !f) head.appendChild(el("span", "tmap-rank", "Rank " + info[0] + " of " + data.of));
+      out.appendChild(head);
+      if (c[0]) {
+        var line = el("p", "tmap-line");
+        line.appendChild(el("b", null, String(c[1])));
+        line.appendChild(document.createTextNode(" of " + words(c[0], "AI measure", "AI measures") +
+          (f ? " citing " + f.toLowerCase() : "") + " would put AI under new government control."));
+        out.appendChild(line);
+        var stats = el("ul", "tmap-stats");
+        var stat = function (n, label) {
+          var li = el("li");
+          li.appendChild(el("b", null, String(n)));
+          li.appendChild(el("span", null, label));
+          stats.appendChild(li);
+        };
+        stat(c[2], "of them already law");
+        if (!f) stat(info[1], info[1] === 1 ? "office would gain power" : "offices would gain power");
+        out.appendChild(stats);
+        if (!f && info[3]) out.appendChild(el("p", "tmap-fear", "Loudest fear: " + info[3]));
+      } else {
+        out.appendChild(el("p", "tmap-line", "No AI measures" + (f ? " citing " + f.toLowerCase() : "") + " on file yet."));
+      }
+      var go = el("a", "tmap-go", "Open " + name + " \u2192");
+      go.href = t.getAttribute("href");
+      out.appendChild(go);
+      if (flash && !reduce) {
+        out.classList.remove("flash");
+        void out.offsetWidth;  // restart the animation on a second pick
+        out.classList.add("flash");
+      }
+    }
+    function pick(t, flash) {
       if (picked && picked !== t) picked.removeAttribute("aria-current");
       picked = t;
       t.setAttribute("aria-current", "true");
-      read(t);
+      read(t, flash);
+      // on a phone the card can sit below the fold; bring it up without jumping the page
+      if (flash && finger) {
+        var r = out.getBoundingClientRect();
+        if (r.bottom > window.innerHeight) out.scrollIntoView({block: "nearest", behavior: reduce ? "auto" : "smooth"});
+      }
     }
     // A tap focuses the square before it clicks it, so what lets a second tap through is a square
     // this tap armed, not the one the readout shows.
     map.addEventListener("pointerdown", function (e) { finger = e.pointerType !== "mouse"; }, true);
     map.addEventListener("keydown", function () { finger = false; }, true);
     tiles.concat(feds).forEach(function (t) {
-      t.addEventListener("mouseenter", function () { if (!finger) pick(t); });
-      t.addEventListener("focus", function () { pick(t); });
+      t.addEventListener("mouseenter", function () { if (!finger) pick(t, false); });
+      t.addEventListener("focus", function () { if (!finger) pick(t, true); });
       t.addEventListener("click", function (e) {
-        if (finger && armed !== t) { e.preventDefault(); armed = t; pick(t); }
+        if (finger && armed !== t) { e.preventDefault(); armed = t; pick(t, true); }
       });
     });
     var ctl = map.querySelector("[data-map-ctl]");

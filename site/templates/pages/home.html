@@ -1,3 +1,7 @@
+{# The sections after the jump bar alternate their shading over the ones present, so a section
+   left out for want of data never stacks two bands, and moving one never needs its neighbours
+   restyled. #}
+{% set ns = namespace(i=0) %}
 {% from "macros.html" import fear_row, org_row, benefit_row, control_row, grid, state_row, tile_map, quote_card, law_row, donor_row %}
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
@@ -25,66 +29,76 @@
 <a href="{{ url('home', anchor='everywhere') }}" data-jump="everywhere">Everywhere</a>
 <a href="{{ url('home', anchor='numbers') }}" data-jump="numbers">The totals</a>
 <a href="{{ url('home', anchor='words') }}" data-jump="words">Their words</a>
+<a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>
 <a href="{{ url('home', anchor='funding') }}" data-jump="funding">The money</a>
 <a href="{{ url('home', anchor='buying') }}" data-jump="buying">What it buys</a>
 <a href="{{ url('home', anchor='benefits') }}" data-jump="benefits">Who benefits</a>
-<a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>
 <a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>
 </div></div></nav>
 
 {% if d.polls %}
-<section class="block band" id="afraid"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="afraid">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">How afraid people are</h2>
 <ul class="polls">{% for p in d.polls %}<li><b>{{ p.figure }}</b><span>{{ p.text }}. <a href="{{ p.url }}" rel="noopener" target="_blank">{{ p.source }}</a></span></li>{% endfor %}</ul>
 </div></section>
 {% endif %}
-<section class="block" id="turning"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="turning">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">What the fear is turning into</h2>
 <ol class="chain">{% for big, label in d.index.chain %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ol>
 {% if d.index.change %}<p class="move">{{ d.index.change }}</p>{% endif %}
 <figure class="spark">{{ spark_svg|safe }}<figcaption>{{ d.index.series_label }}</figcaption></figure>
 </div></section>
-<section class="block band" id="index"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="index">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The Fear Index</h2>
 <p class="sub">Scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
 <ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
 </div></section>
 {% if d.grid %}
-<section class="block" id="everywhere"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="everywhere">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The same fears, everywhere</h2>
 <p class="sub">Every fear, every channel, counted.</p>
 {{ grid(d.grid) }}
 </div></section>
 {% endif %}
 {% if d.numbers %}
-<section class="block band" id="numbers"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="numbers">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The totals</h2>
 <ul class="numbers">{% for big, label in d.numbers %}<li><b data-count>{{ big }}</b><span>{{ label }}</span></li>{% endfor %}</ul>
 </div></section>
 {% endif %}
 {% if d.quotes %}
-<section class="block" id="words"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="words">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">In their own words</h2>
 <p class="sub">The fear as each bill's official summary states it, and the controls the same bill would create.</p>
 <ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
+{% if d.states %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="states">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">Where it's happening</h2>
+<p class="sub">Every state, shaded by the AI measures that would put AI, the people building it or the people using it under new government control.</p>
+{% if d.state_map %}{{ tile_map(d.state_map) }}{% endif %}
+<p class="kicker tmap-top">The five with the most</p>
+<ol class="rank">{% for s in d.states[:5] %}{{ state_row(s) }}{% endfor %}</ol>
+<a class="more" href="{{ url('states') }}" data-goatcounter-click="all-states">All the states</a>
+</div></section>
+{% endif %}
 {% if d.funders %}
-<section class="block band" id="funding"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="funding">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Who's funding it</h2>
 <p class="sub">Advocacy groups and foundations lobbying on these fears, past year.</p>
 <ol class="rank">{% for o in d.funders %}{{ org_row(o) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.industry %}
-<section class="block" id="industry"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="industry">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Everyone else lobbying</h2>
 <p class="sub">Companies, trade groups, think tanks, unions and other groups lobbying on these fears, past year. Ranked by how often they file.</p>
 <ol class="rank">{% for o in d.industry %}{{ org_row(o) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.election %}
-<section class="block band" id="election"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="election">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Election money</h2>
 <p class="sub">Political committees working on AI policy this cycle, and the names that put up the money.</p>
 <ol class="rank">{% for o in d.election %}{{ org_row(o) }}{% endfor %}</ol>
@@ -94,30 +108,20 @@
 {% endif %}
 </div></section>
 {% endif %}
-<section class="block" id="buying"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="buying">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">The government controls written into AI bills, rules and orders, by number of measures.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
 </div></section>
 {% if d.beneficiaries %}
-<section class="block band" id="benefits"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="benefits">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Who benefits</h2>
 <p class="sub">Agencies and officials that bills carrying a control would hand new power over AI or data centers, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
-{% if d.states %}
-<section class="block band" id="states"><div class="wrap">
-<h2 class="h">Where it's happening</h2>
-<p class="sub">Every state, shaded by the AI measures that would put AI, the people building it or the people using it under new government control.</p>
-{% if d.state_map %}{{ tile_map(d.state_map) }}{% endif %}
-<p class="kicker tmap-top">The five with the most</p>
-<ol class="rank">{% for s in d.states[:5] %}{{ state_row(s) }}{% endfor %}</ol>
-<a class="more" href="{{ url('states') }}" data-goatcounter-click="all-states">All the states, and a page for each</a>
-</div></section>
-{% endif %}
 {% if d.already_law %}
-<section class="block" id="law"><div class="wrap">
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="law">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_passed }} measures have passed. {{ d.law_total }} of them carry a control.{% if d.law_total > d.already_law|length %} The {{ d.already_law|length }} carrying the most are shown.{% endif %}</p>
 <ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>

@@ -36,7 +36,7 @@
 {# Ranked by what the report is about: the measures that would put AI under new government control.
    The total rides in the line under the name, so the number on the right is never read as it. #}
 {% macro state_row(s) -%}
-<li><a class="row" href="{{ url('state', s.slug) }}"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} of {{ s.bills }} AI measure{{ '' if s.bills == '1' else 's' }} carry a control · {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}{% if s.filling %} · <span class="chip">Still being read in</span>{% endif %}</span></span><span class="val accent">{{ s.controlled }}<span class="unit">bills</span></span></a></li>
+<li><a class="row" href="{{ url('state', s.slug) }}"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} of {{ s.bills }} AI measure{{ '' if s.bills == '1' else 's' }} carry a control · {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.controlled }}<span class="unit">bills</span></span></a></li>
 {%- endmacro %}
 
 {# The state map: one square per state, shaded by the measures that would put AI under new government
@@ -54,15 +54,15 @@
 </div>
 <label class="tmap-sel"><span>Citing</span><select data-fear><option value="all">Any fear</option>{% for f in d.fears %}<option value="{{ f.slug }}">{{ f.name }}</option>{% endfor %}</select></label>
 </div>
-{% endif %}
 <p class="tmap-cap"><span data-map-cap>AI measures that would put AI under new government control</span></p>
+{% endif %}
 <div class="tmap-grid">
-{% for t in m.tiles %}<a class="tile l{{ t.level }}{% if t.filling %} filling{% endif %}" href="{{ url('state', t.slug) }}" style="grid-column:{{ t.col + 1 }};grid-row:{{ t.row + 1 }}" data-code="{{ t.code }}" data-name="{{ t.name }}" aria-label="{{ t.name }}: {{ t.c }} of {{ t.n }} AI measures carry a control"><b>{{ t.abbr }}</b><i>{{ t.c }}</i></a>
+{% for t in m.tiles %}<a class="tile l{{ t.level }}" href="{{ url('state', t.slug) }}" style="grid-column:{{ t.col + 1 }};grid-row:{{ t.row + 1 }}" data-code="{{ t.code }}" data-name="{{ t.name }}" aria-label="{{ t.name }}: {{ t.c }} of {{ t.n }} AI measures carry a control"><b>{{ t.abbr }}</b><i>{{ t.c }}</i></a>
 {% endfor %}</div>
 {% if m.federal %}<div class="tmap-fed">{% for f in m.federal %}<a class="tile-fed" href="{{ url('state', f.slug) }}" data-code="{{ f.code }}" data-name="{{ f.name }}" aria-label="{{ f.name }}: {{ f.c }} of {{ f.n }} AI measures carry a control"><span>{{ 'Congress' if f.code == 'us' else 'Federal agencies' }}</span><b>{{ f.c }}</b></a>{% endfor %}</div>{% endif %}
-<div class="tmap-key" aria-hidden="true"><span>0</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span data-map-top>{{ m.top }}</span>{% if m.tiles|selectattr('filling')|list %}<span class="tmap-note">Dashed: still being read in</span>{% endif %}</div>
-<p class="tmap-out" data-map-out aria-live="polite">Pick a state to see its numbers.</p>
-<script type="application/json" data-map-data>{{ {"counts": m.counts, "fed": m.fed_counts} | tojson }}</script>
+<div class="tmap-key" aria-hidden="true"><span>0</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span data-map-top>{{ m.top }}</span></div>
+<div class="tmap-out" data-map-out aria-live="polite"><p class="tmap-hint">Pick a state to see its numbers.</p></div>
+<script type="application/json" data-map-data>{{ {"counts": m.counts, "fed": m.fed_counts, "info": m.info, "of": m.of} | tojson }}</script>
 </div>
 {%- endmacro %}
 

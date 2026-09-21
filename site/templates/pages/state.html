@@ -9,12 +9,9 @@
 {% if p.n %}
 <p class="hero-num sm">{{ p.c }}</p>
 <p class="hero-text sm">AI measure{{ '' if p.c == 1 else 's' }} that would put AI, the people building it or the people using it under new government control.</p>
-{% elif p.filling %}
-<p class="hero-text">None on file yet.</p>
 {% else %}
-<p class="hero-text">No AI measures found here since January 2025.</p>
+<p class="hero-text">No AI measures on file here yet.</p>
 {% endif %}
-{% if p.filling %}<p class="caption">Still being read in. The search that finds bills for this site cannot see this legislature's bill text, so its bills are being read one at a time, and this page fills in as they are.</p>{% endif %}
 {% if p.n %}<button type="button" class="copy" data-copy="{{ p.receipt }}" data-goatcounter-click="copy-state-receipt">Copy the receipt</button>{% endif %}
 </div></section>
 

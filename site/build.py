@@ -203,7 +203,7 @@ def card_specs(d):
                    f"AI measure{'' if p['c'] == 1 else 's'} that would put AI under new government control, "
                    f"of {p['n']:,} since January 2025")
         else:
-            yield f"state-{p['slug']}", "0", p["name"], "No AI measures found here yet"
+            yield f"state-{p['slug']}", "0", p["name"], "No AI measures on file here yet"
 
 
 # The map card is drawn in the light theme's heat colours, the same five the page uses.
@@ -354,7 +354,7 @@ def page_specs(d):
         elif s["kind"] == "state":
             p = s["ctx"]["p"]
             s["description"] = (p["receipt"].rsplit(" http", 1)[0] if p["n"] else
-                                f"{p['name']}: no AI measures found here since January 2025.")
+                                f"{p['name']}: no AI measures on file here yet.")
     return specs
 
 

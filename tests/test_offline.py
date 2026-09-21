@@ -1715,9 +1715,23 @@ def check_states(dist, data):
     assert states_page.count('<a class="row" href="/states/') == len(rows), "the states page does not list every one"
     assert "data-all" in states_page, "the full list on the states page is cut to five"
     home = (dist / "index.html").read_text()
-    section = home[home.index('id="states"'):home.index('id="law"') if 'id="law"' in home else len(home)]
+    at = home.index('id="states"')
+    section = home[at:home.index("<section", at)]
     assert section.count('<a class="row" href="/states/') == min(5, len(rows)), "the front page should show five states"
     assert 'href="/states/"' in section and "data-map-ctl" not in section, "the front page map should be plain"
+    assert "data-map-cap" not in section, "the front page map repeats the line above it"
+    # The map sits above the money: it is the page's one thing to play with, not its last section.
+    assert home.index('id="states"') < home.index('id="funding"'), "the map fell below the money"
+    present = re.findall(r'<section class="block[^"]*" id="([a-z]+)"', home)
+    jumps = [x for x in re.findall(r'data-jump="([a-z]+)"', home) if x in present]
+    sections = [x for x in present if x in jumps]
+    assert jumps == sections, f"the jump bar is out of order with the page: {jumps} against {sections}"
+    # The page's own sections alternate; the brief and the pitch-in under </main> are every page's
+    # and keep their own look.
+    own = home[home.index('class="jumpbar"'):home.index("</main>")]
+    shades = re.findall(r'<section class="block( band)?" id="[a-z]+"', own)
+    assert len(shades) > 3 and all(a != b for a, b in zip(shades, shades[1:])), "two sections in a row share a shade"
+    assert "filling" not in home and "being read in" not in home.lower(), "a read-in note is back on the page"
     for page in dist.rglob("index.html"):
         assert 'data-nav="states"' in page.read_text(), f"{page} has no States link"
     for p in pages:

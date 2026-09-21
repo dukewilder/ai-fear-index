@@ -921,6 +921,11 @@ STOPPED = re.compile(
     r"|passed by indefinitely|inexpedient to legislate|enacting clause stricken|tabled"
     r"|in committee upon adjournment|sine die adjournment|placed in legislative files", re.I)
 NOT_THE_BILL = re.compile(r"amendments?\s*(\(s\)\s*)?(no\.?\s*\d+\s*)?failed|motion[^.;]*failed", re.I)
+# The last action hands the bill to the one who signs it: the legislature has passed it and nobody
+# has acted on it since. "Not passed" is true of it but reads as if the legislature had not, and
+# fifteen California bills sat on the governor's desk under that label after the session closed.
+AT_SIGNER = re.compile(r"\b(?:presented|sent|delivered|transmitted|forwarded)\s+to\s+(?:the\s+)?"
+                       r"(governor|president|mayor)\b", re.I)
 
 
 def status_label(status, action="", kind=""):
@@ -941,7 +946,23 @@ def status_label(status, action="", kind=""):
         if "veto" in a or "notwithstanding the objections" in a:
             return "Vetoed"
         return "Withdrawn" if "withdrawn" in a else "Did not pass"
+    desk = AT_SIGNER.search(action or "")
+    if desk and kind != "resolution":
+        return f"Sent to the {desk.group(1).lower()}"
     return "Not passed"
+
+
+def closed_sessions():
+    """Sessions whose last day to pass a bill has gone by, each confirmed from a published source."""
+    return {(s["jurisdiction"], s["session"]): s["last_day"] for s in config("sessions_closed")["sessions"]}
+
+
+def can_still_pass(m, today, closed=None):
+    """False for a bill left pending in a session known to be over and not with the governor."""
+    closed = closed_sessions() if closed is None else closed
+    last = closed.get((m["jurisdiction"], m["session"]))
+    return not (last and today > last and m["status"] == "pending"
+                and not AT_SIGNER.search(m["latest_action"] or ""))
 
 
 def status_from_action(text):

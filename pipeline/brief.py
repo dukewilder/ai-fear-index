@@ -22,7 +22,7 @@ import re
 import sys
 
 from .common import (EUPHEMISM, STATES, Entities, annotate, config, connect, env, kv_set, log,
-                     measures_in_scope, name_key, now, status_label)
+                     can_still_pass, closed_sessions, measures_in_scope, name_key, now, status_label)
 from . import tag
 from .export import gave
 from .tag import agreed, norm
@@ -181,7 +181,11 @@ def pool(db, today, days=POOL_DAYS, limit=12):
     # older copy of a carried-over bill could otherwise lead the card while the page has no row
     # for it, and the card says nothing the site cannot show.
     shown = in_scope(db)
-    rows = [r for r in rows if r["id"] in shown and english(r)]
+    # A bill left pending when its session closed cannot pass unless it is with the governor, and the
+    # post opens on power being taken today. California's AB 2023 was second in line for the day
+    # after launch, three weeks after it was put on the inactive file on the session's last day.
+    closed = closed_sessions()
+    rows = [r for r in rows if r["id"] in shown and english(r) and can_still_pass(r, today, closed)]
     recent = [r["jurisdiction"] for r in db.execute(
         "SELECT b.edition, m.jurisdiction_name AS jurisdiction FROM brief b JOIN measures m ON m.id = b.target "
         "ORDER BY b.edition DESC LIMIT 4")]
@@ -818,9 +822,12 @@ def patterns(db, today, recent):
         if not f:
             continue
         n, word = places(db, "fear", r["slug"], keep)
+        # "Name the same fear: Deepfakes" went out on launch day under a lead citing children and
+        # chatbots, where "the same" could only be read as the lead's fear. It says which fear, in
+        # the words the lead uses for one.
+        what = f"cite the fear that {f['because']}" if f.get("because") else f"cite one fear: {f['name']}"
         out.append({"key": f"fear:{r['slug']}:{r['n']}", "weight": 3,
-                    "sentence": f"{count(r['n'], 'measure', cap=True)} in {count(n, word)} "
-                                f"name the same fear: {f['name']}.",
+                    "sentence": f"{count(r['n'], 'measure', cap=True)} in {count(n, word)} {what}.",
                     "meta": f["name"], "office": "",
                     "head": f"{r['n']} measures name the same fear: {f['name']}"})
 
@@ -1139,9 +1146,11 @@ def spare_for(db, lead, today, used):
     by_control = [p for p in spare if p["key"].startswith("control:")]
     if mine:
         by_control.sort(key=lambda p: not p["key"].startswith(f"control:{mine}:"))
-    # the fears all weigh the same, so the one worth printing is the one with the most behind it
+    # The fear the measure itself cites, when enough others cite it to count; otherwise, since the
+    # fears all weigh the same, the one with the most behind it.
+    own = [f for f in (lead.get("fears") or "").split("|") if f]
     by_fear = sorted((p for p in spare if p["key"].startswith("fear:")),
-                     key=lambda p: -int(p["key"].rsplit(":", 1)[1]))
+                     key=lambda p: (p["key"].split(":")[1] not in own, -int(p["key"].rsplit(":", 1)[1])))
     out = by_control[:1] + by_fear[:1]
     return out or spare[:2]
 

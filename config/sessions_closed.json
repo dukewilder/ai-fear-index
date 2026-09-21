@@ -1,0 +1,12 @@
+{
+  "about": "Legislative sessions whose last day to pass a bill has gone by. A bill still pending in one of them can only become law if it is already with the governor, so no other can lead the daily post. The site still shows such a bill as not passed, which stays true. Add a session only once its adjournment is confirmed from a published source, and give the source.",
+  "sessions": [
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "last_day": "2026-08-31",
+      "source": "https://ballotpedia.org/2026_California_legislative_session",
+      "note": "Adjourned August 31, 2026, the last day to pass bills; the Governor's deadline to act on bills sent to him is September 30, 2026 (Courthouse News Service, August 31, 2026)."
+    }
+  ]
+}

@@ -1258,6 +1258,23 @@ def check_status_and_coverage():
     assert status_label("failed", "Died in Committee") == "Did not pass"
     assert status_label("pending", "", "rule") == "Proposed" and status_label("passed", "", "rule") == "Final"
     assert status_label("passed", "", "resolution") == "Adopted" and status_label("passed", "", "order") == "Signed"
+    # A bill the legislature has passed and handed to the governor says so, rather than "not passed".
+    assert status_label("pending", "Enrolled and presented to the Governor at 2 p.m.") == "Sent to the governor"
+    assert status_label("pending", "Presented to President.") == "Sent to the president"
+    assert status_label("pending", "Re-referred to Rules & Executive Nominations") == "Not passed"
+    assert status_label("failed", "Vetoed by Governor") == "Vetoed"
+    assert status_label("passed", "Chaptered by Secretary of State - Chapter 116, Statutes of 2026") == "Passed"
+    # A bill left pending when its session closed cannot lead the post, unless it is with the governor.
+    from pipeline.common import can_still_pass, closed_sessions
+    shut = closed_sessions()
+    assert shut[("ca", "20252026")] == "2026-08-31", shut
+    dead = {"jurisdiction": "ca", "session": "20252026", "status": "pending",
+            "latest_action": "Ordered to inactive file at the request of Senator Padilla."}
+    assert not can_still_pass(dead, "2026-09-22", shut)
+    assert can_still_pass(dead, "2026-08-30", shut), "the session was still open"
+    assert can_still_pass({**dead, "latest_action": "Enrolled and presented to the Governor at 3 p.m."}, "2026-09-22", shut)
+    assert can_still_pass({**dead, "status": "passed"}, "2026-09-22", shut)
+    assert can_still_pass({**dead, "jurisdiction": "nj", "session": "222"}, "2026-09-22", shut)
     for title, want in (("Artificial Intelligence Amendments", True), ("AI Whistleblower Protection Act", True),
                         ("AN ACT CONCERNING ARTIFICIAL INTELLIGENCE.", True), ("Regulate the use of pricing algorithms", True),
                         ("CHATBOT Act", True), ("A.I. in Environmental Permitting.", True),
@@ -1766,6 +1783,15 @@ def main():
     assert offices, "the plate stopped counting offices"
     assert offices["key"] == f"offices:{plate['offices']}", \
         f"the plate's office line says {offices['key']} and its own total says {plate['offices']}"
+    # A fear count says which fear, and under a lead that cites one it counts that one. "Name the
+    # same fear: Deepfakes" went out under a lead citing children and chatbots.
+    fear_lines = [l for l in lines if l["key"].startswith("fear:")]
+    assert fear_lines and not any("same fear" in l["sentence"] for l in fear_lines), fear_lines
+    from pipeline.brief import spare_for as plate_spare  # noqa: E402
+    for l in fear_lines:
+        slug = l["key"].split(":")[1]
+        got = plate_spare(db, {"fears": slug, "controls": ""}, dt.date.today().isoformat(), set())
+        assert any(p["key"] == l["key"] for p in got), f"a lead citing {slug} got {[p['key'] for p in got]}"
     assert data["fears"] and data["controls"]
     # The top of the page has to say who ends up holding the controls, not just that they exist
     assert "office" in (data["exhibit"]["bought"] or ""), \

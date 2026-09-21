@@ -1431,6 +1431,7 @@ def check_status_and_coverage():
                                        "chatbot": {"backfilling": False, "since": "2026-09-20", "page": 1},
                                        "data center": {"backfilling": True, "page": 203}})
     _kv_set(db, "openstates_offset", 3)
+    _kv_set(db, "openstates_probe", cos.PROBE)  # the one-time look for a person, not under test here
     asked = []
 
     class FakeOS:

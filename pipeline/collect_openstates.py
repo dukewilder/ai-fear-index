@@ -42,6 +42,48 @@ FIRST_RUN = "2026-09-18"
 RESWEEP = 1
 
 
+# One look, for a person, at what Open States holds where the record is thin: the District of
+# Columbia has no measure on file at all, and Indiana none from its 2026 session, though both have
+# AI bills (DC's B26-0491, the AI Literacy in Education Act; Indiana's HB 1182 and HB 1201). It
+# reads and logs, and stores nothing. It uses the few requests left above the daily budget.
+PROBE = 1
+PROBE_ASKS = [
+    ("dc, anything", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government"}),
+    ("dc, the search", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government",
+                        "q": "artificial intelligence"}),
+    ("dc, B26-0491 by number", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government",
+                                "identifier": "B26-0491"}),
+    ("in 2026, anything", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government", "session": "2026"}),
+    ("in 2026, the search", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government", "session": "2026",
+                             "q": "artificial intelligence"}),
+    ("in 2026, HB 1182 by number", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government",
+                                    "session": "2026", "identifier": "HB 1182"}),
+]
+
+
+def probe(db, http):
+    """Run the asks above once per PROBE, and log what came back. Returns the requests used."""
+    if kv_get(db, "openstates_probe") == PROBE:
+        return 0
+    used, answered = 0, 0
+    for name, params in PROBE_ASKS:
+        try:
+            data = http.json(BASE, params={**params, "per_page": 3, "include": ["abstracts"]})
+            used += 1
+            answered += 1
+            pag = data.get("pagination") or {}
+            seen = [(b.get("identifier"), (b.get("title") or "")[:70], b.get("session"),
+                     (b.get("created_at") or "")[:10], (b.get("first_action_date") or "")[:10],
+                     len(b.get("abstracts") or [])) for b in data.get("results", [])]
+            log(f"[openstates] probe {name}: {pag.get('total_items')} in all, {pag.get('max_page')} pages; {seen}")
+        except Exception as exc:
+            used += 1
+            log(f"[openstates] probe {name}: {str(exc)[:240]}")
+    if answered:
+        kv_set(db, "openstates_probe", PROBE)
+    return used
+
+
 def jurisdiction_code(j):
     jid = (j or {}).get("id", "")
     for part in jid.split("/"):
@@ -60,6 +102,15 @@ def run(db, state, mode):
     day = iso()[:10]
     spent = kv_get(db, "openstates_spend", {})
     used_today = spent.get("n", 0) if spent.get("date") == day else 0
+    try:
+        probed = probe(db, http)
+    except Exception as exc:  # a look for a person is never the reason a run fails
+        probed = 0
+        log(f"[openstates] probe failed: {str(exc)[:200]}")
+    if probed:
+        used_today += probed
+        kv_set(db, "openstates_spend", {"date": day, "n": used_today})
+        db.commit()
     budget = max(0, min(MAX_REQUESTS, DAY_BUDGET - used_today))
     if not budget:
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"

@@ -447,7 +447,10 @@ def redo_briefs(db):
 # 12: that edition led with the Attorney General's power over the audit reports "beginning July 1,
 #    2027". The date in the digest belongs to the law's duties; the audit section has none, and its
 #    first audits are due by 2029. A start year now has to come from the part of the measure quoted.
-REDO_EDITION = ("2026-09-21", 12)
+# 13: that one was right and said "an operator's audit report" without saying an operator of what,
+#    and the plate read "can request operator audit reports for cause". A sentence and its plate
+#    now have to say what AI the measure is about, in the measure's words.
+REDO_EDITION = ("2026-09-21", 13)
 
 
 def redo_today(db):

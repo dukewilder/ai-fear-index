@@ -37,11 +37,11 @@ def check_brief_prompt():
            "office": "Ohio Department of Commerce"}
     assert "Ohio" in brief.doc(row)
     # and the gates, both ways round
-    body = "ohio would put every operator under the ohio department of commerce"
-    good = "Ohio would put every operator under the Ohio Department of Commerce, which decides who may run one."
-    assert brief.why_not(good, "would put every operator under the ohio department", body, False,
+    body = "ohio would put every ai operator under the ohio department of commerce"
+    good = "Ohio would put every AI operator under the Ohio Department of Commerce, which decides who may run one."
+    assert brief.why_not(good, "would put every ai operator under the ohio department", body, False,
                          row["office"]) == "", "a sound pending sentence was rejected"
-    assert brief.why_not(good, "would put every operator under the ohio department", body, True,
+    assert brief.why_not(good, "would put every ai operator under the ohio department", body, True,
                          row["office"]), "a passed measure written conditionally was accepted"
     # the gates that decide whether a sentence is reporting or repeating the sponsor
     FDA = "Health and Human Services Department, Food and Drug Administration"
@@ -965,10 +965,10 @@ def check_brief_attempts():
     duty_q = "before making a new companion chatbot available to users in the state"
     assert "Attorney General" in brief.dated_part(f"Companion chatbots.\n{two_parts}", power_q)
     for answers, want, reason in (
-            ([("California gives the Attorney General the power to request and obtain, for cause, an operator's "
-               "audit report, beginning July 1, 2027.", power_q),
-              ("California gives the Attorney General the power to request and obtain, for cause, an operator's "
-               "audit report.", power_q)], 1, "different part"),
+            ([("California gives the Attorney General the power to request and obtain, for cause, a companion "
+               "chatbot operator's audit report, beginning July 1, 2027.", power_q),
+              ("California gives the Attorney General the power to request and obtain, for cause, a companion "
+               "chatbot operator's audit report.", power_q)], 1, "different part"),
             ([("California puts every new companion chatbot under a risk assessment the operator must document.",
                duty_q),
               ("From July 1, 2027, California puts every new companion chatbot under a risk assessment the "
@@ -989,6 +989,35 @@ def check_brief_attempts():
         assert lines and lines[0]["sentence"] == answers[want][0], attempts
     print("the brief is written by the stronger model, told every fault, and reads a passive duty: ok")
     print("a start date stays with the part of the measure it belongs to: ok")
+
+    # An operator of what. The fourth writing of the launch edition was true and never said.
+    vague = "California gives the Attorney General the power to request and obtain a copy of an operator's audit report for cause."
+    q = "authorize the Attorney General to, for cause, request and obtain a copy"
+    assert brief.why_not(vague, q, brief.norm(raw), True, "", "", "California", raw=raw, offices=[]) == brief.UNSAID
+    named = vague.replace("an operator's", "a companion chatbot operator's")
+    assert brief.why_not(named, q, brief.norm(raw), True, "", "", "California", raw=raw, offices=[]) == ""
+    elsewhere = "This bill would require a utility to file load forecasts with the commission."
+    assert "words the measure uses" in brief.why_not(
+        "Texas would give the commission the power to demand companion chatbot forecasts.",
+        "require a utility to file load forecasts", brief.norm(elsewhere), False, "", "", "Texas",
+        raw=elsewhere, offices=[]), "a borrowed AI word was accepted"
+    heads = ["California Attorney General can request operator audit reports for cause",
+             "California Attorney General can request companion chatbot audit reports"]
+    asked = []
+
+    def head(key, system, prompt, max_tokens=0):
+        asked.append(prompt)
+        return {"line": heads[len(asked) - 1]}
+    brief.call = head
+    try:
+        got = brief.headline("k", [{"sentence": named, "office": "", "jurisdiction": "California",
+                                    "controls": "mandatory-reporting", "head": ""}],
+                             {c["slug"]: c for c in config("controls")}, {})
+    finally:
+        brief.call = real
+    assert got == heads[1] and len(asked) == 2 and "what AI" in asked[1], (got, len(asked))
+    assert brief.power_clause(named) == "", "the fallback plate would read 'California gives the Attorney General'"
+    print("a sentence and its plate say what AI the measure is about: ok")
 
 
 def check_lobbying_money():

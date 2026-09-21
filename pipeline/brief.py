@@ -235,6 +235,8 @@ RULES = (
     "guidelines, best practices, common sense, sensible, balanced, appropriate, proportionate. "
     "Not stakeholders, public-private, voluntary commitments. Not empower, ensure, transparency. "
     "Name the power and who now holds it.\n"
+    "Say what AI the measure is about, in its words: the companion chatbot, the model, the data "
+    "center. An operator or a company, without saying of what, tells the reader nothing.\n"
     "Use the measure's own words for what it does. Do not reach for a near neighbour of one: a "
     "supply a data centre diminishes is a diminished supply, never a diminutive one.\n"
     "Report it. Do not argue it, do not say what it shows or reveals or highlights, and do not "
@@ -305,6 +307,16 @@ TUCKED = re.compile(r",\s+(?:giving|granting|handing|letting|allowing|authori[sz
 
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
+
+# What the measure is about. Every measure in the pool is about AI, and a sentence has to say which
+# AI: "California gives the Attorney General the power to request and obtain a copy of an operator's
+# audit report" was true, and an operator of what went unsaid, on the plate as well.
+AI_WORD = re.compile(r"\b(?:AI|A\.I\.|artificial[\s-]intelligence|chatbots?|chat\s?bots?|companions?|models?|"
+                     r"algorithm\w*|automated|machine[\s-]learning|deepfakes?|deep[\s-]fakes?|synthetic|"
+                     r"generative|data[\s-]cent(?:er|re)s?|facial[\s-]recognition|biometric\w*|bots?|neural|"
+                     r"LLMs?|frontier|autonomous|robot\w*|digital[\s-]replicas?|chips?|semiconductors?|"
+                     r"compute|computing|GPUs?|integrated[\s-]circuits?)\b", re.I)
+UNSAID = "does not say what AI it is about; name it in the measure's words, such as the chatbot, the model or the data center"
 
 # A sentence that names the power has a shape: something is put under a body, a body is handed
 # something, or a body does the deciding. The words alone are not enough. "Under penalty of
@@ -586,6 +598,15 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     loose = re.search(r"\b(bill|act|legislation|lawmakers?)\b", text, re.I)
     if loose:
         return f"says {loose.group(0)!r} instead of naming who is bound"
+    named = [norm(m.group(0)) for m in AI_WORD.finditer(text)]
+    if not named:
+        return UNSAID
+    if raw:
+        # and in words the measure uses, not ones borrowed from the examples in the rules
+        said = f" {norm(raw)} "
+        if not any((f" {n} " in said or "artificial intelligence" in said) if n in ("ai", "a i")
+                   else n[:6] in said for n in named):
+            return UNSAID.replace("; name it", ", in words the measure uses; name it")
     if passed and starts and starts not in text:
         return f"passed but starts in {starts}, and the sentence does not say so"
     if offices is not None and unpowered_body(text, offices):
@@ -859,7 +880,9 @@ HEAD_RULES = (
     "as the requirement going away, and a headline without the body says the second one.\n"
     "If the sentence says what a government office can do, the office and what it can do are the "
     "headline, with the office doing it. A firm a company has to hire, such as an auditor, is not "
-    "an office, and it never takes the office's place."
+    "an office, and it never takes the office's place.\n"
+    "Keep what the measure is about, in the sentence's words: the chatbot, the model, the data "
+    "center. A headline about an operator or a company, without saying of what, says nothing."
 )
 
 NUMERAL = re.compile(r"\d[\d,.]*")
@@ -908,7 +931,9 @@ def power_clause(text, limit=13):
     Cutting at a word count lands mid-phrase. The end of the power phrase is a boundary, and
     everything up to it is the sentence's own wording, already checked against the measure.
     """
-    m = POWER.search(text or "")
+    # Only "under" closes a clause. "California gives the Attorney General" and "..., which licenses"
+    # stop before the power they are about, and would go on the plate as half a sentence.
+    m = next((p for p in POWER.finditer(text or "") if p.group(0).lower().startswith("under")), None)
     if not m or private_holder(text):
         return ""
     end = m.end()
@@ -954,8 +979,9 @@ def headline(key, lines, names, totals):
     place = lead.get("jurisdiction") or ""
     conditional = bool(CONDITIONAL.search(tense_of(text, place)))
     holder = holder_words(text)
+    about = AI_WORD.search(text)
     extra = ""
-    for _ in range(2 if holder else 1):
+    for _ in range(3):
         try:
             out = call(key, HEAD_SYSTEM, f"SENTENCE\n{text}\n\n{HEAD_RULES}{extra}\n\n"
                                         'Return JSON: {"line": "..."}', max_tokens=150)
@@ -963,22 +989,33 @@ def headline(key, lines, names, totals):
         except Exception as exc:
             log(f"[brief] headline: {exc}")
             break
+        faults = []
         if holder and not any(w in line.lower() for w in holder):
             # Everything else here stops the headline saying something untrue. This stops it
             # saying the true thing backwards, or leaving out who gains the power, which are the
             # two ways it has gone wrong so far.
-            log(f"[brief] headline dropped who holds the power: {line!r}")
-            extra = ("\n\nThe attempt before this one dropped the office that holds the power. "
-                     f"The headline has to name {' or '.join(sorted(holder))}. A measure that "
-                     "hands one office a power is not the same as a rule on a company, and "
-                     "without the office the line says the second.")
-            continue
-        if line and len(line.split()) <= 10 \
-                and not sponsors_word(line, lead.get("office") or "", loose=True) \
-                and set(NUMERAL.findall(line)) <= source \
-                and bool(CONDITIONAL.search(tense_of(line, place))) == conditional:
+            faults.append(f"it dropped the office that holds the power, and has to name "
+                          f"{' or '.join(sorted(holder))}: a measure that hands one office a power is "
+                          f"not the same as a rule on a company, and without the office the line says "
+                          f"the second")
+        if about and not AI_WORD.search(line):
+            faults.append(f"it does not say what AI the measure is about; keep {about.group(0)!r}, or "
+                          f"the sentence's own word for it")
+        if not line or len(line.split()) > 10:
+            faults.append("it is longer than nine words")
+        word = sponsors_word(line, lead.get("office") or "", loose=True)
+        if word:
+            faults.append(f"it uses the sponsor's word {word!r}")
+        if not set(NUMERAL.findall(line)) <= source:
+            faults.append("it has a number the sentence does not")
+        if bool(CONDITIONAL.search(tense_of(line, place))) != conditional:
+            faults.append("it says would where the sentence does not" if not conditional
+                          else "it drops the would the sentence has, which turns a proposal into a law")
+        if not faults:
             return line
-        break
+        log(f"[brief] headline refused, {line!r}: {'; '.join(faults)}")
+        extra = ("\n\nThe attempt before this one was refused because " + "; and ".join(faults)
+                 + ". Write it again without that, keeping every rule above.")
     return plain(lead, names)
 
 

@@ -135,8 +135,8 @@
    rather than sending the reader to the front page for something a screen above them. #}
 {% if d.site and d.site.donate_url %}<a href="{{ d.site.donate_url }}" rel="noopener" target="_blank" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% elif d.site and d.site.donate_btc %}<a href="#keep" data-goatcounter-click="donate-footer">{{ d.site.donate_label }}</a>{% endif %}
 {% if d.site and d.site.x_handle %}<a href="https://x.com/{{ d.site.x_handle }}" rel="noopener" target="_blank" data-goatcounter-click="x-footer">Daily brief on X</a>{% endif %}
-<a href="{{ d.links.code }}">Source code</a>
-<a href="{{ d.links.report }}" data-goatcounter-click="report-error">Report an error</a>
+<a href="{{ d.links.code }}" rel="noopener" target="_blank">Source code</a>
+<a href="{{ d.links.report }}" rel="noopener" target="_blank" data-goatcounter-click="report-error">Report an error</a>
 </nav>
 </div>
 <p class="foot-note">Last updated <span data-rel="{{ d.built_at }}">recently</span></p>

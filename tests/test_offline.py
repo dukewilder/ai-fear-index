@@ -1215,6 +1215,40 @@ def check_mark_geometry():
 ALLOWED_HOSTS = {"gc.zgo.at"}   # the counter, and nothing else
 
 
+def check_links_open_right(dist):
+    """A link off the site opens a new tab; a link within it does not.
+
+    A reader who follows a bill to its source, or the footer to GitHub, should still have the
+    report open behind it. A page of this site opening in a new tab would do the opposite, piling
+    tabs up and breaking the back button, and bitcoin: and mailto: hand off to an app, so a new tab
+    there is left empty.
+    """
+    from html.parser import HTMLParser
+
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.found = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                self.found.append(dict(attrs))
+    checked = 0
+    for page in pathlib.Path(dist).rglob("*.html"):
+        parser = Links()
+        parser.feed(page.read_text(encoding="utf-8"))
+        for a in parser.found:
+            href, blank = a.get("href") or "", a.get("target") == "_blank"
+            away = re.match(r"https?://", href) and not re.match(r"https?://(www\.)?aifearreport\.com", href)
+            if away:
+                assert blank and "noopener" in (a.get("rel") or ""), f"{page}: {href} opens in the same tab"
+            else:
+                assert not blank, f"{page}: {href} is part of the site and opens a new tab"
+            checked += 1
+    assert checked, "no links were checked"
+    print(f"links off the site open a new tab, links within it do not ({checked} checked): ok")
+
+
 def check_every_page_asks(dist, db, day):
     """The brief and the pitch-in are on every page, in that order, and the card is real.
 
@@ -1531,6 +1565,7 @@ def main():
         assert "election money, past year" not in body and "election money this year" not in body, \
             f"{page.name} dates cycle-to-date election money as a year"
     check_every_page_asks(tmp / "dist", db, brief_day)
+    check_links_open_right(tmp / "dist")
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

@@ -23,8 +23,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
   issues: write   # the Monday label review opens one issue for a person to read
 
 concurrency:
@@ -81,24 +79,10 @@ jobs:
           ls -la state
       - name: First pass
         run: bash .github/pass.sh once
-      - uses: actions/upload-pages-artifact@v3
-        continue-on-error: true   # a bad build must not stop the passes that follow
-        with:
-          path: dist
 
-  # Publishes the first pass through Pages. Once Pages serves the gh-pages branch that
-  # every pass writes, this job has nothing left to do and can go.
-  deploy:
-    needs: pass
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        continue-on-error: true
-        uses: actions/deploy-pages@v4
+  # Pages serves the gh-pages branch, which every pass writes. There used to be a deploy job here
+  # as well, publishing the first pass a second way; the two raced, and on 21 September Pages
+  # refused a build because the other deployment was still in progress.
 
   # The rest of the run: a pass every twenty minutes until the job's time is up.
   keep:

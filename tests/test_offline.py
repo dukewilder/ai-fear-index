@@ -1312,8 +1312,14 @@ def check_status_and_coverage():
                                   {"type": "HR", "number": "1", "title": "AI Ads Act", "updateDate": "b"},
                                   {"type": "HR", "number": "9", "title": "NO FAKES Act", "updateDate": "c"}]}
             if url.split("?")[0].endswith("/summaries/119"):
-                return {"summaries": [{"bill": {"type": "S", "number": "146"}, "text": "<p>covers deepfakes</p>"},
-                                      {"bill": {"type": "HR", "number": "2"}, "text": "<p>highway funding</p>"}]}
+                # a short first page with a next link, as the API pages: the scan must not stop there
+                if params.get("offset", 0) == 0:
+                    return {"summaries": [{"bill": {"type": "S", "number": "146"}, "text": "<p>covers deepfakes</p>"},
+                                          {"bill": {"type": "HR", "number": "2"}, "text": "<p>highway funding</p>"}],
+                            "pagination": {"count": 3, "next": "https://api.congress.gov/v3/summaries/119?offset=2"}}
+                return {"summaries": [{"bill": {"type": "HR", "number": "7"},
+                                       "text": "<p>requires disclosure of artificial intelligence use</p>"}],
+                        "pagination": {"count": 3}}
             raise AssertionError(url)
     calls = []
     saved = (cc.Http, cc.store_bill, cc.env, cc.current_congress)
@@ -1325,6 +1331,7 @@ def check_status_and_coverage():
         cc.Http, cc.store_bill, cc.env, cc.current_congress = saved
     assert ("HR", 1, True) in calls and ("HR", 9, True) in calls, calls
     assert ("S", 146, False) in calls and not any(c[:2] == ("HR", 2) for c in calls), calls
+    assert ("HR", 7, False) in calls, "the summary scan stopped at a short page"
     print("Congress bills are found by their summaries as well as their titles: ok")
 
     # State searches: the ones already caught up run first, so a backfill cannot starve them.

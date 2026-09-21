@@ -57,7 +57,7 @@ def run(db, state, mode):
     by_summary, capped = 0, False
     try:
         # The first scan reads every summary this Congress has; after that, what changed since.
-        full = not kv_get(db, f"congress_summaries:{congress}")
+        full = not kv_get(db, f"congress_summaries:{congress}:2")
         seen = {(b.get("type") or "").upper() + str(b.get("number")) for b in matched}
         for kind, number in summary_matches(http, key, congress, None if full else params.get("fromDateTime")):
             if kind + str(number) in seen or f"us-{congress}-{kind.lower()}-{number}" in stored:
@@ -70,7 +70,7 @@ def run(db, state, mode):
             added += store_bill(db, http, key, congress, kind, number)
             db.commit()
         if full and not capped:
-            kv_set(db, f"congress_summaries:{congress}", iso())
+            kv_set(db, f"congress_summaries:{congress}:2", iso())
     except Exception as exc:  # the title scan still stands
         log(f"[congress] summary scan failed: {str(exc)[:200]}")
     kv_set(db, "congress_since", started)
@@ -85,8 +85,8 @@ def summary_matches(http, key, congress, since=None):
     if since:
         params["fromDateTime"] = since
     offset, pages, out = 0, 0, []
-    while pages < 80:
-        data = http.json(f"{BASE}/summaries/{congress}", params={**params, "offset": offset, "sort": "updateDate+desc"})
+    while pages < 200:
+        data = http.json(f"{BASE}/summaries/{congress}?sort=updateDate+desc", params={**params, "offset": offset})
         items = data.get("summaries", [])
         pages += 1
         for item in items:
@@ -94,9 +94,12 @@ def summary_matches(http, key, congress, since=None):
             kind, number = (bill.get("type") or "").upper(), bill.get("number")
             if kind in TYPE_LABEL and number and looks_ai(strip_html(item.get("text") or "")):
                 out.append((kind, int(number)))
-        if len(items) < params["limit"]:
+        # The end is where the API says there is no next page. A page shorter than asked for is
+        # not the end: the first full scan stopped after one page that way and found one bill.
+        if not items or not (data.get("pagination") or {}).get("next"):
             break
-        offset += params["limit"]
+        offset += len(items)
+    log(f"[congress] read {pages} pages of summaries, {len(out)} name AI")
     return out
 
 

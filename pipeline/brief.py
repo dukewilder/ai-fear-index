@@ -244,7 +244,8 @@ RULES = (
     "Not stakeholders, public-private, voluntary commitments. Not empower, ensure, transparency. "
     "Name the power and who now holds it.\n"
     "Say what AI the measure is about, in its words: the companion chatbot, the model, the data "
-    "center. An operator or a company, without saying of what, tells the reader nothing.\n"
+    "center. An operator or a company, without saying of what, tells the reader nothing. Write AI "
+    "only if the measure does: a data center bill that does not say AI is about data centers.\n"
     "Use the measure's own words for what it does. Do not reach for a near neighbour of one: a "
     "supply a data centre diminishes is a diminished supply, never a diminutive one.\n"
     "Report it. Do not argue it, do not say what it shows or reveals or highlights, and do not "
@@ -325,6 +326,10 @@ AI_WORD = re.compile(r"\b(?:AI|A\.I\.|artificial[\s-]intelligence|chatbots?|chat
                      r"LLMs?|frontier|autonomous|robot\w*|digital[\s-]replicas?|chips?|semiconductors?|"
                      r"compute|computing|GPUs?|integrated[\s-]circuits?)\b", re.I)
 UNSAID = "does not say what AI it is about; name it in the measure's words, such as the chatbot, the model or the data center"
+# The word itself. A data center bill that never says AI is counted all the same, and a sentence or
+# a headline that calls its data centers "AI data centers" would be putting words in the measure.
+AI_ITSELF = re.compile(r"\bA\.?I\.?(?![\w/])|\bartificial[\s-]intelligence\b", re.I)
+AI_ADDED = "says AI, which the measure does not; use the measure's own word for it, such as the data center"
 
 # A sentence that names the power has a shape: something is put under a body, a body is handed
 # something, or a body does the deciding. The words alone are not enough. "Under penalty of
@@ -615,6 +620,9 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
         if not any((f" {n} " in said or "artificial intelligence" in said) if n in ("ai", "a i")
                    else n[:6] in said for n in named):
             return UNSAID.replace("; name it", ", in words the measure uses; name it")
+        # Data center bills are counted whether or not they say AI, so the sentence cannot add it.
+        if AI_ITSELF.search(text) and not AI_ITSELF.search(raw):
+            return AI_ADDED
     if passed and starts and starts not in text:
         return f"passed but starts in {starts}, and the sentence does not say so"
     if offices is not None and unpowered_body(text, offices):
@@ -895,7 +903,8 @@ HEAD_RULES = (
     "headline, with the office doing it. A firm a company has to hire, such as an auditor, is not "
     "an office, and it never takes the office's place.\n"
     "Keep what the measure is about, in the sentence's words: the chatbot, the model, the data "
-    "center. A headline about an operator or a company, without saying of what, says nothing."
+    "center. A headline about an operator or a company, without saying of what, says nothing. "
+    "Write AI only if the sentence does."
 )
 
 NUMERAL = re.compile(r"\d[\d,.]*")
@@ -1014,6 +1023,8 @@ def headline(key, lines, names, totals):
         if about and not AI_WORD.search(line):
             faults.append(f"it does not say what AI the measure is about; keep {about.group(0)!r}, or "
                           f"the sentence's own word for it")
+        if AI_ITSELF.search(line) and not AI_ITSELF.search(text):
+            faults.append("it says AI where the sentence does not; keep the sentence's own word")
         if not line or len(line.split()) > 10:
             faults.append("it is longer than nine words")
         word = sponsors_word(line, lead.get("office") or "", loose=True)

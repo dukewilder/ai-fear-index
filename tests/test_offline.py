@@ -1017,6 +1017,27 @@ def check_brief_attempts():
         brief.call = real
     assert got == heads[1] and len(asked) == 2 and "what AI" in asked[1], (got, len(asked))
     assert brief.power_clause(named) == "", "the fallback plate would read 'California gives the Attorney General'"
+    # A data center bill that never says AI is counted all the same, and neither the sentence nor its
+    # headline may call its data centers AI.
+    dc_raw = "Data centers; site assessment. Requires a locality to review the sound profile of a data center."
+    dc_q = "Requires a locality to review the sound profile of a data center"
+    added = "Virginia would give each locality the power to review the sound profile of an AI data center."
+    assert brief.why_not(added, dc_q, brief.norm(dc_raw), False, "", "", "Virginia", raw=dc_raw,
+                         offices=[]) == brief.AI_ADDED
+    plain = added.replace("an AI data center", "a data center")
+    assert brief.why_not(plain, dc_q, brief.norm(dc_raw), False, "", "", "Virginia", raw=dc_raw,
+                         offices=[]) != brief.AI_ADDED
+    heads = ["Virginia localities would review AI data center noise",
+             "Virginia localities would review data center noise"]
+    asked.clear()
+    brief.call = head
+    try:
+        got = brief.headline("k", [{"sentence": plain, "office": "", "jurisdiction": "Virginia",
+                                    "controls": "data-center-limits", "head": ""}],
+                             {c["slug"]: c for c in config("controls")}, {})
+    finally:
+        brief.call = real
+    assert got == heads[1] and len(asked) == 2 and "says AI where the sentence does not" in asked[1], (got, asked)
     print("a sentence and its plate say what AI the measure is about: ok")
 
 
@@ -1282,6 +1303,41 @@ def check_status_and_coverage():
                         ("Large-Load Data Centers", False), ("Hawaiian ai pono kitchens", False),
                         ("Artificial Intelligence (AI) Literacy Act", True)):
         assert title_names_ai(title) == want, f"title {title!r}"
+    # Data center bills count whether or not they say AI, and a title naming data centers settles it,
+    # except where "data center" is the name of a data program rather than a building.
+    from pipeline.common import title_names_data_centers, title_settles, retag_data_centers, RETAG_DATA_CENTERS
+    for title, want in (("Large-Load Data Centers", True), ("HYPERSCALE DATA CENTERS", True),
+                        ("AN ACT relating to data centers.", True), ("Data center tax revenue; creates local program.", True),
+                        ("An Act establishing an education-to-career data center", False),
+                        ("State government; Oklahoma State Data Center; Legislative Service Bureau", False),
+                        ("Maryland Longitudinal Data System Center - External Data Sharing With Third-Party Data Centers", False),
+                        ("Establishes NJ Water Data Center at public institution of higher education", False),
+                        ("Relating to property tax exemptions", False)):
+        assert title_names_data_centers(title) == want, f"data center title {title!r}"
+    assert title_settles("Large-Load Data Centers") and title_settles("AI Whistleblower Protection Act")
+    assert not title_settles("Relating to property tax exemptions")
+    rdb = connect(":memory:")
+    for mid, title, summary, ai in (("d1", "Large-Load Data Centers", "", 0),
+                                    ("d2", "Relating to utilities", "Sets a rate class for large load customers.", 0),
+                                    ("d3", "Relating to fishing licenses", "Raises the fee.", 0),
+                                    ("d4", "Data centers; moratorium", "", 1)):
+        upsert(rdb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "co", "session": "2026A",
+                                 "identifier": mid, "title": title, "summary": summary, "status": "pending",
+                                 "introduced_date": "2026-02-01", "url": f"u-{mid}"})
+        rdb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', ?, 'then')", (mid, ai))
+    # An office refused on a data center bill because the power was over data centers, not AI.
+    rdb.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) VALUES("
+                "'d4', 'agency', 'Colorado Public Utilities Commission', 'approve a data center connection', 'no', "
+                "'authority over data centers, not over AI', 'fake', 'then')")
+    rdb.execute("DELETE FROM kv WHERE key = ?", (f"retag:data-centers:{RETAG_DATA_CENTERS}",))
+    rdb.commit()
+    assert retag_data_centers(rdb) == 3 and retag_data_centers(rdb) == 0, "the data center requeue is not once only"
+    queued = {r["target"] for r in rdb.execute("SELECT target FROM tag_runs WHERE text_hash IS NULL")}
+    assert queued == {"d1", "d2", "d4"}, queued
+    assert rdb.execute("SELECT evidence FROM tags WHERE target = 'd4' AND kind = 'agency'").fetchone()[0] == \
+        "approve a data center connection", "the refused office was not put back to be asked again"
+    assert not rdb.execute("SELECT 1 FROM checks WHERE target = 'd4'").fetchall(), "the old refusal was kept"
+    print("a data center bill counts whether or not it says AI, and those turned down are read again: ok")
     assert session_year("mt", "2025") == 2025 and session_year("tx", "89R") == 2025 and session_year("tx", "891") == 2025
     assert session_year("nj", "221") == 2024 and session_year("az", "57th-1st-regular") == 2025
     assert session_year("zz", "12") is None
@@ -1416,7 +1472,8 @@ def check_status_and_coverage():
     adb = connect(":memory:")
     for mid, title, summary in (("a1", "CATCH Fentanyl Act", "Directs a pilot of detection technology, which may include artificial intelligence."),
                                 ("a2", "An act relating to a person's voice and likeness", "Bars unauthorized AI-generated digital replicas."),
-                                ("a3", "Artificial Intelligence Amendments", "")):
+                                ("a3", "Artificial Intelligence Amendments", ""),
+                                ("a0", "HYPERSCALE DATA CENTERS", "")):
         upsert(adb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "session": "89R", "identifier": mid,
                                  "title": title, "summary": summary, "status": "pending", "introduced_date": "2025-03-01",
                                  "url": f"u-{mid}", "jurisdiction_name": "Texas", "source": "Open States"})
@@ -1431,8 +1488,8 @@ def check_status_and_coverage():
                 else {"verdict": "yes", "reason": "it regulates digital replicas"}), "fake"
     check.run(adb, "k", ask_fn=judge)
     counted = {m["id"] for m in _in_scope(adb)}
-    assert len(asked) == 2, f"asked {len(asked)} times; a title naming AI should not be asked"
-    assert counted == {"a2", "a3"}, counted
+    assert len(asked) == 2, f"asked {len(asked)} times; a title naming AI or data centers should not be asked"
+    assert counted == {"a2", "a3", "a0"}, counted
     check.run(adb, "k", ask_fn=judge)
     assert len(asked) == 2, "a measure already answered on the same text was asked again"
     # What the report counts with AI is not the second reading's to narrow. The first wording took
@@ -1444,7 +1501,7 @@ def check_status_and_coverage():
     # read again since, on new text, keeps the tagger's answer.
     for mid, tagged in (("a5", "2026-09-21T10:00:00+00:00"), ("a6", "2026-09-21T13:00:00+00:00")):
         upsert(adb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "session": "89R", "identifier": mid,
-                                 "title": "Relating to a moratorium on data centers",
+                                 "title": "Relating to electric utilities and local permits",
                                  "summary": "Pauses permits for new data centers and sets large-load electricity rates.",
                                  "status": "pending", "introduced_date": "2025-03-01", "url": f"u-{mid}",
                                  "jurisdiction_name": "Texas", "source": "Open States"})
@@ -1458,7 +1515,7 @@ def check_status_and_coverage():
     counted = {m["id"] for m in _in_scope(adb)}
     assert "put back 1 measure to ask again whether it is about AI" in line, line
     assert "a5" in counted and "a6" not in counted, counted
-    assert len(asked) == 3 and "moratorium on data centers" in asked[-1], "the one put back was not asked again"
+    assert len(asked) == 3 and "Pauses permits for new data centers" in asked[-1], "the one put back was not asked again"
     assert not adb.execute("SELECT 1 FROM checks WHERE kind = 'about' AND verdict = 'no'").fetchall(), \
         "an old refusal was kept"
     check.run(adb, "k", ask_fn=judge)

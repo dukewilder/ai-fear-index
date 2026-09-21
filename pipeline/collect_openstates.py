@@ -10,11 +10,13 @@ from .common import (SINCE, Http, HttpError, congress_id, env, iso, kv_get, kv_s
                      status_from_action, upsert)
 
 BASE = "https://v3.openstates.org/bills"
-# "data center" goes last. It matches every bill that mentions one, most of them not about AI, and
-# its backfill had used four days of the allowance at page 203 while "automated decision",
+# "data center" goes last. It matches every bill that mentions one, budget bills included, and its
+# backfill had used four days of the allowance at page 203 while "automated decision",
 # "algorithmic", "synthetic media" and "digital replica" had not been searched once. California's
 # No Robo Bosses Act and Colorado's delay of its AI Act were missing because of it. The stored
 # offset points at the fourth query, which in this order is the first of the four never searched.
+# Data center bills are counted whether or not they say AI, and the tagger sorts the ones about
+# data centers from the ones that mention one in passing.
 QUERIES = ["artificial intelligence", "deepfake", "chatbot", "automated decision", "algorithmic",
            "synthetic media", "digital replica", "data center"]
 MAX_REQUESTS = 240  # per run
@@ -171,7 +173,7 @@ def prefile_sweep(db, http, cap, started):
     """Read the pre-filed bills each search has not reached. Returns (requests, rows stored)."""
     state = kv_get(db, "openstates_prefile", {})
     used, stored = 0, 0
-    for query in [q for q in QUERIES if q != "data center"]:
+    for query in QUERIES:  # data center included, now that data center bills count whatever they say
         cur = state.get(query, {"page": 1, "done": False})
         while not cur["done"] and used < cap and time.time() - started < SECONDS:
             try:

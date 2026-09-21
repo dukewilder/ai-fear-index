@@ -20,7 +20,7 @@ import time
 
 import requests
 
-from .common import annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_names_ai
+from .common import annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_settles
 from . import known
 
 API = "https://api.anthropic.com/v1/messages"
@@ -106,9 +106,10 @@ CONTROL_NOTES = {
 }
 
 OFFICE_QUESTION = (
-    "Does the measure itself create this office, or give it new authority over AI or over the people "
-    "who build, deploy, or use AI: to make rules, license, certify, approve, inspect, audit, "
-    "investigate, enforce, or require reports or records from them?\n"
+    "Does the measure itself create this office, or give it new authority over AI, over data centers, "
+    "or over the people who build, deploy, or use AI: to make rules, license, certify, approve, "
+    "inspect, audit, investigate, enforce, or require reports or records from them? Data centers "
+    "count whether or not the measure says they are for AI.\n"
     "Answer no when any of these is true:\n"
     "- the office is only mentioned, or is one place a person may choose to report to;\n"
     "- the office receives a report from another government body, or is asked to study, recommend, "
@@ -138,7 +139,8 @@ ABOUT_QUESTION = (
     "learning, algorithms or automated decision systems; AI chatbots; deepfakes and other synthetic or "
     "digitally altered images, video, audio or voices; rights over a person's voice and likeness (not "
     "payments to athletes for their name, image and likeness); data centers or high performance "
-    "computing facilities, including their power, water, siting, rates or taxes.\n"
+    "computing facilities, including their power, water, siting, rates or taxes, whether or not the "
+    "measure says AI (not a data program, office or database that is called a data center).\n"
     "Answer no when the subject appears only in passing: one of several technologies or fields a "
     "program may use, fund or study; a finding, a definition or a statement of purpose; or one line "
     "in a measure about something else, such as defense, trade or health care. An intimate-image or "
@@ -270,13 +272,13 @@ def queue(db, controls, fears=None):
                 refused.append(r)  # the measure was read again and landed on the same quote
             continue  # yes stays; hold waits for a person
         todo.append(r)
-    # Every counted measure whose title does not name AI, unless a person has confirmed it is an AI
-    # law. Keyed to its text, so a new summary is asked about again.
+    # Every counted measure whose title does not name AI or data centers, unless a person has
+    # confirmed it is an AI law. Keyed to its text, so a new summary is asked about again.
     confirmed = known.ids(db)
     asked = {r["target"]: (r["evidence"], r["verdict"]) for r in
              db.execute("SELECT target, evidence, verdict FROM checks WHERE kind = 'about'")}
     for mid, m in shown.items():
-        if m.get("post") or mid in confirmed or title_names_ai(m["title"]):
+        if m.get("post") or mid in confirmed or title_settles(m["title"]):
             continue
         r = {"target": mid, "kind": "about", "value": "ai",
              "evidence": sha(f"{m['title'] or ''}\n{m['summary'] or ''}")}

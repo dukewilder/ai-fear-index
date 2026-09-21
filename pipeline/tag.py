@@ -12,7 +12,8 @@ import time
 
 import requests
 
-from .common import AI_TEXT, config, env, in_window, iso, kv_get, kv_set, log, sha, states_a_position, title_names_ai
+from .common import (AI_TEXT, config, env, in_window, iso, kv_get, kv_set, log, sha, states_a_position,
+                     title_settles)
 from . import known
 
 API = "https://api.anthropic.com/v1/messages"
@@ -73,12 +74,15 @@ def propose(key, fears, controls, doc, is_measure):
               "what the text says. Reply with a single JSON object and nothing else.")
     control_block = f"\nCONTROLS (what the measure itself would impose):\n{definitions(controls)}\n" if is_measure else ""
     schema = ('{"ai_related": true or false, "fears": [fear slugs], "controls": [control slugs], '
-              '"agencies": ["government bodies the measure would give new authority, duties, or enforcement power over AI, '
+              '"agencies": ["government bodies the measure would give new authority, duties, or enforcement power over AI '
+              'or data centers, '
               'named with their jurisdiction, for example \\"Colorado Attorney General\\""]}') if is_measure else \
         '{"ai_related": true or false, "fears": [fear slugs]}'
     user = (f"FEARS (harms the text may cite):\n{definitions(fears)}\n{control_block}\nTEXT\n{doc}\n\n"
             f"Return JSON: {schema}\nRules: ai_related is true only if the text is substantially about artificial "
-            "intelligence, algorithms, automated decisions, synthetic media, or AI data centers. A fear counts only if "
+            "intelligence, algorithms, automated decisions, synthetic media, or data centers: their building, power, "
+            "water, land, siting, rates or taxes, and the large electricity loads they bring, whether or not the text "
+            "says AI (not a data program or office that happens to be called a data center). A fear counts only if "
             "the text states or clearly invokes that harm. A control counts only if the measure itself would impose it. "
             "Summaries often recite law already in force before saying what the measure does. Ignore every "
             "sentence that describes existing law, including ones that open with \"Existing law\" or name an "
@@ -314,9 +318,10 @@ def run(db, state, mode):
         if not ai and target.startswith("fr-") and AI_TEXT.search(title):
             ai = True
         # The same for a bill, and for the same reason: most states publish no summary, and the
-        # model given a bare title said "Artificial Intelligence Amendments" was not about AI.
+        # model given a bare title said "Artificial Intelligence Amendments" was not about AI. A
+        # title naming data centers settles it the same way, as the report counts them with AI.
         # Not a resolution, which can name AI in honouring a school team.
-        if not ai and target not in resolutions and not target.startswith("fr-") and title_names_ai(title):
+        if not ai and target not in resolutions and not target.startswith("fr-") and title_settles(title):
             ai = True
         if not ai and target in known_ai:
             ai = True

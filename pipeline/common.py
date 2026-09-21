@@ -592,6 +592,7 @@ def connect(path):
     drop_position_controls(db)
     retag_ai_titles(db)
     retag_ai_bills(db)
+    retag_data_centers(db)
     restatus(db)
     return db
 
@@ -832,8 +833,8 @@ def looks_ai(*texts):
 # text is "substantially about" AI, and given a title and no summary it said no to 180 bills titled
 # with it: Utah's "Artificial Intelligence Amendments", Connecticut's "An Act Concerning Artificial
 # Intelligence", Congress's "AI Whistleblower Protection Act". Most states publish no summary, so
-# this is most of their record. Narrower than AI_TEXT: a data center bill is about AI only if its
-# text says so, and "AI" alone has to be the acronym, in capitals, standing for AI.
+# this is most of their record. Narrower than AI_TEXT: "AI" alone has to be the acronym, in
+# capitals, standing for AI. Data centers have a rule of their own below.
 AI_TITLE = re.compile(
     r"(?i)\b(artificial intelligence|machine learning|deep ?fakes?|synthetic media|digital replicas?|"
     r"chat ?bots?|large language models?|foundation models?|frontier (ai|models?)|generative (ai|artificial)|"
@@ -846,6 +847,77 @@ def title_names_ai(title):
     if not re.search(r"artificial intelligence\s*\(\s*A\.?I\.?\s*\)", t, re.I):
         t = re.sub(r"\(\s*A\.?I\.?\s*\)", " ", t)  # "Accelerating Innovation (AI) for Kids with Cancer"
     return bool(AI_TITLE.search(t))
+
+
+# Data center bills are counted whether or not they say AI: the owner's decision of 21 September
+# 2026, since the fight over data centers' power, water, land and tax breaks is the fight over the AI
+# buildout. Before it the tagger was told "AI data centers" and split them at random, 155 counted
+# and 191 just like them left out. A title that names data centers settles it, as a title naming AI
+# does, except where "data center" names a data program or an office rather than a building: a
+# census State Data Center, a longitudinal data system, an education-to-career data center.
+DC_TITLE = re.compile(r"(?i)\b(data ?cent(er|re)s?|hyperscale)\b")
+NOT_A_BUILDING = re.compile(r"(?i)\b(state data cent(er|re)|longitudinal|data systems?|education[- ]to[- ]career|"
+                            r"career[- ]to[- ]education|water data cent(er|re)|census)\b")
+# What sends a measure the tagger turned down back to it under the new rule: data centers named
+# anywhere in its text, or the large electricity loads the utilities' own bills call them.
+DC_TEXT = re.compile(r"(?i)\b(data ?cent(er|re)s?|hyperscale|large[- ]loads?|high[- ]performance computing)\b")
+
+
+def title_names_data_centers(title):
+    t = title or ""
+    return bool(DC_TITLE.search(t)) and not NOT_A_BUILDING.search(t)
+
+
+def title_settles(title):
+    """A title that decides on its own that a bill is in the report: it names AI or data centers."""
+    return title_names_ai(title) or title_names_data_centers(title)
+
+
+# Bump to send the tagger again every measure it turned down that names data centers.
+RETAG_DATA_CENTERS = 1
+
+
+def retag_data_centers(db):
+    """Queue once, under the rule that counts data centers, the measures it changes.
+
+    Every measure the tagger turned down that names data centers: a bill whose title names them is
+    then counted whatever the tagger says, and the rest are read again by a tagger told they count.
+    And every data center measure already counted, because the tagger was asked for offices gaining
+    power over AI and so named almost none: 16 offices across 196 data center bills, where a public
+    utilities commission handed the approval of a data center's grid connection is gaining exactly
+    the power this report counts. An office refused for that reason alone is asked about again.
+    """
+    key = f"retag:data-centers:{RETAG_DATA_CENTERS}"
+    if kv_get(db, key):
+        return 0
+    marked = {r["target"] for r in db.execute(
+        "SELECT target FROM tags WHERE (kind = 'control' AND value = 'data-center-limits') "
+        "OR (kind = 'fear' AND value = 'power-bills')")}
+    ids = [r["id"] for r in db.execute(
+        "SELECT m.id, m.kind, m.jurisdiction, m.session, m.introduced_date, m.title, m.summary, t.ai_related "
+        "FROM measures m JOIN tag_runs t ON t.target = m.id")
+        if in_window(r) and (
+            (r["ai_related"] == 0 and DC_TEXT.search(f"{r['title'] or ''}\n{r['summary'] or ''}"))
+            or (r["ai_related"] == 1 and (title_names_data_centers(r["title"]) or r["id"] in marked)))]
+    for mid in ids:
+        db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target = ?", (mid,))
+    # An office refused on a data center measure is asked again under the question that counts
+    # power over data centers. Its label is put back on the quote it rested on, so a measure the
+    # tagger does not reach first still has it asked; one the tagger does reach starts afresh.
+    offices = [r for r in db.execute(
+        "SELECT c.target, c.value, c.evidence, m.title, m.summary FROM checks c JOIN measures m ON m.id = c.target "
+        "WHERE c.kind = 'agency' AND c.verdict IN ('no', 'hold')")
+        if DC_TEXT.search(f"{r['title'] or ''}\n{r['summary'] or ''}")]
+    for r in offices:
+        db.execute("INSERT OR IGNORE INTO tags(target, kind, value, evidence, model, tagged_at) VALUES(?,?,?,?,?,?)",
+                   (r["target"], "agency", r["value"], r["evidence"], "recheck", iso()))
+        db.execute("DELETE FROM checks WHERE target = ? AND kind = 'agency' AND value = ?", (r["target"], r["value"]))
+    kv_set(db, key, True)
+    db.commit()
+    if ids or offices:
+        log(f"[repair] {len(ids)} data center measures queued to be read again, "
+            f"{len(offices)} offices refused on them put back to be asked again")
+    return len(ids)
 
 
 # Bump to read again the bills whose title names AI that the tagger judged not about AI.

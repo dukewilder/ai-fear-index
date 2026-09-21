@@ -117,6 +117,11 @@ def main():
         from . import blindspots
         with source_run(db, "blindspots") as state:
             blindspots.run(db, state, mode)
+        # Mondays: the labels most likely to be wrong and the groups the lists miss, as one issue
+        # for a person to read. It changes nothing on the site.
+        from . import review
+        with source_run(db, "review") as state:
+            review.run(db, state, mode)
     from . import export
     data = export.export(db, args.out, args.base)
     if mode == "daily":

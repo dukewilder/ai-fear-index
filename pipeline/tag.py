@@ -220,10 +220,26 @@ def prune_tags(db):
         if (position and r["kind"] in ("control", "agency")) or (url, r["kind"], r["value"]) in pulled \
                 or not agreed(label, body, kind, jur, raw=raw, code=code):
             gone.append(r["rowid"])
+    # A label the third reading refused on this very quote stays off, even on a run where the
+    # reading itself cannot happen (no key, the day's cap reached, the model unreachable).
+    gone += [r["rowid"] for r in db.execute(
+        "SELECT t.rowid FROM tags t JOIN checks c ON c.target = t.target AND c.kind = t.kind "
+        "AND c.value = t.value AND c.evidence = t.evidence AND c.verdict = 'no'")]
+    gone = sorted(set(gone))
     for chunk in (gone[i:i + 400] for i in range(0, len(gone), 400)):
         db.execute(f"DELETE FROM tags WHERE rowid IN ({','.join('?' for _ in chunk)})", chunk)
     db.commit()
     return len(gone)
+
+
+def check_labels(db, key):
+    """The third reading (pipeline.check), which never takes the tagging run down with it."""
+    from . import check
+    try:
+        return check.run(db, key)
+    except Exception as exc:  # the labels stay as they are and are checked on the next run
+        log(f"[check] {exc}")
+        return f"label check failed: {str(exc)[:160]}"
 
 
 def targets(db, limit):
@@ -265,7 +281,8 @@ def run(db, state, mode):
     limit = max(0, min(LIMITS.get(mode, 150), DAY_CAP - used_today))
     if not limit:
         state["message"] = (f"daily cap of {DAY_CAP} items reached; resumes tomorrow"
-                            + (f"; dropped {dropped} unsupported labels" if dropped else ""))
+                            + (f"; dropped {dropped} unsupported labels" if dropped else "")
+                            + f"; {check_labels(db, key)}")
         return
     work, backlog = targets(db, limit)
     done, errors = 0, 0
@@ -346,9 +363,11 @@ def run(db, state, mode):
     db.commit()
     state["added"] = done
     ran_out = time.time() - started > SECONDS
+    checked = check_labels(db, key)
     state["message"] = (f"{done} tagged, {errors} errors, {max(0, backlog - done)} still queued, "
                         f"{used_today + done} of {DAY_CAP} today"
                         + (f"; dropped {dropped} unsupported labels" if dropped else "")
-                        + (f"; stopped at {SECONDS}s" if ran_out else ""))
+                        + (f"; stopped at {SECONDS}s" if ran_out else "")
+                        + f"; {checked}")
     if work and errors == len(work):
         raise RuntimeError(f"every tagging call failed; last error shown in logs")

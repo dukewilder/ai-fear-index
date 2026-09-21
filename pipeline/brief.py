@@ -100,6 +100,14 @@ def score(row, today, recent=()):
     return points
 
 
+# Only labels the third reading has confirmed on the quote they rest on now. A control or an office
+# decides which measure leads the post and what the post says it hands out, and the rare, heavy
+# controls were the labels most often wrong, so an unconfirmed one can sit on the site while it waits
+# to be checked but cannot put a measure at the top of the post.
+PASSED = ("JOIN checks c ON c.target = t.target AND c.kind = t.kind AND c.value = t.value "
+          "AND c.evidence = t.evidence AND c.verdict = 'yes'")
+
+
 def pool(db, today, days=POOL_DAYS, limit=12):
     """Measures that carry a control, have not been in an edition, and moved recently.
 
@@ -112,9 +120,10 @@ def pool(db, today, days=POOL_DAYS, limit=12):
     rows = db.execute(
         "SELECT m.id, m.kind, m.jurisdiction_name, m.identifier, m.title, m.summary, m.status, m.url, "
         "  COALESCE(m.latest_action_date, m.updated, m.first_seen) AS moved, "
-        "  (SELECT GROUP_CONCAT(value, '|') FROM tags t WHERE t.target=m.id AND t.kind='control') AS controls, "
+        "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='control') AS controls, "
         "  (SELECT GROUP_CONCAT(value, '|') FROM tags t WHERE t.target=m.id AND t.kind='fear') AS fears, "
-        "  (SELECT value FROM tags t WHERE t.target=m.id AND t.kind='agency' ORDER BY LENGTH(value) LIMIT 1) AS office "
+        "  (SELECT t.value FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency' "
+        "   ORDER BY LENGTH(t.value) LIMIT 1) AS office "
         "FROM measures m JOIN tag_runs r ON r.target = m.id "
         "WHERE r.ai_related = 1 AND controls IS NOT NULL AND m.kind != 'resolution' "
         "  AND m.id NOT IN (SELECT target FROM brief) "

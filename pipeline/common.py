@@ -287,6 +287,9 @@ CREATE INDEX IF NOT EXISTS brief_edition ON brief(edition);
 CREATE TABLE IF NOT EXISTS status(
   source TEXT PRIMARY KEY, last_run TEXT, ok INTEGER, added INTEGER, message TEXT, last_ok TEXT);
 CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS checks(
+  target TEXT, kind TEXT, value TEXT, evidence TEXT, verdict TEXT, reason TEXT, model TEXT, checked_at TEXT,
+  PRIMARY KEY(target, kind, value));
 CREATE TABLE IF NOT EXISTS history(date TEXT PRIMARY KEY, snapshot TEXT);
 CREATE INDEX IF NOT EXISTS idx_articles_seen ON articles(seen);
 CREATE INDEX IF NOT EXISTS idx_measures_intro ON measures(introduced_date);
@@ -411,7 +414,10 @@ def redo_briefs(db):
 #    2: its plate read "Health and Human Services Department, Food and Drug Administration: reports
 #    companies must file with the state" for a federal rule. The fallback headline for reporting
 #    said the state whoever the measure was, and named a federal rule by its parent department.
-REDO_EDITION = ("2026-09-21", 2)
+# 3: the third reading went in (pipeline.check). Controls and offices are now asked whether the
+#    measure does what the label says, and only confirmed ones can lead. The edition is written once
+#    more so the post and the page count the same labels at launch.
+REDO_EDITION = ("2026-09-21", 3)
 
 
 def redo_today(db):

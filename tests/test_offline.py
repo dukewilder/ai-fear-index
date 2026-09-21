@@ -570,6 +570,115 @@ def check_label_rules():
     print("the quote check refuses recitals, legislatures, half words and misplaced controls: ok")
 
 
+def check_third_reading():
+    """A label that passed the quote check can still say the opposite of what the measure does.
+
+    The third reading asks one question per control and office label. A no takes the label off and
+    is remembered against its quote; a label not yet checked cannot lead the post; and a key that
+    cannot use the stronger model falls back to the next one instead of checking nothing.
+    """
+    from pipeline import brief, check
+    from pipeline.common import connect as _connect
+    import tempfile as _tempfile
+    db = _connect(pathlib.Path(_tempfile.mkdtemp()) / "check.db")
+    day = dt.date.today().isoformat()
+    for mid, title, controls, office in (
+            ("c1", "Sandbox for AI testing under waived rules", ["license-to-build"], "Federal Reserve Board"),
+            ("c2", "Frontier model licensing", ["license-to-build"], "State AI Licensing Office")):
+        upsert(db, "measures", {"id": mid, "kind": "bill", "jurisdiction": "ca", "jurisdiction_name": "California",
+                                "session": "2025", "identifier": f"SB {mid}", "title": title, "summary": title,
+                                "status": "pending", "url": f"u{mid}", "introduced_date": day,
+                                "latest_action_date": day, "source": "test", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        for c in controls:
+            db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", c, title, "t", iso()))
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "agency", office, title, "t", iso()))
+    db.commit()
+    assert not brief.pool(db, day), "a measure led the post on labels nobody had checked"
+    asked = []
+
+    def fake(key, prompt):
+        asked.append(prompt)
+        no = "waived rules" in prompt
+        return {"verdict": "no" if no else "yes", "reason": "a sandbox" if no else "it licenses"}, "fake-model"
+    line = check.run(db, "k", ask_fn=fake)
+    assert len(asked) == 4, f"expected four questions, asked {len(asked)}"
+    left = {(r["target"], r["kind"]) for r in db.execute("SELECT target, kind FROM tags")}
+    assert ("c1", "control") not in left and ("c1", "agency") not in left, "a refused label stayed on"
+    assert ("c2", "control") in left and ("c2", "agency") in left, "a confirmed label was taken off"
+    lead = brief.pool(db, day)
+    assert [r["id"] for r in lead] == ["c2"] and lead[0]["office"] == "State AI Licensing Office", \
+        "only the confirmed measure, with its confirmed office, should be able to lead"
+    # Read again and landing on the same quote, the refused label goes without a second question
+    db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("c1", "control", "license-to-build",
+                                                        "Sandbox for AI testing under waived rules", "t", iso()))
+    db.commit()
+    asked.clear()
+    check.run(db, "k", ask_fn=fake)
+    assert not asked and not db.execute("SELECT 1 FROM tags WHERE target='c1' AND kind='control'").fetchone(), \
+        "a label refused on this quote came back"
+    assert "took off" in line
+
+    # A key that cannot use the stronger model gets the next one, not no check at all
+    class Reply:
+        def __init__(self, code, text):
+            self.status_code, self.text = code, text
+
+        def json(self):
+            return {"content": [{"type": "text", "text": self.text}]}
+    calls = []
+
+    def post(url, **kw):
+        calls.append(kw["json"]["model"])
+        if kw["json"]["model"] == check.MODELS[0]:
+            return Reply(404, '{"type":"error","error":{"type":"not_found_error","message":"model: x"}}')
+        return Reply(200, '{"verdict": "yes", "reason": "fine"}')
+    real, check.requests.post = check.requests.post, post
+    check._model["i"] = 0
+    try:
+        answer, model = check.ask("k", "question")
+    finally:
+        check.requests.post, check._model["i"] = real, 0
+    assert answer["verdict"] == "yes" and model == check.MODELS[1] and calls == check.MODELS[:2], calls
+    print("a third reading takes off what the measure does not do, and only checked labels lead: ok")
+
+    # A run that refuses far more than the hand check ever found holds its refusals for a person
+    db2 = _connect(pathlib.Path(_tempfile.mkdtemp()) / "hold.db")
+    for i in range(70):
+        mid = f"h{i}"
+        upsert(db2, "measures", {"id": mid, "kind": "bill", "jurisdiction": "ny", "jurisdiction_name": "New York",
+                                 "session": "2025", "identifier": f"A {i}", "title": f"AI bill {i}", "summary": "s",
+                                 "status": "pending", "url": f"h{mid}", "introduced_date": day, "source": "test",
+                                 "first_seen": iso()})
+        db2.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+        db2.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", (mid, "control", "labeling-mandates", f"q{i}", "t", iso()))
+    db2.commit()
+    check.run(db2, "k", ask_fn=lambda key, prompt: ({"verdict": "no", "reason": "misread"}, "fake-model"))
+    assert db2.execute("SELECT COUNT(*) FROM tags").fetchone()[0] == 70, "a wave of refusals took the labels down"
+    assert db2.execute("SELECT COUNT(*) FROM checks WHERE verdict='hold'").fetchone()[0] == 70
+    from pipeline import review
+    body, items = review.build(db2, dt.date.today())
+    assert "Held: 70 refusals" in body and items >= 70, "the held refusals are not on the weekly list"
+    print("a wave of refusals is held for a person, and listed: ok")
+
+    # An executive order the Register marks as revoked comes off the record
+    from pipeline import collect_fedreg
+
+    class FakeHttp:
+        def json(self, url, params=None, tries=5):
+            return {"executive_order_notes": "See: EO 14028\r\nRevoked by: EO 14318, July 23, 2025"} \
+                if "2025-01395" in url else {"executive_order_notes": "Revokes: EO 14141, January 14, 2025"}
+    for mid, ident in (("fr-2025-01395", "Executive Order 14141"), ("fr-2025-14212", "Executive Order 14318")):
+        upsert(db2, "measures", {"id": mid, "kind": "order", "jurisdiction": "us-exec", "jurisdiction_name": "EOP",
+                                 "session": "", "identifier": ident, "title": "AI", "summary": "", "status": "passed",
+                                 "url": f"u{mid}", "introduced_date": day, "source": "test", "first_seen": iso()})
+    db2.commit()
+    gone = collect_fedreg.revoked_orders(db2, FakeHttp())
+    left = {r["id"] for r in db2.execute("SELECT id FROM measures WHERE kind='order'")}
+    assert gone == ["Executive Order 14141"] and left == {"fr-2025-14212"}, (gone, left)
+    print("a revoked executive order comes off, and the order revoking it stays: ok")
+
+
 def check_lobbying_money():
     """A year of lobbying is four quarters of reports, and a client's money is counted once.
 
@@ -945,6 +1054,7 @@ def main():
     check_places_word()
     check_headline_keeps_the_power()
     check_label_rules()
+    check_third_reading()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()

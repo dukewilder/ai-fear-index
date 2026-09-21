@@ -606,6 +606,10 @@ def export(db, out_dir, base=""):
     spots = kv_get(db, "blindspots:report")
     if spots:
         (out / "blindspots.json").write_text(json.dumps(spots, indent=1, default=str))
+    # The weekly review rides the data branch too, beside the issue it was posted as.
+    review = kv_get(db, "review:latest")
+    if review and review.get("body"):
+        (out / "review.md").write_text(f"# Label review, {review['week']}\n\n{review['body']}")
     write_csvs(out / "public", measures, lob_recent, ranked + industry_ranked, com_ranked)
     save_snapshot(db, today, {"fear_rank": {r["slug"]: r["rank"] for r in fear_rows},
                               "fear_index": {r["slug"]: int(r["score"]) for r in fear_rows},
@@ -623,7 +627,7 @@ SOURCES = [
     ("news", "Headlines", "NEWS_FEEDS"),   # filled in from config/news.json, so the page cannot drift from it
     ("wikipedia", "Public attention", "Wikipedia pageviews"),
     ("rss", "Organization statements", "Newsroom feeds of tracked organizations"),
-    ("tag", "Fear and control labels", "Claude, each label resting on a quote that code finds word for word in the measure"),
+    ("tag", "Fear and control labels", "Claude, each label resting on a quote that code finds word for word in the measure, and each control and office read a third time for what the measure does"),
 ]
 SCHEDULE = [
     ["Every 20 minutes", "News, statements, federal rules and the feed"],

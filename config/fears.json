@@ -97,7 +97,7 @@
     "name": "Power bills and data centers",
     "sentence": "power bills and data centers",
     "short": "Power bills",
-    "definition": "Data centers for AI raising electricity or water costs, straining the power grid, or harming the environment and communities.",
+    "definition": "Data centers raising electricity or water costs, straining the power grid, or harming the environment and communities.",
     "keywords": [
       "data center*",
       "datacenter*",

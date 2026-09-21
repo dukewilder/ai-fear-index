@@ -51,9 +51,9 @@
     "slug": "new-agency-powers",
     "name": "New powers for government agencies",
     "chip": "New agency powers",
-    "definition": "Creates a new government office or agency for AI, or gives an existing agency or attorney general new authority over AI to make rules, inspect, license, or enforce.",
-    "pattern": "create an AI office, or hand an existing one new authority over AI",
-    "head": "new authority over AI for a government body"
+    "definition": "Creates a new government office or agency for AI or data centers, or gives an existing agency or attorney general new authority over AI or data centers to make rules, inspect, license, or enforce.",
+    "pattern": "create an AI office, or hand an existing one new authority over AI or data centers",
+    "head": "new authority over AI or data centers for a government body"
   },
   {
     "slug": "export-controls",

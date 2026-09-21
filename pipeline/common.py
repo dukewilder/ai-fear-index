@@ -593,6 +593,7 @@ def connect(path):
     retag_ai_titles(db)
     retag_ai_bills(db)
     retag_data_centers(db)
+    recheck_data_center_labels(db)
     restatus(db)
     return db
 
@@ -939,6 +940,35 @@ def retag_ai_bills(db):
     if ids:
         log(f"[repair] {len(ids)} bills titled with AI queued to be read again")
     return len(ids)
+
+
+# Bump to ask again about the labels refused on data center measures under wording that counted
+# only AI. 1: the agency powers control and the power bills fear were widened to data centers on 21
+# September 2026, after the check refused 13 in one pass as "over data centers, not AI".
+RECHECK_DATA_CENTER_LABELS = 1
+WIDENED_FOR_DATA_CENTERS = (("control", "new-agency-powers"), ("fear", "power-bills"))
+
+
+def recheck_data_center_labels(db):
+    """Put back, once, those labels refused on data center measures, on the quote each rested on."""
+    key = f"recheck:data-center-labels:{RECHECK_DATA_CENTER_LABELS}"
+    if kv_get(db, key):
+        return 0
+    rows = [r for r in db.execute(
+        "SELECT c.target, c.kind, c.value, c.evidence, m.title, m.summary FROM checks c "
+        "JOIN measures m ON m.id = c.target WHERE c.verdict IN ('no', 'hold')")
+        if (r["kind"], r["value"]) in WIDENED_FOR_DATA_CENTERS
+        and DC_TEXT.search(f"{r['title'] or ''}\n{r['summary'] or ''}")]
+    for r in rows:
+        db.execute("INSERT OR IGNORE INTO tags(target, kind, value, evidence, model, tagged_at) VALUES(?,?,?,?,?,?)",
+                   (r["target"], r["kind"], r["value"], r["evidence"], "recheck", iso()))
+        db.execute("DELETE FROM checks WHERE target = ? AND kind = ? AND value = ?",
+                   (r["target"], r["kind"], r["value"]))
+    kv_set(db, key, True)
+    db.commit()
+    if rows:
+        log(f"[repair] {len(rows)} labels refused on data center measures put back to be asked again")
+    return len(rows)
 
 
 # Bump when the reading of a last action changes, to read every stored one again.

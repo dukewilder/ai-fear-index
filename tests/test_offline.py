@@ -1337,6 +1337,22 @@ def check_status_and_coverage():
     assert rdb.execute("SELECT evidence FROM tags WHERE target = 'd4' AND kind = 'agency'").fetchone()[0] == \
         "approve a data center connection", "the refused office was not put back to be asked again"
     assert not rdb.execute("SELECT 1 FROM checks WHERE target = 'd4'").fetchall(), "the old refusal was kept"
+    # A control or fear widened to data centers is asked again where it was refused on one, and only there.
+    from pipeline.common import recheck_data_center_labels, RECHECK_DATA_CENTER_LABELS
+    for target, kind, value in (("d4", "control", "new-agency-powers"), ("d3", "control", "new-agency-powers"),
+                                ("d4", "control", "license-to-build")):
+        rdb.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) "
+                    "VALUES(?, ?, ?, 'a quote', 'no', 'over data centers, not AI', 'fake', 'then')", (target, kind, value))
+    rdb.execute("DELETE FROM kv WHERE key = ?", (f"recheck:data-center-labels:{RECHECK_DATA_CENTER_LABELS}",))
+    rdb.commit()
+    assert recheck_data_center_labels(rdb) == 1 and recheck_data_center_labels(rdb) == 0
+    left = {(r["target"], r["value"]) for r in rdb.execute("SELECT target, value FROM checks")}
+    assert left == {("d3", "new-agency-powers"), ("d4", "license-to-build")}, left
+    assert rdb.execute("SELECT 1 FROM tags WHERE target = 'd4' AND value = 'new-agency-powers'").fetchone()
+    from pipeline.common import config as _config
+    powers = next(c for c in _config("controls") if c["slug"] == "new-agency-powers")
+    bills = next(f for f in _config("fears") if f["slug"] == "power-bills")
+    assert "data centers" in powers["definition"] and "for AI" not in bills["definition"], "the widened wording was lost"
     print("a data center bill counts whether or not it says AI, and those turned down are read again: ok")
     assert session_year("mt", "2025") == 2025 and session_year("tx", "89R") == 2025 and session_year("tx", "891") == 2025
     assert session_year("nj", "221") == 2024 and session_year("az", "57th-1st-regular") == 2025

@@ -92,8 +92,10 @@ CONTROL_NOTES = {
     "data-center-limits": "Building or operating data centers has to be paused, banned, or put under "
                           "new permitting restrictions or conditions. Incentives, tax breaks, or "
                           "faster permitting are the opposite.",
-    "new-agency-powers": "A government office has to be created for AI, or an existing office handed "
-                         "new authority over AI to make rules, inspect, license, or enforce. A study, "
+    "new-agency-powers": "A government office has to be created for AI or data centers, or an existing "
+                         "office handed new authority over AI or data centers to make rules, inspect, "
+                         "license, or enforce. Data centers count whether or not the measure says they "
+                         "are for AI. A study, "
                          "a task force that only reports, or money to buy software is not this.",
     "preemption": "It has to be a federal measure that overrides, preempts, or blocks state or local "
                   "AI laws, or conditions federal funding on states not regulating AI.",

@@ -1431,7 +1431,8 @@ def check_status_and_coverage():
                                        "chatbot": {"backfilling": False, "since": "2026-09-20", "page": 1},
                                        "data center": {"backfilling": True, "page": 203}})
     _kv_set(db, "openstates_offset", 3)
-    _kv_set(db, "openstates_probe", cos.PROBE)  # the one-time look for a person, not under test here
+    # the weekly look for legislatures the search cannot see is tested on its own below
+    _kv_set(db, "openstates_blind", {"checked": __import__("pipeline.common", fromlist=["iso"]).iso()[:10], "sweeps": {}})
     asked = []
 
     class FakeOS:
@@ -1503,6 +1504,70 @@ def check_status_and_coverage():
     finally:
         cos.Http, cos.env, cos.iso, cos.store = saved
     print("a pass through a state search resumes, and the next reads what changed while it ran: ok")
+
+    # A legislature whose bill text the search cannot see is found once a week and read bill by bill:
+    # Indiana's 2026 session answered the search with nothing though it filed 935 bills, and the DC
+    # Council answered nothing in either year.
+    bdb = connect(":memory:")
+    for i in range(6):  # a state the search sees, which is not asked about
+        upsert(bdb, "measures", {"id": f"tx{i}", "kind": "bill", "jurisdiction": "tx", "session": "89R",
+                                 "identifier": f"HB {i}", "title": "t", "introduced_date": "2025-03-01",
+                                 "source": "Open States"})
+    for y in ("2025", "2026"):
+        for code in sorted(__import__("pipeline.common", fromlist=["STATES"]).STATES - {"tx", "in"}):
+            for i in range(6):
+                upsert(bdb, "measures", {"id": f"{code}{y}{i}", "kind": "bill", "jurisdiction": code, "session": y,
+                                         "identifier": f"B {i}", "title": "t", "introduced_date": f"{y}-03-01",
+                                         "source": "Open States"})
+    for i in range(6):
+        upsert(bdb, "measures", {"id": f"tx26{i}", "kind": "bill", "jurisdiction": "tx", "session": "2026",
+                                 "identifier": f"SB {i}", "title": "t", "introduced_date": "2026-03-01",
+                                 "source": "Open States"})
+        upsert(bdb, "measures", {"id": f"in25{i}", "kind": "bill", "jurisdiction": "in", "session": "2025",
+                                 "identifier": f"SB {i}", "title": "t", "introduced_date": "2025-02-01",
+                                 "source": "Open States"})
+    bdb.commit()
+    asks = []
+    pages = {1: [{"id": "ocd-bill/in1", "identifier": "HB 1182", "title": "Digital sexual image abuse.",
+                  "abstracts": [{"abstract": "Makes it a crime to share an image made with artificial intelligence."}]},
+                 {"id": "ocd-bill/in2", "identifier": "HB 1002", "title": "Electric utility affordability.", "abstracts": []}],
+             2: [{"id": "ocd-bill/in3", "identifier": "SB 99", "title": "Data centers.", "abstracts": []},
+                 {"id": "ocd-bill/in4", "identifier": "SB 100", "title": "Bail procedures.", "abstracts": []}]}
+
+    class Blind:
+        def json(self, url, params=None, **kw):
+            asks.append(dict(params))
+            where = params["jurisdiction"]
+            if params.get("per_page") == 1:  # a count
+                if "district:dc" in where:
+                    n = 0 if params.get("q") else (2400 if params["created_since"] < "2026" else 1100)
+                elif "state:in" in where:
+                    n = (2 if params["created_since"] < "2026" else 0) if params.get("q") else \
+                        (1900 if params["created_since"] < "2026" else 935)
+                else:
+                    n = 12
+                return {"results": [], "pagination": {"total_items": n, "max_page": 1}}
+            if "state:in" in where:
+                return {"results": pages[params["page"]], "pagination": {"max_page": 2}}
+            return {"results": [], "pagination": {"max_page": 1}}
+    kept = []
+    saved = cos.store
+    cos.store = lambda db_, b: kept.append(b["identifier"]) or 1
+    try:
+        used = cos.find_blind(bdb, Blind(), 80, "2026-09-22")
+        st = _kv_get(bdb, "openstates_blind")
+        assert set(st["sweeps"]) == {"in:2026-01-01", "dc:2025-01-01"}, st
+        assert not any("state:tx" in a["jurisdiction"] for a in asks), "a state the search sees was asked about"
+        assert cos.find_blind(bdb, Blind(), 80, "2026-09-25") == 0, "asked again inside the week"
+        n, stored = cos.sweep_blind(bdb, Blind(), 10, __import__("time").time(), "2026-09-22")
+        assert kept == ["HB 1182", "SB 99"], f"kept {kept}; only what names AI or data centers belongs"
+        st = _kv_get(bdb, "openstates_blind")
+        assert st["sweeps"]["in:2026-01-01"] == {"page": 1, "started": None, "done": True,
+                                                 "updated_since": "2026-09-22"}, st["sweeps"]
+        assert st["sweeps"]["dc:2025-01-01"]["done"], st["sweeps"]
+    finally:
+        cos.store = saved
+    print("a legislature the search cannot see is read bill by bill: ok")
 
     # Bills pre-filed in late 2024 for a 2025 session are swept once, stopping at the first bill
     # acted on in 2025, and a refusal ends the sweep for that search rather than the run.
@@ -1624,6 +1689,44 @@ def check_links_open_right(dist):
             checked += 1
     assert checked, "no links were checked"
     print(f"links off the site open a new tab, links within it do not ({checked} checked): ok")
+
+
+def check_states(dist, data):
+    """The map, the states page and a page for every square on it, ranked by what the report is about.
+
+    Every square is a link, so every square needs a page that exists; the front page shows five and
+    sends the rest to the states page; the ranking is by measures carrying a control, the number the
+    map is shaded by, so the two cannot disagree about who leads.
+    """
+    from pipeline.export import TILES
+    rows, pages, m = data["states"], data["state_pages"], data["state_map"]
+    assert [r["c"] for r in rows] == sorted((r["c"] for r in rows), reverse=True), \
+        "the states are not ranked by measures carrying a control"
+    assert len(m["tiles"]) == len(TILES) == 52, f"{len(m['tiles'])} squares on the map"
+    assert {t["code"] for t in m["tiles"]} == set(TILES), "a state is missing from the map"
+    top = max(t["c"] for t in m["tiles"])
+    assert all((t["level"] == 0) == (t["c"] == 0) for t in m["tiles"]), "a state with none is shaded, or one with some is not"
+    assert all(t["level"] == 4 for t in m["tiles"] if t["c"] == top and top), "the leader is not the darkest square"
+    for t in m["tiles"] + m["federal"]:
+        assert (dist / "states" / t["slug"] / "index.html").exists(), f"the square for {t['name']} goes nowhere"
+        assert t["code"] in m["counts"] or t["code"] in m["fed_counts"], f"{t['name']} has no counts for the switches"
+    states_page = (dist / "states" / "index.html").read_text()
+    assert states_page.count('class="tile ') == 52 and "data-map-ctl" in states_page, "the states page map is incomplete"
+    assert states_page.count('<a class="row" href="/states/') == len(rows), "the states page does not list every one"
+    assert "data-all" in states_page, "the full list on the states page is cut to five"
+    home = (dist / "index.html").read_text()
+    section = home[home.index('id="states"'):home.index('id="law"') if 'id="law"' in home else len(home)]
+    assert section.count('<a class="row" href="/states/') == min(5, len(rows)), "the front page should show five states"
+    assert 'href="/states/"' in section and "data-map-ctl" not in section, "the front page map should be plain"
+    for page in dist.rglob("index.html"):
+        assert 'data-nav="states"' in page.read_text(), f"{page} has no States link"
+    for p in pages:
+        body = (dist / "states" / p["slug"] / "index.html").read_text()
+        assert f">{p['name']}<" in body, f"the {p['name']} page does not name it"
+        if p["n"]:
+            assert body.count('class="item"') >= min(len(p["bills"]), 1), f"the {p['name']} page lists no measures"
+            assert p["receipt"].startswith(p["name"] + ":") and p["receipt"].endswith(f"/states/{p['slug']}/")
+    print(f"a map of {len(m['tiles'])} squares, {len(pages)} place pages, ranked by what they would control: ok")
 
 
 def check_every_page_asks(dist, db, day):
@@ -1953,6 +2056,7 @@ def main():
             f"{page.name} dates cycle-to-date election money as a year"
     check_every_page_asks(tmp / "dist", db, brief_day)
     check_links_open_right(tmp / "dist")
+    check_states(tmp / "dist", data)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

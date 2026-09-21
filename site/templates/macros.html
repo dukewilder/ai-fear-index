@@ -33,8 +33,37 @@
 <li class="row" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.not_passed }} not passed{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
 {%- endmacro %}
 
+{# Ranked by what the report is about: the measures that would put AI under new government control.
+   The total rides in the line under the name, so the number on the right is never read as it. #}
 {% macro state_row(s) -%}
-<li class="row"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} with new controls, {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.bills }}<span class="unit">bills</span></span></li>
+<li><a class="row" href="{{ url('state', s.slug) }}"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} of {{ s.bills }} AI measure{{ '' if s.bills == '1' else 's' }} carry a control · {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}{% if s.filling %} · <span class="chip">Still being read in</span>{% endif %}</span></span><span class="val accent">{{ s.controlled }}<span class="unit">bills</span></span></a></li>
+{%- endmacro %}
+
+{# The state map: one square per state, shaded by the measures that would put AI under new government
+   control. A tile is a link to the state's page. Pointing at one, focusing it, or tapping it once on
+   a phone reads its numbers out underneath, and a second tap opens it. The switches, where shown, are
+   inert without script and so start hidden. #}
+{% macro tile_map(m, controls=false, wide=false) -%}
+<div class="tmap{% if wide %} wide{% endif %}" data-map>
+{% if controls %}
+<div class="tmap-ctl" data-map-ctl hidden>
+<div class="filters" role="group" aria-label="What the map counts">
+<button type="button" class="filter" data-metric="1" aria-pressed="true">Carry a control</button>
+<button type="button" class="filter" data-metric="2" aria-pressed="false">Already law</button>
+<button type="button" class="filter" data-metric="0" aria-pressed="false">All AI measures</button>
+</div>
+<label class="tmap-sel"><span>Citing</span><select data-fear><option value="all">Any fear</option>{% for f in d.fears %}<option value="{{ f.slug }}">{{ f.name }}</option>{% endfor %}</select></label>
+</div>
+{% endif %}
+<p class="tmap-cap"><span data-map-cap>AI measures that would put AI under new government control</span></p>
+<div class="tmap-grid">
+{% for t in m.tiles %}<a class="tile l{{ t.level }}{% if t.filling %} filling{% endif %}" href="{{ url('state', t.slug) }}" style="grid-column:{{ t.col + 1 }};grid-row:{{ t.row + 1 }}" data-code="{{ t.code }}" data-name="{{ t.name }}" aria-label="{{ t.name }}: {{ t.c }} of {{ t.n }} AI measures carry a control"><b>{{ t.abbr }}</b><i>{{ t.c }}</i></a>
+{% endfor %}</div>
+{% if m.federal %}<div class="tmap-fed">{% for f in m.federal %}<a class="tile-fed" href="{{ url('state', f.slug) }}" data-code="{{ f.code }}" data-name="{{ f.name }}" aria-label="{{ f.name }}: {{ f.c }} of {{ f.n }} AI measures carry a control"><span>{{ 'Congress' if f.code == 'us' else 'Federal agencies' }}</span><b>{{ f.c }}</b></a>{% endfor %}</div>{% endif %}
+<div class="tmap-key" aria-hidden="true"><span>0</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span data-map-top>{{ m.top }}</span>{% if m.tiles|selectattr('filling')|list %}<span class="tmap-note">Dashed: still being read in</span>{% endif %}</div>
+<p class="tmap-out" data-map-out aria-live="polite">Pick a state to see its numbers.</p>
+<script type="application/json" data-map-data>{{ {"counts": m.counts, "fed": m.fed_counts} | tojson }}</script>
+</div>
 {%- endmacro %}
 
 {% macro quote_card(q, name_fear=true) -%}

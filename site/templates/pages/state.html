@@ -1,0 +1,74 @@
+{% from "macros.html" import benefit_row, quote_card, law_row, buying_row %}
+{# Sections come and go with the data, so the shading alternates on the ones present rather than
+   being fixed to each: a state with no offices named would otherwise stack two bands together. #}
+{% set ns = namespace(i=0) %}
+<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('states') }}">{{ chevron|safe }}All states</a>
+{% if p.rank %}<p class="kicker">Rank {{ p.rank }} of {{ p.of }}</p>{% endif %}
+<h1 class="title">{{ p.name }}</h1>
+{% if p.n %}
+<p class="hero-num sm">{{ p.c }}</p>
+<p class="hero-text sm">AI measure{{ '' if p.c == 1 else 's' }} that would put AI, the people building it or the people using it under new government control.</p>
+{% elif p.filling %}
+<p class="hero-text">None on file yet.</p>
+{% else %}
+<p class="hero-text">No AI measures found here since January 2025.</p>
+{% endif %}
+{% if p.filling %}<p class="caption">Still being read in. The search that finds bills for this site cannot see this legislature's bill text, so its bills are being read one at a time, and this page fills in as they are.</p>{% endif %}
+{% if p.n %}<button type="button" class="copy" data-copy="{{ p.receipt }}" data-goatcounter-click="copy-state-receipt">Copy the receipt</button>{% endif %}
+</div></section>
+
+{% if p.evidence %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">The receipts</h2>
+<div style="margin-top:12px">{% for big, label in p.evidence %}<div class="ev"><b>{{ big }}</b><span>{{ label }}</span></div>{% endfor %}</div>
+</div></section>
+{% endif %}
+
+{% if p.beneficiaries %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">Who benefits</h2>
+<p class="sub">Agencies and officials these measures would hand new power over AI or data centers, by number of measures.</p>
+<ol class="rank">{% for b in p.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if p.already_law %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">Already law</h2>
+<p class="sub">{{ p.passed }} measure{{ ' has' if p.passed == 1 else 's have' }} passed. {{ p.law_total }} of them carr{{ 'ies' if p.law_total == 1 else 'y' }} a control.</p>
+<ul class="list">{% for a in p.already_law %}{{ law_row(a) }}{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if p.quotes %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">In their own words</h2>
+<p class="sub">The fear as each measure's official summary states it, and the controls the same measure would create.</p>
+<ul class="quotes">{% for q in p.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
+</div></section>
+{% endif %}
+
+{% if p.buying %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">What it's buying</h2>
+<p class="sub">The government controls written into these measures.</p>
+<ol class="rank">{% for c in p.buying %}{{ buying_row(c) }}{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if p.fears %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">The fears they cite</h2>
+<p class="sub">Each fear as the measure's own text states it, by number of measures.</p>
+<ol class="rank">{% for f in p.fears %}<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="meta">{{ f.controlled }} of them carry a control</span></span><span class="val accent">{{ f.bills }}<span class="unit">bills</span></span></a></li>{% endfor %}</ol>
+</div></section>
+{% endif %}
+
+{% if p.bills %}
+<section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
+<h2 class="h">Every measure</h2>
+<p class="sub">The ones carrying the most controls first, then what has passed, then the most recent.</p>
+<ul class="list">{% for b in p.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="stamp">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+</div></section>
+{% endif %}

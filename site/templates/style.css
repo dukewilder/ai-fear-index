@@ -54,6 +54,8 @@ a:hover{color:var(--accent)}
 .theme{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--edge);background:transparent;color:var(--muted);font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .theme:hover{border-color:var(--ink);color:var(--ink)}
 @media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme{padding:0 6px}.theme span{display:none}.status .asof{display:none}}
+/* Three links and the switch, on the narrowest phones: 320 wide overflowed by 18px once States joined. */
+@media (max-width:374px){.masthead .wrap{gap:6px}.brand{font-size:19px;gap:5px}.nav{gap:8px}.nav a{letter-spacing:.04em}}
 .theme i{display:inline-block;width:8px;height:8px;border:1px solid currentColor;background:var(--ink)}
 :root[data-theme=dark] .theme i,:root:not([data-theme=light]) .theme i{background:var(--ink)}
 .status{--hair:var(--rule-band);border-bottom:1px solid var(--hair);background:var(--band);font:500 11px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
@@ -304,6 +306,46 @@ a.copy.donate{text-decoration:none}
 .btc-a{font-family:var(--mono);font-size:13px;line-height:1.5;word-break:break-all;color:var(--ink)}
 /* A phone: both buttons go full width, which is where a thumb lands. */
 @media (max-width:559px){.pay-go,.pay-addr .copy{align-self:stretch;justify-content:center}}
+/* The state map: equal squares, one per state, shaded with the fear grid's own heat scale. Capped
+   well inside the column on a wide screen so it reads as a figure, and allowed the whole column on
+   the states page, where it is the page. On a phone a square is about 27px: the letters stay, the
+   count goes, and a tap reads the state out before a second one opens it. */
+.tmap{margin:14px 0 0;max-width:600px}
+.tmap.wide{max-width:none}
+.tmap-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 12px}
+.tmap-ctl .filters{margin:0;padding:0;overflow:visible;flex-wrap:wrap}
+.tmap-sel{display:inline-flex;align-items:center;gap:8px;max-width:100%;font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tmap-sel select{flex:1 1 auto;min-width:0;max-width:100%;height:36px;padding:0 10px;border:1px solid var(--edge);border-radius:0;background:var(--panel);color:var(--ink);font:500 12px var(--mono);letter-spacing:.04em}
+.tmap-cap{margin:0 0 8px;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tmap-grid{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:3px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1;min-width:0;background:var(--heat0);border:1px solid var(--rule);color:var(--muted);font-family:var(--mono);line-height:1;text-decoration:none}
+.tile b{font-size:12px;font-weight:600;letter-spacing:.03em}
+.tile i{margin-top:4px;font-size:11px;font-style:normal;font-variant-numeric:tabular-nums;opacity:.9}
+.tile.l1{background:var(--heat1);color:var(--soft)}
+.tile.l2{background:var(--heat2);color:var(--ink)}
+/* Ink on the third shade in both themes: the light text the fear grid uses there measures 3.3 to 1
+   in the light theme and dark text 2.5 in the dark one; ink clears 5 in both. */
+.tile.l3{background:var(--heat3);border-color:var(--heat3);color:var(--ink)}
+.tile.l4{background:var(--heat4);border-color:var(--heat4);color:var(--heat4t)}
+.tile.filling{border:1.5px dashed var(--ink)}
+.tile:hover,.tile[aria-current=true],.tile-fed:hover,.tile-fed[aria-current=true]{outline:2px solid var(--ink);outline-offset:1px;z-index:1;color:inherit}
+.tile.l3:hover,.tile.l3[aria-current=true]{color:var(--ink)}
+.tile.l4:hover,.tile.l4[aria-current=true]{color:var(--heat4t)}
+.tmap-fed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+.tile-fed{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;padding:0 12px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+.tile-fed b{font-size:14px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
+.tmap-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:12px;font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tmap-key i{display:inline-block;width:20px;height:11px;border:1px solid var(--rule)}
+.tmap-key span:first-child{margin-right:3px}
+.tmap-key [data-map-top]{margin-left:3px}
+.tmap-note{margin-left:14px}
+.tmap-key .l0{background:var(--heat0)}.tmap-key .l1{background:var(--heat1)}.tmap-key .l2{background:var(--heat2)}
+.tmap-key .l3{background:var(--heat3)}.tmap-key .l4{background:var(--heat4)}
+.tmap-out{min-height:46px;margin:12px 0 0;font-size:14px;line-height:1.5;color:var(--soft)}
+.tmap-out b{color:var(--ink)}
+.tmap-out a{margin-left:2px;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.tmap-top{margin-top:20px}
+@media (max-width:559px){.tmap-grid{gap:2px}.tile i{display:none}.tile b{font-size:9.5px;letter-spacing:0}.tile.filling{border-width:1px}}
 .tip{position:absolute;z-index:30;padding:5px 9px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);font:500 12px var(--mono);white-space:nowrap;pointer-events:none}
 
 @media (min-width:760px){

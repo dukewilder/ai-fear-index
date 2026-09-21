@@ -68,6 +68,7 @@
 {% set bits = (d.site.name if d.site and d.site.name else "AI Fear Report").split(" ", 1) %}
 <a class="brand" href="{{ url('home') }}"><span class="badge">{{ bits[0] }}</span>{{ bits[1] if bits|length > 1 else "" }}</a>
 <nav class="nav" aria-label="Main">
+<a href="{{ url('states') }}" data-nav="states"{% if nav == 'states' %} aria-current="page"{% endif %}>States</a>
 <a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
 <button type="button" class="theme" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
@@ -258,7 +259,7 @@
   // every list shows five until asked, and goes back to five when asked again
   document.querySelectorAll("ol.rank, ul.rank, ul.list").forEach(function (list) {
     var n = list.children.length;
-    if (n <= 5) return;
+    if (n <= 5 || list.hasAttribute("data-all")) return;
     if (list.id && document.querySelector('[data-filter-group="' + list.id + '"]')) return;
     list.classList.add("clip");
     var btn = document.createElement("button");
@@ -319,6 +320,97 @@
     });
   });
 
+  // The state map. Shades each state by the count chosen, reads a state out when it is pointed at,
+  // focused or tapped, and opens it on a click, or on a second tap from a finger. The readout is
+  // written with textContent: every word in it is ours, and still none of it is parsed as markup.
+  document.querySelectorAll("[data-map]").forEach(function (map) {
+    var data;
+    try { data = JSON.parse(map.querySelector("[data-map-data]").textContent); } catch (e) { return; }
+    var tiles = Array.prototype.slice.call(map.querySelectorAll("a.tile")),
+        feds = Array.prototype.slice.call(map.querySelectorAll("a.tile-fed")),
+        out = map.querySelector("[data-map-out]"), cap = map.querySelector("[data-map-cap]"),
+        topEl = map.querySelector("[data-map-top]"), sel = map.querySelector("select[data-fear]"),
+        metric = 1, fear = "all", picked = null, finger = false, armed = null;
+    var CAPS = ["All AI measures", "AI measures that would put AI under new government control",
+                "AI measures carrying a control that are already law"];
+    function counts(code) {
+      var c = (data.counts[code] || data.fed[code] || {})[fear];
+      return c || [0, 0, 0];
+    }
+    function level(v, top) {
+      return !v || !top ? 0 : Math.min(4, 1 + Math.floor(3.99 * Math.log(1 + v) / Math.log(1 + top)));
+    }
+    function fearName() {
+      return sel && fear !== "all" ? sel.options[sel.selectedIndex].text : "";
+    }
+    function paint() {
+      var top = 0;
+      tiles.forEach(function (t) { top = Math.max(top, counts(t.getAttribute("data-code"))[metric]); });
+      tiles.forEach(function (t) {
+        var v = counts(t.getAttribute("data-code"))[metric];
+        t.className = t.className.replace(/\bl[0-4]\b/, "l" + level(v, top));
+        var i = t.querySelector("i");
+        if (i) i.textContent = v;
+      });
+      feds.forEach(function (t) {
+        var b = t.querySelector("b");
+        if (b) b.textContent = counts(t.getAttribute("data-code"))[metric];
+      });
+      if (topEl) topEl.textContent = top;
+      if (cap) cap.textContent = CAPS[metric] + (fearName() ? ", citing " + fearName().toLowerCase() : "");
+      if (picked) read(picked);
+    }
+    function words(n, one, many) { return n + " " + (n === 1 ? one : many); }
+    function read(t) {
+      var c = counts(t.getAttribute("data-code")), name = t.getAttribute("data-name");
+      out.textContent = "";
+      var b = document.createElement("b");
+      b.textContent = name + (fearName() ? ", citing " + fearName().toLowerCase() : "");
+      out.appendChild(b);
+      var line = c[0]
+        ? ": " + c[1] + " of " + words(c[0], "AI measure", "AI measures") + " would put AI under new government control, " +
+          (c[2] === 1 ? "1 of them already law. " : c[2] + " of them already law. ")
+        : ": no AI measures found" + (fearName() ? " citing it" : "") + " yet. ";
+      out.appendChild(document.createTextNode(line));
+      if (t.classList.contains("filling")) out.appendChild(document.createTextNode("Still being read in. "));
+      var a = document.createElement("a");
+      a.href = t.getAttribute("href");
+      a.textContent = "Open " + name + " \u2192";
+      out.appendChild(a);
+    }
+    function pick(t) {
+      if (picked && picked !== t) picked.removeAttribute("aria-current");
+      picked = t;
+      t.setAttribute("aria-current", "true");
+      read(t);
+    }
+    // A tap focuses the square before it clicks it, so what lets a second tap through is a square
+    // this tap armed, not the one the readout shows.
+    map.addEventListener("pointerdown", function (e) { finger = e.pointerType !== "mouse"; }, true);
+    map.addEventListener("keydown", function () { finger = false; }, true);
+    tiles.concat(feds).forEach(function (t) {
+      t.addEventListener("mouseenter", function () { if (!finger) pick(t); });
+      t.addEventListener("focus", function () { pick(t); });
+      t.addEventListener("click", function (e) {
+        if (finger && armed !== t) { e.preventDefault(); armed = t; pick(t); }
+      });
+    });
+    var ctl = map.querySelector("[data-map-ctl]");
+    if (ctl) {
+      ctl.hidden = false;
+      ctl.querySelectorAll("button[data-metric]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          ctl.querySelectorAll("button[data-metric]").forEach(function (x) {
+            x.setAttribute("aria-pressed", x === btn ? "true" : "false");
+          });
+          metric = parseInt(btn.getAttribute("data-metric"), 10);
+          paint();
+        });
+      });
+      if (sel) sel.addEventListener("change", function () { fear = sel.value; paint(); });
+    }
+  });
+
   document.querySelectorAll("[data-filter-group]").forEach(function (group) {
     var list = document.getElementById(group.getAttribute("data-filter-group"));
     group.addEventListener("click", function (e) {
@@ -336,7 +428,7 @@
 {% if preview %}
 
   var pages = Array.prototype.slice.call(document.querySelectorAll("main[data-route]"));
-  var navFor = { fear: "", org: "", feed: "feed", method: "method" };
+  var navFor = { fear: "", org: "", feed: "feed", method: "method", states: "states" };
   function has(route) {
     return pages.some(function (p) { return p.getAttribute("data-route") === route; });
   }

@@ -23,7 +23,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 CHEVRON = ('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
            '<path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
            'stroke-linecap="round" stroke-linejoin="round"/></svg>')
-NAV_FOR = {"home": "", "fear": "", "org": "", "feed": "feed", "method": "method"}
+NAV_FOR = {"home": "", "fear": "", "org": "", "feed": "feed", "method": "method", "states": "states",
+           "state": "states"}
 
 
 def esc(value):
@@ -192,19 +193,91 @@ def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com"):
 
 
 def card_specs(d):
-    """Which cards to draw: one per fear. The front page has the standing one."""
-    ix = d["index"]
+    """Which cards to draw: one per fear and one per state. The front page has the standing one."""
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
             f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
+    for p in d.get("state_pages") or []:
+        if p["n"]:
+            yield (f"state-{p['slug']}", f"{p['c']:,}", p["name"],
+                   f"AI measure{'' if p['c'] == 1 else 's'} that would put AI under new government control, "
+                   f"of {p['n']:,} since January 2025")
+        else:
+            yield f"state-{p['slug']}", "0", p["name"], "No AI measures found here yet"
+
+
+# The map card is drawn in the light theme's heat colours, the same five the page uses.
+HEAT = ["#EDE9DE", "#EFDCD0", "#DFB09C", "#C76F55", "#B3321F"]
+
+
+def map_card(path, m, foot="aifearreport.com"):
+    """The states page's card: the tile map itself, which is the thing people share it for."""
+    from PIL import Image, ImageDraw
+    from brand import font as bfont, ink as bink, wordmark, PAPER, INK, VERMILLION
+    im = Image.new("RGB", (CARD_W, CARD_H), PAPER)
+    d = ImageDraw.Draw(im)
+    d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline=INK, width=3)
+    band = 118
+    d.line([(0, band), (CARD_W, band)], fill=INK, width=2)
+    mark = 44
+    wordmark(d, 60, (band - mark * 1.14) / 2, mark, fill=VERMILLION, back=PAPER)
+    foot_y = CARD_H - 74
+    # the grid on the right, as large as the space between the rules allows
+    cell, gap = 44, 4
+    gx = CARD_W - 60 - 11 * cell - 10 * gap
+    gy = band + (foot_y - band - (8 * cell + 7 * gap)) / 2
+    f_abbr = bfont("ibm-plex-mono-600", 15)
+    for t in m["tiles"]:
+        x = gx + t["col"] * (cell + gap)
+        y = gy + t["row"] * (cell + gap)
+        lv = t["level"]
+        d.rectangle([x, y, x + cell, y + cell], fill=HEAT[lv], outline="#CDC6B5")
+        lx, ty, w, h = bink(d, t["abbr"], f_abbr)
+        d.text((x + (cell - w) / 2 - lx, y + (cell - h) / 2 - ty), t["abbr"], font=f_abbr,
+               fill="#FBF9F4" if lv == 4 else INK)
+    # the words on the left
+    f_head = bfont("barlow-condensed-800", 64)
+    f_sub = bfont("barlow-500", 26)
+    f_key = bfont("ibm-plex-mono-500", 18)
+    left, room = 60, gx - 60 - 40
+    y = band + 40
+    for line in wrap_text(d, "STATE BY STATE", f_head, room):
+        lx, ty, _, h = bink(d, line, f_head)
+        d.text((left - lx, y - ty), line, font=f_head, fill=INK)
+        y += h + 10
+    y += 14
+    for line in wrap_text(d, "AI measures that would put AI, the people building it or the people using it "
+                             "under new government control", f_sub, room)[:5]:
+        lx, ty, _, h = bink(d, line, f_sub)
+        d.text((left - lx, y - ty), line, font=f_sub, fill="#33302A")
+        y += h + 11
+    ky = foot_y - 64
+    kx = left
+    lx, ty, w, h = bink(d, "0", f_key)
+    d.text((kx - lx, ky - ty), "0", font=f_key, fill="#5D584D")
+    kx += w + 10
+    for c in HEAT:
+        d.rectangle([kx, ky - 2, kx + 28, ky + 16], fill=c, outline="#CDC6B5")
+        kx += 32
+    top = f"{m.get('top', 0):,}"
+    lx, ty, w, h = bink(d, top, f_key)
+    d.text((kx + 6 - lx, ky - ty), top, font=f_key, fill="#5D584D")
+    d.line([(60, foot_y), (CARD_W - 60, foot_y)], fill=INK, width=2)
+    f_foot = bfont("ibm-plex-mono-500", 24)
+    lf, tf, _, hf = bink(d, foot, f_foot)
+    d.text((60 - lf, foot_y + (74 - hf) / 2 - tf), foot, font=f_foot, fill="#5D584D")
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+    im.save(path, "PNG", optimize=True)
 
 
 def make_url(preview, base):
-    routes = {"home": "", "feed": "feed", "method": "method"}
+    routes = {"home": "", "feed": "feed", "method": "method", "states": "states"}
 
     def url(kind, slug=None, anchor=None):
         if kind in ("fear", "org"):
             path = f"{kind}/{slug}"
+        elif kind == "state":
+            path = f"states/{slug}"
         else:
             path = routes[kind]
         if preview:
@@ -239,10 +312,19 @@ def page_specs(d):
                         ("method", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
                       "title": f"{title}, {name}", "ctx": {}})
+    if d.get("state_pages"):
+        specs.append({"kind": "states", "route": "states", "out": "states/index.html", "template": "states.html",
+                      "title": f"The states: where AI measures would add government control, {name}", "ctx": {}})
+        for p in d["state_pages"]:
+            specs.append({"kind": "state", "route": f"states/{p['slug']}", "out": f"states/{p['slug']}/index.html",
+                          "template": "state.html",
+                          "title": f"{p['name']}: AI measures and who they would hand power, {name}",
+                          "ctx": {"p": p}})
     for s in specs:
         s["nav"] = NAV_FOR[s["kind"]]
-        s["card"] = \
-            (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else None)
+        s["card"] = (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else
+                     f"state-{s['ctx']['p']['slug']}" if s["kind"] == "state" else
+                     "states" if s["kind"] == "states" else None)
         s["description"] = None
         if s["kind"] == "fear":
             f = s["ctx"]["f"]
@@ -265,6 +347,14 @@ def page_specs(d):
         elif s["kind"] == "method":
             s["description"] = ("Where every number on this site comes from: the government sources, "
                                 "how measures are tagged, and what each label means.")
+        elif s["kind"] == "states":
+            s["description"] = ("Every state, DC and Puerto Rico, shaded by the AI measures that would put AI, "
+                                "the people building it or the people using it under new government control, "
+                                "with a page for each.")
+        elif s["kind"] == "state":
+            p = s["ctx"]["p"]
+            s["description"] = (p["receipt"].rsplit(" http", 1)[0] if p["n"] else
+                                f"{p['name']}: no AI measures found here since January 2025.")
     return specs
 
 
@@ -316,6 +406,10 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
                        kicker=name.upper(), foot=site_url.replace("https://", "") or name)
             cards[card] = stamped(f"{card}.png")
+        if d.get("state_map"):
+            map_card(pathlib.Path(out_dir) / "og" / "states.png", d["state_map"],
+                     foot=site_url.replace("https://", "") or name)
+            cards["states"] = stamped("states.png")
         # The tab, the bookmark, the home screen and the manifest all want a real file, and
         # they want the same mark. 16 because that is what a tab is at 1x, and a browser handed
         # only a 32 downsamples it itself and smears the letters.
@@ -370,7 +464,7 @@ def write_index_files(out_dir, site_url, pages, d):
         loc = f"{site_url}/{route}{'/' if route else ''}"
         urls.append(f"  <url><loc>{loc}</loc>"
                     f"{f'<lastmod>{stamp}</lastmod>' if stamp else ''}"
-                    f"<changefreq>{'daily' if page['kind'] in ('home', 'feed') else 'weekly'}</changefreq>"
+                    f"<changefreq>{'daily' if page['kind'] in ('home', 'feed', 'states') else 'weekly'}</changefreq>"
                     f"<priority>{'1.0' if page['kind'] == 'home' else '0.7'}</priority></url>")
     (out / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'

@@ -1,4 +1,4 @@
-{% from "macros.html" import fear_row, org_row, benefit_row, control_row, grid, state_row, quote_card, law_row, donor_row %}
+{% from "macros.html" import fear_row, org_row, benefit_row, control_row, grid, state_row, tile_map, quote_card, law_row, donor_row %}
 {% if d.exhibit %}
 <section class="exhibit"><div class="wrap">
 <!-- the page's one h1. A masthead is a logo, not a heading; the lead is what the page is
@@ -102,15 +102,18 @@
 {% if d.beneficiaries %}
 <section class="block band" id="benefits"><div class="wrap">
 <h2 class="h">Who benefits</h2>
-<p class="sub">Agencies and officials that bills carrying a control would hand new power over AI, by number of bills.</p>
+<p class="sub">Agencies and officials that bills carrying a control would hand new power over AI or data centers, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 {% if d.states %}
 <section class="block band" id="states"><div class="wrap">
 <h2 class="h">Where it's happening</h2>
-<p class="sub">Every jurisdiction, ranked by AI measures.</p>
-<ol class="rank">{% for s in d.states %}{{ state_row(s) }}{% endfor %}</ol>
+<p class="sub">Every state, shaded by the AI measures that would put AI, the people building it or the people using it under new government control.</p>
+{% if d.state_map %}{{ tile_map(d.state_map) }}{% endif %}
+<p class="kicker tmap-top">The five with the most</p>
+<ol class="rank">{% for s in d.states[:5] %}{{ state_row(s) }}{% endfor %}</ol>
+<a class="more" href="{{ url('states') }}" data-goatcounter-click="all-states">All the states, and a page for each</a>
 </div></section>
 {% endif %}
 {% if d.already_law %}

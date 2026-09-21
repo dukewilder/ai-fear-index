@@ -1,0 +1,13 @@
+{% from "macros.html" import state_row, tile_map %}
+<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('home', anchor='states') }}">{{ chevron|safe }}The report</a>
+<h1 class="title">The states</h1>
+<p class="lead">Where fear of AI is turning into new government control, state by state.</p>
+<p class="sub">Every state, DC and Puerto Rico, shaded by the AI measures that would put AI, the people building it or the people using it under new government control. Switch the map to what is already law, or to the measures citing one fear. Each state has a page with what it would control and who would hold the power.</p>
+{{ tile_map(d.state_map, controls=true, wide=true) }}
+</div></section>
+<section class="block band" id="ranked"><div class="wrap">
+<h2 class="h">Every one, ranked</h2>
+<p class="sub">By AI measures that carry a control. A state's count also reflects how much its legislature files.</p>
+<ol class="rank" data-all>{% for s in d.states %}{{ state_row(s) }}{% endfor %}</ol>
+</div></section>

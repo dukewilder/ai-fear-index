@@ -4,10 +4,12 @@ Open States searches bill text, so it also finds federal bills whose titles neve
 and Congress.gov's title match therefore misses. Those land on the same row Congress.gov
 would write, and Congress.gov's own record wins wherever both have one.
 """
+import collections
+import datetime as dt
 import time
 
-from .common import (SINCE, Http, HttpError, congress_id, env, iso, kv_get, kv_set, log, retry_at, retry_clear,
-                     status_from_action, upsert)
+from .common import (AI_TEXT, SINCE, STATES, Http, HttpError, congress_id, env, iso, kv_get, kv_set, log, retry_at,
+                     retry_clear, status_from_action, upsert)
 
 BASE = "https://v3.openstates.org/bills"
 # "data center" goes last. It matches every bill that mentions one, budget bills included, and its
@@ -42,46 +44,140 @@ FIRST_RUN = "2026-09-18"
 RESWEEP = 1
 
 
-# One look, for a person, at what Open States holds where the record is thin: the District of
-# Columbia has no measure on file at all, and Indiana none from its 2026 session, though both have
-# AI bills (DC's B26-0491, the AI Literacy in Education Act; Indiana's HB 1182 and HB 1201). It
-# reads and logs, and stores nothing. It uses the few requests left above the daily budget.
-PROBE = 1
-PROBE_ASKS = [
-    ("dc, anything", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government"}),
-    ("dc, the search", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government",
-                        "q": "artificial intelligence"}),
-    ("dc, B26-0491 by number", {"jurisdiction": "ocd-jurisdiction/country:us/district:dc/government",
-                                "identifier": "B26-0491"}),
-    ("in 2026, anything", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government", "session": "2026"}),
-    ("in 2026, the search", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government", "session": "2026",
-                             "q": "artificial intelligence"}),
-    ("in 2026, HB 1182 by number", {"jurisdiction": "ocd-jurisdiction/country:us/state:in/government",
-                                    "session": "2026", "identifier": "HB 1182"}),
-]
+# Legislatures the search cannot see. Open States' search reads bill text, and some legislatures'
+# text is not in it: asked for "artificial intelligence", Indiana's 2026 session of 935 bills
+# answered nothing, and so did the DC Council's session that began in 2025, though Indiana had HB
+# 1182 on AI-made sexual images and DC has B26-0491, the Artificial Intelligence Literacy in
+# Education Act. Neither had a bill on file, and a state map would have shown them as quiet. So
+# once a week, where the record holds almost nothing from a legislature in a year, the search is
+# asked; if it sees nothing while that legislature filed plenty, the year's bills are read one by
+# one instead, title and summary, and those that name AI or data centers go to the tagger like any
+# other. A sweep that has read everything once then reads each day what changed.
+BLIND_EVERY_DAYS = 7
+BLIND_THIN = 5       # bills on file from a legislature in a year, below which the search is doubted
+BLIND_FILED = 50     # bills that legislature filed that year, above which a search seeing none is blind
+SWEEP_CAP = 60       # requests per run for the legislatures read bill by bill
+BLIND_ASK = "artificial intelligence"
 
 
-def probe(db, http):
-    """Run the asks above once per PROBE, and log what came back. Returns the requests used."""
-    if kv_get(db, "openstates_probe") == PROBE:
+def ocd_id(code):
+    kind = "district" if code == "dc" else "territory" if code == "pr" else "state"
+    return f"ocd-jurisdiction/country:us/{kind}:{code}/government"
+
+
+# Found by asking Open States directly on 21 September 2026, before the weekly check existed: the DC
+# Council's session that began in 2025 and Indiana's 2026 session answer the search with nothing.
+# They start as sweeps so the site can say so today, and the check still runs on the first chance.
+KNOWN_BLIND = ("dc:2025-01-01", "in:2026-01-01")
+
+
+def blind_state(db):
+    st = kv_get(db, "openstates_blind")
+    if st is None:
+        st = {"checked": "", "sweeps": {k: {"page": 1, "started": None, "done": False} for k in KNOWN_BLIND}}
+    return st
+
+
+def find_blind(db, http, cap, today):
+    """Once a week, ask the search about the legislatures the record holds almost nothing from.
+
+    Returns the requests used. A legislature and year the search cannot see gets a sweep, keyed by
+    the day its bills are read from; one found blind from the earlier year covers the later too.
+    """
+    st = blind_state(db)
+    if st.get("checked") and (dt.date.fromisoformat(today) - dt.date.fromisoformat(st["checked"])).days < BLIND_EVERY_DAYS:
         return 0
-    used, answered = 0, 0
-    for name, params in PROBE_ASKS:
-        try:
-            data = http.json(BASE, params={**params, "per_page": 3, "include": ["abstracts"]})
-            used += 1
-            answered += 1
-            pag = data.get("pagination") or {}
-            seen = [(b.get("identifier"), (b.get("title") or "")[:70], b.get("session"),
-                     (b.get("created_at") or "")[:10], (b.get("first_action_date") or "")[:10],
-                     len(b.get("abstracts") or [])) for b in data.get("results", [])]
-            log(f"[openstates] probe {name}: {pag.get('total_items')} in all, {pag.get('max_page')} pages; {seen}")
-        except Exception as exc:
-            used += 1
-            log(f"[openstates] probe {name}: {str(exc)[:240]}")
-    if answered:
-        kv_set(db, "openstates_probe", PROBE)
+    first, current = int(SINCE[:4]), int(today[:4])
+    held = collections.Counter((r["jurisdiction"], (r["introduced_date"] or "")[:4]) for r in db.execute(
+        "SELECT jurisdiction, introduced_date FROM measures WHERE source = 'Open States'"))
+    used = 0
+
+    def total(code, since, q=None):
+        nonlocal used
+        params = {"jurisdiction": ocd_id(code), "created_since": since, "per_page": 1}
+        if q:
+            params["q"] = q
+        data = http.json(BASE, params=params)
+        used += 1
+        return int((data.get("pagination") or {}).get("total_items") or 0)
+
+    thin = [(code, held[(code, str(current))] < BLIND_THIN, first < current and held[(code, str(first))] < BLIND_THIN)
+            for code in sorted(STATES | {"dc", "pr"})]
+    thin = [t for t in thin if t[1] or t[2]]
+    if 4 * len(thin) > cap:
+        return 0  # not enough left in this run to ask them all; a run with more asks instead
+    found = []
+    for code, thin_now, thin_before in thin:
+        now_since = f"{current}-01-01"
+        seen_now = total(code, now_since, BLIND_ASK)
+        filed_now = total(code, now_since) if not seen_now else None
+        blind_from = now_since if not seen_now and filed_now > BLIND_FILED else None
+        if thin_before:
+            seen_all = total(code, SINCE, BLIND_ASK)
+            if seen_all == seen_now:  # nothing from the earlier year answered the search
+                filed_all = total(code, SINCE)
+                before = filed_all - (filed_now if filed_now is not None else total(code, now_since))
+                if before > BLIND_FILED:
+                    blind_from = SINCE
+        if blind_from:
+            found.append(f"{code}:{blind_from}")
+    for key in found:
+        code, since = key.split(":", 1)
+        mine = [k for k in st["sweeps"] if k.split(":", 1)[0] == code]
+        if any(k.split(":", 1)[1] <= since for k in mine):
+            continue  # already read from that day or earlier
+        for k in mine:
+            del st["sweeps"][k]  # a sweep from later in the year is inside this one
+        st["sweeps"][key] = {"page": 1, "started": None, "done": False}
+    st["checked"] = today
+    kv_set(db, "openstates_blind", st)
+    db.commit()
+    if found:
+        log(f"[openstates] the search cannot see: {', '.join(found)}; read bill by bill instead")
     return used
+
+
+def sweep_blind(db, http, cap, started, today):
+    """Read the blind legislatures bill by bill, keeping what names AI or data centers."""
+    st = blind_state(db)
+    used, stored = 0, 0
+    for key in sorted(st["sweeps"]):
+        cur = dict(st["sweeps"][key])
+        code, since = key.split(":", 1)
+        began = cur.get("started") or today
+        while used < cap and time.time() - started < SECONDS:
+            params = {"jurisdiction": ocd_id(code), "created_since": since, "sort": "updated_desc",
+                      "per_page": 20, "page": cur["page"], "include": ["abstracts", "sponsorships"]}
+            if cur.get("updated_since"):
+                params["updated_since"] = cur["updated_since"]
+            try:
+                data = http.json(BASE, params=params)
+            except HttpError as exc:
+                if exc.status == 400 and cur["page"] > 1:
+                    cur = {"page": 1, "started": None, "done": True, "updated_since": began}
+                    break
+                if "exceeded limit" in str(exc) or exc.status == 429:
+                    st["sweeps"][key] = cur
+                    kv_set(db, "openstates_blind", st)
+                    return used, stored
+                raise
+            used += 1
+            results = data.get("results", [])
+            for b in results:
+                words = f"{b.get('title') or ''} " + " ".join(a.get("abstract", "") for a in (b.get("abstracts") or []))
+                if AI_TEXT.search(words):
+                    stored += store(db, b)
+            db.commit()
+            last = (data.get("pagination") or {}).get("max_page") or cur["page"]
+            if not results or cur["page"] >= last:
+                cur = {"page": 1, "started": None, "done": True, "updated_since": began}
+                break
+            cur.update(page=cur["page"] + 1, started=began)
+        st["sweeps"][key] = cur
+    kv_set(db, "openstates_blind", st)
+    if used:
+        log(f"[openstates] blind legislatures read bill by bill: {used} requests, {stored} bills stored")
+    return used, stored
 
 
 def jurisdiction_code(j):
@@ -102,15 +198,6 @@ def run(db, state, mode):
     day = iso()[:10]
     spent = kv_get(db, "openstates_spend", {})
     used_today = spent.get("n", 0) if spent.get("date") == day else 0
-    try:
-        probed = probe(db, http)
-    except Exception as exc:  # a look for a person is never the reason a run fails
-        probed = 0
-        log(f"[openstates] probe failed: {str(exc)[:200]}")
-    if probed:
-        used_today += probed
-        kv_set(db, "openstates_spend", {"date": day, "n": used_today})
-        db.commit()
     budget = max(0, min(MAX_REQUESTS, DAY_BUDGET - used_today))
     if not budget:
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
@@ -140,6 +227,13 @@ def run(db, state, mode):
         added += found
     except Exception as exc:  # the searches below still run
         log(f"[openstates] pre-filed sweep failed: {str(exc)[:200]}")
+    try:
+        requests_used += find_blind(db, http, min(80, budget - requests_used), day)
+        swept, found = sweep_blind(db, http, min(SWEEP_CAP, budget - requests_used), started, day)
+        requests_used += swept
+        added += found
+    except Exception as exc:  # the searches below still run
+        log(f"[openstates] reading blind legislatures failed: {str(exc)[:200]}")
     stopped_at = None
     for i, query in enumerate(ordered):
         cursor = cursors.get(query, {})
@@ -203,9 +297,13 @@ def run(db, state, mode):
     kv_set(db, "openstates_spend", {"date": day, "n": used_today + requests_used})
     kv_set(db, "openstates_offset", stopped_at if stopped_at is not None else 0)
     # A refusal that cost nothing is their rolling window, not our budget: the run is worth
-    # repeating later the same day rather than writing the day off.
+    # repeating later the same day rather than writing the day off. So is a run that stopped at
+    # the clock with requests left: at six and a half seconds a request, one run reads 120 of the
+    # day's 240, and the other half used to wait for tomorrow.
     if capped and not requests_used:
         retry_at(db, "openstates", RETRY_HOURS)
+    elif ran_out and requests_used < budget:
+        retry_at(db, "openstates", 1)
     else:
         retry_clear(db, "openstates")
     db.commit()

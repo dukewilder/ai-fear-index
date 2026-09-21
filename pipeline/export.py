@@ -507,23 +507,21 @@ def export(db, out_dir, base=""):
     # carrying a control, out of a larger number that did not.
     law_passed = sum(1 for m in measures if m["status"] == "passed")
 
-    # ---------------- where it is happening: every jurisdiction, ranked
-    by_state = collections.defaultdict(list)
-    for m in measures:
-        by_state[m["jurisdiction"]].append(m)
-    state_rows = []
-    for j, ms in by_state.items():
-        fear_mix = collections.Counter(fs for m in ms for fs in m["fears"])
-        # Rules and orders come from several offices under one code, and the row took the name of
-        # whichever came first: a list of executive orders labelled Food and Drug Administration.
-        name = "Federal agencies and the President" if j == "us-exec" else ms[0]["jurisdiction_name"]
-        state_rows.append({"code": j, "name": name, "n": len(ms),
-                           "bills": f"{len(ms):,}", "controlled": str(sum(1 for m in ms if m["controls"])),
-                           "passed": str(sum(1 for m in ms if m["status"] == "passed")),
-                           "top_fear": fear_by[fear_mix.most_common(1)[0][0]]["name"] if fear_mix else None})
-    state_rows.sort(key=lambda r: -r["n"])
+    # ---------------- where it is happening: every state, DC, Puerto Rico and the federal government
+    # Ranked, mapped and paged by the measures that would put AI under new government control, the
+    # number the report is about. Every tile on the map has a page, including a place with nothing
+    # found yet, which says so rather than leaving a square that goes nowhere.
+    places = place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None,
+                         filling=filling_in(db), today=today)
+    state_rows = [p["row"] for p in places if p["n"]]
+    state_rows.sort(key=lambda r: (-r["c"], -r["n"], r["name"]))
     for i, r in enumerate(state_rows, 1):
         r["rank"] = i
+    ranks = {r["code"]: r["rank"] for r in state_rows}
+    for p in places:
+        p["rank"] = ranks.get(p["code"])
+        p["of"] = len(state_rows)
+    state_map = place_map(places)
 
     # ---------------- fear pages and org pages
     fear_pages = [fear_page(f, i + 1, len(fears), fear_stats, lob, feed, today, db, control_by, page_slugs, ents)
@@ -588,6 +586,7 @@ def export(db, out_dir, base=""):
         "quotes": quotes[:5], "already_law": already_law, "law_total": law_total,
         "law_passed": law_passed,
         "states": state_rows, "states_total": len(state_rows), "runs_today": runs_today,
+        "state_pages": [{k: v for k, v in p.items() if k != "row"} for p in places], "state_map": state_map,
         "feed_today": sum(1 for i in feed if (i.get("time_iso") or "") >= (today - dt.timedelta(days=1)).isoformat()),
         "tracked": {"measures": all_measures, "filings": all_filings, "orgs": len(ents.items)},
         "fears_tracked": [f["name"] if f["name"].startswith(("AI", "China")) else f["name"][0].lower() + f["name"][1:]
@@ -626,7 +625,7 @@ SOURCES = [
     ("news", "Headlines", "NEWS_FEEDS"),   # filled in from config/news.json, so the page cannot drift from it
     ("wikipedia", "Public attention", "Wikipedia pageviews"),
     ("rss", "Organization statements", "Newsroom feeds of tracked organizations"),
-    ("tag", "Fear and control labels", "Claude, each label resting on a quote that code finds word for word in the measure, and each control and office read a third time for what the measure does"),
+    ("tag", "Fear and control labels", "Claude reads each measure. Every label rests on a quote copied word for word from it, and is checked against its text"),
 ]
 SCHEDULE = [
     ["Every 20 minutes", "News, statements, federal rules and the feed"],
@@ -1232,6 +1231,168 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
             "timeline_sources": "LDA.gov lobbying filings that mention this fear, bills tagged with it, and Wikipedia pageviews for its topic.",
             "events": [], "latest": latest, "pushers": push_rows, "beneficiaries": ben_rows, "bills": bill_rows,
             "sentence": None, "reach": None}
+
+
+# ---------------------------------------------------------------- state by state
+# The map is a grid of equal squares, one per state, each roughly where the state is. A traced map
+# would give Rhode Island a speck and Montana a field, and on a phone the Northeast could not be
+# tapped at all. Column and row, west to east and north to south.
+TILES = {"ak": (0, 0), "me": (10, 0), "wi": (5, 1), "vt": (9, 1), "nh": (10, 1),
+         "wa": (0, 2), "id": (1, 2), "mt": (2, 2), "nd": (3, 2), "mn": (4, 2), "il": (5, 2), "mi": (6, 2),
+         "ny": (8, 2), "ma": (9, 2),
+         "or": (0, 3), "nv": (1, 3), "wy": (2, 3), "sd": (3, 3), "ia": (4, 3), "in": (5, 3), "oh": (6, 3),
+         "pa": (7, 3), "nj": (8, 3), "ct": (9, 3), "ri": (10, 3),
+         "ca": (0, 4), "ut": (1, 4), "co": (2, 4), "ne": (3, 4), "mo": (4, 4), "ky": (5, 4), "wv": (6, 4),
+         "va": (7, 4), "md": (8, 4), "de": (9, 4),
+         "az": (1, 5), "nm": (2, 5), "ks": (3, 5), "ar": (4, 5), "tn": (5, 5), "nc": (6, 5), "sc": (7, 5),
+         "dc": (8, 5),
+         "ok": (3, 6), "la": (4, 6), "ms": (5, 6), "al": (6, 6), "ga": (7, 6),
+         "hi": (0, 7), "tx": (3, 7), "fl": (8, 7), "pr": (10, 7)}
+PLACE_NAMES = {
+    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas", "ca": "California", "co": "Colorado",
+    "ct": "Connecticut", "de": "Delaware", "fl": "Florida", "ga": "Georgia", "hi": "Hawaii", "id": "Idaho",
+    "il": "Illinois", "in": "Indiana", "ia": "Iowa", "ks": "Kansas", "ky": "Kentucky", "la": "Louisiana",
+    "me": "Maine", "md": "Maryland", "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota",
+    "ms": "Mississippi", "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada",
+    "nh": "New Hampshire", "nj": "New Jersey", "nm": "New Mexico", "ny": "New York", "nc": "North Carolina",
+    "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma", "or": "Oregon", "pa": "Pennsylvania",
+    "ri": "Rhode Island", "sc": "South Carolina", "sd": "South Dakota", "tn": "Tennessee", "tx": "Texas",
+    "ut": "Utah", "vt": "Vermont", "va": "Virginia", "wa": "Washington", "wv": "West Virginia",
+    "wi": "Wisconsin", "wy": "Wyoming", "dc": "District of Columbia", "pr": "Puerto Rico",
+    "us": "Congress", "us-exec": "Federal agencies and the President"}
+PLACE_SLUG = {"us": "congress", "us-exec": "federal"}
+# What a place's measures are, in the words its page uses: Congress files bills and resolutions,
+# the federal agencies rules and the President orders, a legislature bills and resolutions.
+PLACE_KIND = {"us": "bills and resolutions", "us-exec": "rules and executive orders"}
+ONE_KIND = {"bills and resolutions": "bill or resolution", "rules and executive orders": "rule or executive order"}
+
+
+def place_slug(code):
+    return PLACE_SLUG.get(code, code)
+
+
+def filling_in(db):
+    """Places still being read bill by bill because the search cannot see their bills, and so
+    thinner on this site than they are. Empty once each has been read through."""
+    from .collect_openstates import blind_state
+    st = blind_state(db) or {}
+    return sorted({k.split(":", 1)[0] for k, v in (st.get("sweeps") or {}).items() if not v.get("done")})
+
+
+def heat(v, top):
+    """0 to 4, log scaled to the leader, the way the fear grid shades its cells."""
+    return 0 if not v or not top else min(4, 1 + int(3.99 * math.log1p(v) / math.log1p(top)))
+
+
+def place_pages(db, measures, fear_by, control_by, suppressed, fear_stats=None, filling=(), today=None):
+    """One page for every state, DC and Puerto Rico, and for Congress and the federal agencies.
+
+    Counted over the measures the front page counts, with offices counted the front page's way: named
+    in measures that carry a control, one office however it is spelled.
+    """
+    by_place = collections.defaultdict(list)
+    for m in measures:
+        by_place[m["jurisdiction"]].append(m)
+    codes = list(TILES) + [c for c in ("us", "us-exec") if by_place.get(c)]
+    out = []
+    for code in codes:
+        ms = by_place.get(code, [])
+        name = PLACE_NAMES.get(code) or (ms[0]["jurisdiction_name"] if ms else code.upper())
+        slug = place_slug(code)
+        kind = PLACE_KIND.get(code, "bills and resolutions")
+        ctl = [m for m in ms if m["controls"]]
+        passed = [m for m in ms if m["status"] == "passed"]
+        law = sorted((m for m in ctl if m["status"] == "passed"),
+                     key=lambda m: (-len(m["controls"]), m["latest_action_date"] or ""))
+        offices, office_name, beside = collections.Counter(), {}, collections.defaultdict(collections.Counter)
+        for m in ctl:
+            for a in m["agencies"]:
+                k = name_key(a)
+                if not k:
+                    continue
+                offices[k] += 1
+                office_name.setdefault(k, a.strip())
+                beside[k].update(m["controls"])
+        ben_rows = [{"rank": i, "name": office_name[k], "slug": None,
+                     "type": "Attorney general" if "attorney general" in k else "Agency",
+                     "gains": control_by[beside[k].most_common(1)[0][0]]["chip"] if beside[k] else "",
+                     "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(offices.most_common(10), 1)]
+        fear_mix = collections.Counter(fs for m in ms for fs in m["fears"])
+        fear_rows = [{"rank": i, "name": fear_by[fs]["name"], "slug": fs, "bills": str(n),
+                      "controlled": str(sum(1 for m in ctl if fs in m["fears"]))}
+                     for i, (fs, n) in enumerate(fear_mix.most_common(), 1)]
+        buying = collections.Counter(c for m in ms for c in m["controls"])
+        buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n),
+                        "passed": str(sum(1 for m in ms if c in m["controls"] and m["status"] == "passed"))}
+                       for i, (c, n) in enumerate(buying.most_common(), 1)]
+        # the most controls first, law ahead of the rest, then the most recently moved: two stable sorts
+        order = sorted(ms, key=lambda m: m["latest_action_date"] or "", reverse=True)
+        order.sort(key=lambda m: (-len(m["controls"]), m["status"] != "passed"))
+        bill_rows = [{"name": m["identifier"] or KIND_LABEL.get(m["kind"], "Measure"),
+                      "title": cut(m["title"] or "", 160),
+                      "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["url"],
+                      "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in order]
+        law_rows = [{"name": m["identifier"] or "Measure", "title": cut(m["title"] or "", 140), "url": m["url"],
+                     "date": law_date(m, today or now().date()),
+                     "controls": [control_by[c]["chip"] for c in m["controls"]],
+                     "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in law[:30]]
+        n, c = len(ms), len(ctl)
+        evidence = []
+        if n:
+            evidence.append([f"{n:,}", f"{kind if n != 1 else ONE_KIND[kind]} about AI since January 2025"])
+        if c:
+            evidence.append([f"{c:,}", "of them would put AI, the people building it or the people using it "
+                                       "under new government control"])
+        if offices:
+            evidence.append([f"{len(offices):,}", ("agencies and officials" if len(offices) != 1 else "agency or official")
+                             + (" they would hand new power" if c != 1 else " it would hand new power")])
+        if passed:
+            evidence.append([f"{len(passed):,}", ("have passed" if len(passed) != 1 else "has passed")
+                             + (f", {len(law):,} of them carrying a control" if law and len(passed) > 1
+                                else ", carrying a control" if law else "")])
+        receipt = " ".join(x for x in [
+            f"{name}: {count(n, 'AI measure')} since January 2025." if n else "",
+            (f"{c:,} would put AI under new government control"
+             + (f", handing new power to {count(len(offices), 'office')}." if offices else ".")) if c else "",
+            f"{len(passed):,} passed." if passed else "",
+            f"{SITE_URL}/states/{slug}/"] if x)
+        tile = TILES.get(code)
+        out.append({
+            "code": code, "slug": slug, "name": name, "abbr": code.upper() if code in TILES else "",
+            "col": tile[0] if tile else None, "row_n": tile[1] if tile else None, "federal": code in FEDERAL,
+            "n": n, "c": c, "passed": len(passed), "law": len(law), "offices": len(offices),
+            "filling": code in filling, "kind": kind,
+            "top_fear": fear_rows[0]["name"] if fear_rows else None,
+            "evidence": evidence, "receipt": receipt, "beneficiaries": ben_rows, "already_law": law_rows,
+            "law_total": len(law), "quotes": own_words(db, ms, fear_by, control_by, suppressed, limit=5) if ms else [],
+            "buying": buying_rows, "fears": fear_rows, "bills": bill_rows,
+            # the counts the map shades by, whole and fear by fear: all, carrying a control, law
+            "counts": {"all": [n, c, len(law)],
+                       **{fs: [fear_mix[fs], sum(1 for m in ctl if fs in m["fears"]),
+                               sum(1 for m in law if fs in m["fears"])] for fs in fear_mix}},
+            "row": {"code": code, "slug": slug, "name": name, "n": n, "c": c,
+                    "bills": f"{n:,}", "controlled": f"{c:,}", "passed": f"{len(passed):,}",
+                    "top_fear": fear_rows[0]["name"] if fear_rows else None, "filling": code in filling},
+        })
+    return out
+
+
+def place_map(places):
+    """What the map draws: every tile's counts, and its shade on the default reading, which is the
+    measures that would put AI under new government control. Federal tiles sit beside the grid and
+    are not shaded, since Congress alone would set the top of the scale for every state."""
+    tiles = [p for p in places if p["col"] is not None]
+    top = max((p["c"] for p in tiles), default=0)
+    return {"tiles": [{"code": p["code"], "slug": p["slug"], "abbr": p["abbr"], "name": p["name"],
+                       "col": p["col"], "row": p["row_n"], "n": p["n"], "c": p["c"], "law": p["law"],
+                       "passed": p["passed"], "top_fear": p["top_fear"], "filling": p["filling"],
+                       "level": heat(p["c"], top)} for p in tiles],
+            "federal": [{"code": p["code"], "slug": p["slug"], "name": p["name"], "n": p["n"], "c": p["c"],
+                         "law": p["law"], "passed": p["passed"]} for p in places if p["federal"]],
+            "top": top,
+            # every tile's counts by fear, for the map's own switches: [all, carrying a control, law]
+            "counts": {p["code"]: p["counts"] for p in tiles},
+            "fed_counts": {p["code"]: p["counts"] for p in places if p["federal"]}}
 
 
 def org_page(o, of, lob, receipts, committees, feed, measures, control_by, group="funders"):

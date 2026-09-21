@@ -952,7 +952,43 @@ def check_brief_attempts():
     S, H = brief.MODELS
     assert used == [S, H, S, H, H], used
     assert min(budgets) >= 1000, f"the answer is still given {min(budgets)} tokens"
+
+    # A start date belongs to the part of the measure it is written into. The launch edition put
+    # "beginning July 1, 2027", the date of the law's duties, on the Attorney General's power over
+    # audit reports, which sits in a section of its own over audits due by 2029.
+    two_parts = ("This bill would require an operator to, beginning July 1, 2027, before making a new "
+                 "companion chatbot available to users in the state, perform and document a risk assessment. "
+                 "The bill would authorize the Attorney General to, for cause, request and obtain a copy of "
+                 "an audit report from the operator.")
+    dated = dict(row, summary=two_parts)
+    power_q = "authorize the Attorney General to, for cause, request and obtain a copy"
+    duty_q = "before making a new companion chatbot available to users in the state"
+    assert "Attorney General" in brief.dated_part(f"Companion chatbots.\n{two_parts}", power_q)
+    for answers, want, reason in (
+            ([("California gives the Attorney General the power to request and obtain, for cause, an operator's "
+               "audit report, beginning July 1, 2027.", power_q),
+              ("California gives the Attorney General the power to request and obtain, for cause, an operator's "
+               "audit report.", power_q)], 1, "different part"),
+            ([("California puts every new companion chatbot under a risk assessment the operator must document.",
+               duty_q),
+              ("From July 1, 2027, California puts every new companion chatbot under a risk assessment the "
+               "operator must document.", duty_q)], 1, "starts in 2027")):
+        said.clear()
+
+        def fake(key, system, user, max_tokens=400, answers=answers):
+            said.append(user)
+            s, q = answers[len(said) - 1]
+            return {"sentence": s, "quote": q}
+        brief.call = fake
+        try:
+            attempts = []
+            lines = brief.write_lines("k", [dated], "2026-09-21", 1, attempts)
+        finally:
+            brief.call = real
+        assert reason in attempts[0]["reason"], attempts
+        assert lines and lines[0]["sentence"] == answers[want][0], attempts
     print("the brief is written by the stronger model, told every fault, and reads a passive duty: ok")
+    print("a start date stays with the part of the measure it belongs to: ok")
 
 
 def check_lobbying_money():

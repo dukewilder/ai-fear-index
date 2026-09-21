@@ -444,7 +444,10 @@ def redo_briefs(db):
 # 11: the stronger model was given the smaller one's 400 tokens and answered seven candidates in a
 #    row with no JSON, so the edition led with the eighth. It now has room, a reminder, and the
 #    smaller model behind it when an answer comes back without the JSON.
-REDO_EDITION = ("2026-09-21", 11)
+# 12: that edition led with the Attorney General's power over the audit reports "beginning July 1,
+#    2027". The date in the digest belongs to the law's duties; the audit section has none, and its
+#    first audits are due by 2029. A start year now has to come from the part of the measure quoted.
+REDO_EDITION = ("2026-09-21", 12)
 
 
 def redo_today(db):

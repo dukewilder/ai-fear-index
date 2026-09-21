@@ -198,8 +198,10 @@ SYSTEM = (
 
 RULES = (
     "Write one sentence, at most 30 words. {tense}\n"
-    "If the measure says it starts in a later year, put that year in the sentence. A law on the "
-    "books that bites in 2029 is still the story, and saying from 2029 is more of it, not less.\n"
+    "If the part of the measure the sentence reports says it starts in a later year, put that "
+    "year in the sentence. A law on the books that bites in 2029 is still the story, and saying "
+    "from 2029 is more of it, not less. A date the measure gives to a different part of it does "
+    "not go in the sentence.\n"
     "Say which government office gains a power, and what it can now do. Start with the "
     "jurisdiction, and let the next words be the office and its power, in one of two shapes: "
     "<jurisdiction> gives <office> the power to <what it can now do>, or <jurisdiction> puts "
@@ -446,6 +448,40 @@ def starts_later(text, today):
             return m.group(1)
     return ""
 
+
+YEAR = re.compile(r"\b(20\d\d)\b")
+# A sentence of the measure that dates the whole of it rather than one part.
+WHOLE = re.compile(r"\b(?:this|the)\s+(?:bill|act|chapter|measure|rule)\b[^.]*"
+                   r"\b(?:operative|take effect|takes effect|effective)\b", re.I)
+
+
+def dated_part(raw, quote):
+    """The sentence of the measure's text that the quote comes from, or "" if it cannot be placed.
+
+    A start date belongs to the part of a measure it is written into. California's companion
+    chatbot law has its duties begin on 1 July 2027, and the Attorney General's power to obtain the
+    audit reports sits in a section with no such date, over audits due by 2029. Taking the first
+    date in the digest as the measure's start put "beginning July 1, 2027" on the Attorney General's
+    power in the launch edition.
+    """
+    q = norm(quote)
+    if not q:
+        return ""
+    for s in re.split(r"(?<=\.)\s+(?=[A-Z])", raw or ""):
+        if q in norm(s):
+            return s
+    return ""
+
+
+def whole_dates(raw):
+    """The sentences of the measure that date all of it."""
+    return " ".join(s for s in re.split(r"(?<=\.)\s+(?=[A-Z])", raw or "") if WHOLE.search(s))
+
+
+def later_years(text, today):
+    year = dt.date.fromisoformat(today).year if isinstance(today, str) else today.year
+    return {y for y in YEAR.findall(text or "") if int(y) > year}
+
 # Where the tense of the sentence lives. The sentence has to start with the jurisdiction, so the
 # main verb is in the first clause; everything from the first comma or relative pronoun onward
 # describes the office. That matters because "may" is the natural word for a power the office
@@ -615,14 +651,25 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
             note(attempts, where, f"the model did not answer: {str(exc)[:160]}", fatal=True)
             log(f"[brief] {where}: the model did not answer, {str(exc)[:160]}")
             continue
-        starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
+        raw = f"{row['title'] or ''}\n{row['summary'] or ''}"
+        starts = starts_later(raw, today)
 
         confirmed = [o for o in ((row["offices"] if "offices" in row.keys() else "") or "").split("|") if o]
 
         def fault(t, q):
-            return why_not(t, q, body, (row["status"] or "") == "passed", row["office"] or "", starts,
-                           row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}",
-                           offices=confirmed)
+            # The start year that goes with the part quoted, and only that one: see dated_part.
+            part = dated_part(raw, q)
+            own = f"{part} {whole_dates(raw)}"
+            reason = why_not(t, q, body, (row["status"] or "") == "passed", row["office"] or "",
+                             starts_later(own, today) if part else starts, row["jurisdiction_name"] or "",
+                             raw=raw, offices=confirmed)
+            if reason or not part:
+                return reason
+            stray = later_years(t, today) - set(YEAR.findall(own))
+            if stray:
+                return (f"dates it {min(stray)}, a date the measure gives to a different part of it than "
+                        f"the one quoted; leave the year out")
+            return ""
         reason = fault(text, quote)
         if reason:
             note(attempts, where, reason, sentence_text=text)

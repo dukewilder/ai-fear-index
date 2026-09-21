@@ -72,7 +72,7 @@ def build(db, today):
                      "put back by telling Claude which one.\n\n"
                      "| Measure | Label | Quote | Why the check said no |\n|---|---|---|---|\n"
                      + "\n".join(f"| {where(r['target'])} | "
-                                 f"{('Office: ' + r['value']) if r['kind'] == 'agency' else names.get(r['value'], r['value'])} "
+                                 f"{('Office: ' + r['value']) if r['kind'] == 'agency' else 'About AI at all' if r['kind'] == 'about' else names.get(r['value'], r['value'])} "
                                  f"| {cell(r['evidence'])} | {cell(r['reason'])} |" for r in refused[:LIMIT])
                      + (f"\n\nAnd {len(refused) - LIMIT} more, in the checks table on the data branch."
                         if len(refused) > LIMIT else ""))

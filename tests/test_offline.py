@@ -1391,6 +1391,35 @@ def check_status_and_coverage():
     assert swept["artificial intelligence"]["done"] and swept["deepfake"]["done"], swept
     print("bills pre-filed for a 2025 session are swept once: ok")
 
+    # The third reading asks of every counted measure whose title does not name AI whether AI is a
+    # subject of it at all. A no takes it out of every count; a title naming AI, or a person-confirmed
+    # law, is not asked.
+    from pipeline import check
+    from pipeline.common import measures_in_scope as _in_scope
+    adb = connect(":memory:")
+    for mid, title, summary in (("a1", "CATCH Fentanyl Act", "Directs a pilot of detection technology, which may include artificial intelligence."),
+                                ("a2", "An act relating to a person's voice and likeness", "Bars unauthorized AI-generated digital replicas."),
+                                ("a3", "Artificial Intelligence Amendments", "")):
+        upsert(adb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "session": "89R", "identifier": mid,
+                                 "title": title, "summary": summary, "status": "pending", "introduced_date": "2025-03-01",
+                                 "url": f"u-{mid}", "jurisdiction_name": "Texas", "source": "Open States"})
+        adb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', 1, 'now')", (mid,))
+    adb.commit()
+    asked = []
+
+    def judge(key, user, max_tokens=250):
+        asked.append(user)
+        assert "THE LABEL RESTS ON THIS QUOTE" not in user, "the about question borrowed the label wording"
+        return ({"verdict": "no", "reason": "AI is one technology a pilot may use"} if "Fentanyl" in user
+                else {"verdict": "yes", "reason": "it regulates digital replicas"}), "fake"
+    check.run(adb, "k", ask_fn=judge)
+    counted = {m["id"] for m in _in_scope(adb)}
+    assert len(asked) == 2, f"asked {len(asked)} times; a title naming AI should not be asked"
+    assert counted == {"a2", "a3"}, counted
+    check.run(adb, "k", ask_fn=judge)
+    assert len(asked) == 2, "a measure already answered on the same text was asked again"
+    print("a measure is counted as about AI only when AI is a subject of it: ok")
+
 
 def check_links_open_right(dist):
     """A link off the site opens a new tab; a link within it does not.

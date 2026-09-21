@@ -20,7 +20,8 @@ import time
 
 import requests
 
-from .common import annotate, config, iso, kv_get, kv_set, log, measures_in_scope
+from .common import annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_names_ai
+from . import known
 
 API = "https://api.anthropic.com/v1/messages"
 # Stronger first. A key that cannot use the first model gets the next one down rather than no
@@ -51,7 +52,7 @@ RECHECK = (1, ("labeling-mandates", "mandatory-reporting"))
 
 # The heavy, rare controls first: they decide which measure leads the post, and they were the ones
 # most often wrong. Offices next, since the front page counts them.
-ORDER = ["license-to-build", "training-caps", "open-model-limits", "id-age-checks", "export-controls",
+ORDER = ["about", "license-to-build", "training-caps", "open-model-limits", "id-age-checks", "export-controls",
          "preemption", "new-agency-powers", "data-center-limits", "agency", "mandatory-reporting",
          "labeling-mandates", "fear"]
 
@@ -127,6 +128,23 @@ FEAR_QUESTION = (
     "supply matter with no AI competition in it, or workers trained in AI with no jobs lost to it;\n"
     "- the quote describes law already in force, not what this measure would do.")
 
+# Whether a measure is about AI at all, asked of every counted measure whose title does not say so.
+# The tagger was asked the same thing and is lenient: federal bills found through their CRS
+# summaries included the CATCH Fentanyl Act and the Promoting Precision Agriculture Act, which
+# mention AI once each. A no takes the measure out of every count.
+ABOUT_QUESTION = (
+    "Is artificial intelligence a subject of this measure itself? Answer yes if it regulates, "
+    "restricts, requires, funds, studies or defines AI, machine learning, algorithms or automated "
+    "decision systems, AI chatbots, synthetic media such as deepfakes, digital replicas of a "
+    "person's voice or likeness, or data centers it says are for AI.\n"
+    "Answer no when any of these is true:\n"
+    "- AI appears only in passing: one of several technologies a program may use or study, a "
+    "finding, a definition used nowhere else, or a statement of purpose;\n"
+    "- the measure is about data centers, energy, computing, the internet or technology in general "
+    "without saying they are for AI;\n"
+    "- the measure is about something else, such as trade, health care or defense, and AI is one "
+    "line in it.")
+
 _lock = threading.Lock()
 _model = {"i": 0}
 
@@ -194,6 +212,9 @@ def question(m, kind, value, quote, controls, fears=None):
         what = "MEASURE"
         doc = (f"Jurisdiction: {m['jurisdiction_name']}\nIdentifier: {m['identifier']}\n"
                f"Title: {m['title'] or ''}\nSummary: {(m['summary'] or '(none)')[:5000]}")
+    if kind == "about":
+        return (f"{what}\n{doc}\n\n{ABOUT_QUESTION}\n\n"
+                'Return JSON: {"verdict": "yes" or "no", "reason": "one short sentence"}')
     if kind == "fear":
         f = (fears or {})[value]
         ask_this = (f"LABEL: a fear this {what.lower()} cites: {f['name']}\nDEFINITION: {f['definition']}\n\n"
@@ -242,6 +263,22 @@ def queue(db, controls, fears=None):
                 refused.append(r)  # the measure was read again and landed on the same quote
             continue  # yes stays; hold waits for a person
         todo.append(r)
+    # Every counted measure whose title does not name AI, unless a person has confirmed it is an AI
+    # law. Keyed to its text, so a new summary is asked about again.
+    confirmed = known.ids(db)
+    asked = {r["target"]: (r["evidence"], r["verdict"]) for r in
+             db.execute("SELECT target, evidence, verdict FROM checks WHERE kind = 'about'")}
+    for mid, m in shown.items():
+        if m.get("post") or mid in confirmed or title_names_ai(m["title"]):
+            continue
+        r = {"target": mid, "kind": "about", "value": "ai",
+             "evidence": sha(f"{m['title'] or ''}\n{m['summary'] or ''}")}
+        was = asked.get(mid)
+        if was and was[0] == r["evidence"]:
+            if was[1] == "no":
+                refused.append(r)
+            continue
+        todo.append(r)
     rank = {k: i for i, k in enumerate(ORDER)}
     # Measures that moved in the last 45 days first, because the daily post draws its lead from
     # them and can only use a label once it is checked. Then the groups in order, newest first
@@ -258,6 +295,9 @@ def queue(db, controls, fears=None):
 
 
 def remove(db, target, kind, value):
+    if kind == "about":
+        db.execute("UPDATE tag_runs SET ai_related = 0 WHERE target = ?", (target,))
+        return
     db.execute("DELETE FROM tags WHERE target=? AND kind=? AND value=?", (target, kind, value))
 
 

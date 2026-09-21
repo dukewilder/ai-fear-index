@@ -92,6 +92,14 @@ def check_brief_prompt():
     assert brief.why_not(later.replace("Agency,", "Agency from 2029,"),
                          "puts ai auditors under registration with the government",
                          lbody, True, "", "2029", "California") == "", "a sentence carrying the year was rejected"
+    # Dating a measure is not explaining it, and a sentence opening on its year keeps its tense after it
+    assert not brief.EXPLAINING.search("California puts companion chatbot operators under independent "
+                                       "auditors whose reports the Attorney General can demand, beginning 2027.")
+    assert brief.EXPLAINING.search("California puts chatbots under audits, reflecting a national trend.")
+    assert brief.CONDITIONAL.search(brief.tense_of("From 2027, California would put companion chatbots under "
+                                                   "audits reported to the Attorney General.", "California"))
+    assert brief.CONDITIONAL.search(brief.tense_of("Beginning January 1, 2028, Texas would put data centers "
+                                                   "under a permit.", "Texas"))
     print("brief prompt and gates: ok")
 
 

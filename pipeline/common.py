@@ -427,7 +427,10 @@ def redo_briefs(db):
 #    commission's review". The bill creates a commission and gives it no power the third reading
 #    could confirm. A sentence may now name a commission, council or board only if it is a
 #    confirmed office of the measure.
-REDO_EDITION = ("2026-09-21", 6)
+# 7: the gates themselves refused good sentences. ", beginning 2027" at the end was read as an
+#    explaining clause, and "From 2027, California would put" was read as present tense because the
+#    date came first. The rules ask for the year; the gates now let it through.
+REDO_EDITION = ("2026-09-21", 7)
 
 
 def redo_today(db):

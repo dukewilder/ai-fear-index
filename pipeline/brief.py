@@ -230,7 +230,10 @@ def sponsors_word(text, office="", loose=False):
 
 
 # a sentence that stops reporting and starts explaining what it means
-EXPLAINING = re.compile(r",\s+\w+ing\b[^.]*\.$|\bnot (just|only|merely)\b|\bit is not\b", re.I)
+# A trailing ", reflecting a trend" explains; a trailing ", beginning 2027" dates. The rules ask for
+# the start year when a measure bites later, and the model puts it there, so the dating words pass.
+EXPLAINING = re.compile(r",\s+(?!(?:beginning|starting|commencing)\b)\w+ing\b[^.]*\.$"
+                        r"|\bnot (just|only|merely)\b|\bit is not\b", re.I)
 
 
 CONDITIONAL = re.compile(r"\b(would|could|may)\b", re.I)
@@ -282,6 +285,11 @@ def starts_later(text, today):
 MAIN_CLAUSE = re.compile(r",|\b(which|who|whom|whose|that|whether)\b", re.I)
 
 
+# "From 2027, California would put..." carries its tense after the date, not in it.
+LEADING_DATE = re.compile(r"^(?:from|beginning|starting|commencing|by|in|as of|effective)\s+"
+                          r"(?:[A-Z][a-z]+\s+)?(?:\d{1,2},?\s+)?\d{4},\s*", re.I)
+
+
 def tense_of(text, jurisdiction=""):
     """The first clause, which is the one carrying the tense.
 
@@ -291,7 +299,7 @@ def tense_of(text, jurisdiction=""):
     pending rule from that agency would read as written in the present tense, and every duty
     sentence from it would slip the check for one.
     """
-    body = (text or "").strip()
+    body = LEADING_DATE.sub("", (text or "").strip())
     if jurisdiction and body.lower().startswith(jurisdiction.lower()):
         body = body[len(jurisdiction):].lstrip(" ,")
     return MAIN_CLAUSE.split(body, 1)[0]

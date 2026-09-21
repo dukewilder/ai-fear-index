@@ -742,9 +742,9 @@ def check_second_attempt():
             return {"sentence": "California would put companion chatbots under independent child safety audits "
                                 "reported to the Attorney General.",
                     "quote": "require an operator to submit to independent audits"}
-        return {"sentence": "California would put companion chatbot operators under independent audits whose "
-                            "reports the Attorney General can demand.",
-                "quote": "require an operator to submit to independent audits"}
+        return {"sentence": "California would give the Attorney General the power to demand the audit reports "
+                            "of companion chatbot operators.",
+                "quote": "make the audit reports available to the Attorney General"}
     real, brief.call = brief.call, fake
     try:
         attempts = []
@@ -758,6 +758,98 @@ def check_second_attempt():
     assert not brief.unpowered_body("South Carolina would put data centers under a Public Service Commission certificate.",
                                     ["South Carolina Public Service Commission"])
     print("a sentence names a commission only when it holds a confirmed power: ok")
+
+
+def check_power_is_the_office():
+    """The office gaining the power is who the lead is about, never a firm a company hires.
+
+    The launch edition led with "California puts companion chatbots under independent auditors
+    whose reports the Attorney General can demand", and the plate said "California puts companion
+    chatbots under independent auditors". The power in that law is the Attorney General's. A reader
+    saw a rule protecting children from chatbots, and no office gaining anything. The rules had
+    asked for exactly that shape, by example.
+    """
+    from pipeline import brief
+    assert "an auditor whose report" not in brief.RULES, "the rules still ask for the auditor shape"
+    assert "firm a company has to hire" in brief.RULES, "the rules no longer say a hired firm holds nothing"
+    summary = ("This bill would require an operator to submit to independent audits of its compliance. The "
+               "bill would authorize the Attorney General to, for cause, request and obtain a copy of an "
+               "audit report from the operator, beginning July 1, 2027.")
+    body = brief.norm(f"Companion chatbots.\n{summary}")
+    launch = ("California puts companion chatbots under independent auditors whose reports the Attorney "
+              "General can demand, beginning 2027.")
+    why = brief.why_not(launch, "require an operator to submit to independent audits", body, True, "", "2027",
+                        "California", raw=f"Companion chatbots.\n{summary}", offices=[])
+    assert "Attorney General" in why and "open with" in why, f"the auditor shape was not refused: {why!r}"
+    office = ("California gives the Attorney General the power to demand, for cause, the audit reports of "
+              "companion chatbot operators, beginning 2027.")
+    assert brief.why_not(office, "authorize the Attorney General to, for cause, request and obtain a copy",
+                         body, True, "", "2027", "California", raw=f"Companion chatbots.\n{summary}",
+                         offices=[]) == "", "a sentence leading with the office was refused"
+    for text, firm in (
+            (launch, "auditors"),
+            ("California puts companion chatbots under independent child safety audits reported to the "
+             "Attorney General.", "independent child safety audits"),
+            ("California requires every companion chatbot to be certified by an auditor the Attorney "
+             "General approves.", "auditor"),
+            ("Illinois would put hiring tools under a bias audit by an independent auditor, which the "
+             "Department of Labor could review.", "auditor"),
+            (office, ""),
+            ("California gives the Attorney General the power to demand the reports of independent "
+             "auditors.", ""),
+            ("Ohio would put every operator under the State Auditor, who could demand its records.", ""),
+            ("New York would put frontier developers under an independent AI safety office that decides "
+             "who may release a model.", ""),
+            ("California requires operators to certify compliance under penalty of perjury.", ""),
+            ("California would bar users under 18 from companion chatbots unless an independent auditor "
+             "certifies them.", ""),
+            ("California puts AI auditors under registration with the Government Operations Agency, "
+             "which licenses them.", "")):
+        assert brief.private_holder(text) == firm, f"{text[:70]!r}: {brief.private_holder(text)!r}, wanted {firm!r}"
+
+    # through write_lines: the auditor shape is refused, and told which office to lead with
+    row = {"id": "m1", "jurisdiction_name": "California", "identifier": "SB 1119", "status": "passed",
+           "title": "Companion chatbots.", "office": "", "offices": "", "controls": "mandatory-reporting",
+           "fears": "", "url": "u", "summary": summary}
+    said = []
+
+    def fake(key, system, user, max_tokens=400):
+        said.append(user)
+        if "was refused" not in user:
+            return {"sentence": launch, "quote": "require an operator to submit to independent audits"}
+        return {"sentence": office, "quote": "authorize the Attorney General to, for cause, request and obtain a copy"}
+    real, brief.call = brief.call, fake
+    try:
+        lines = brief.write_lines("k", [row], "2026-09-21", 1, [])
+    finally:
+        brief.call = real
+    assert len(said) == 2 and "open with what the Attorney General can do" in said[1], \
+        "the second attempt was not told which office to lead with"
+    assert lines and lines[0]["sentence"] == office, f"the office-first sentence was not used: {lines}"
+
+    # and the plate keeps the office, even where the sentence says it without a power phrase
+    lets = ("California lets the Attorney General demand, for cause, the audit reports of companion "
+            "chatbot operators, beginning 2027.")
+    assert brief.holder_words(lets) == {"attorney", "general"}, brief.holder_words(lets)
+    assert brief.holder_words(launch) == {"attorney", "general"}, "the plate would keep the auditors"
+    heads = ["California puts companion chatbots under independent auditors",
+             "California lets its Attorney General demand chatbot audit reports"]
+    asked = []
+
+    def two(key, system, prompt, max_tokens=0):
+        asked.append(prompt)
+        return {"line": heads[len(asked) - 1]}
+    brief.call = two
+    try:
+        got = brief.headline("k", [{"sentence": lets, "office": "", "jurisdiction": "California",
+                                    "controls": "mandatory-reporting", "head": ""}],
+                             {c["slug"]: c for c in config("controls")}, {})
+    finally:
+        brief.call = real
+    assert got == heads[1] and len(asked) == 2, f"the plate dropped the office: {got!r}"
+    assert brief.power_clause("Ohio would put every data center under the state regulators, who decide.") \
+        .endswith("regulators"), "the fallback headline stops inside a word"
+    print("the lead is about the office gaining the power, not a firm a company hires: ok")
 
 
 def check_lobbying_money():
@@ -1137,6 +1229,7 @@ def main():
     check_label_rules()
     check_third_reading()
     check_second_attempt()
+    check_power_is_the_office()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()

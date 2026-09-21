@@ -157,15 +157,19 @@ RULES = (
     "Write one sentence, at most 30 words. {tense}\n"
     "If the measure says it starts in a later year, put that year in the sentence. A law on the "
     "books that bites in 2029 is still the story, and saying from 2029 is more of it, not less.\n"
-    "Say what the measure puts under whose control. Name the government body that would decide, "
-    "inspect, licence, or be reported to, inside the sentence. If the measure names no body, say "
-    "the state or the jurisdiction by name.\n"
+    "Say which government office gains a power, and what it can now do. Name the office that "
+    "would decide, inspect, licence, demand, or be reported to, inside the sentence. If the "
+    "measure names no office, the power is the state's: say the state or the jurisdiction by name.\n"
     "A duty on a company is a power for whoever it answers to, and it is the power that goes in "
     "the sentence. Not required to restore the water, but put under the department that decides "
-    "whether it has. Not required to submit to audits reported to the attorney general, but put "
-    "under an auditor whose report the attorney general can demand.\n"
+    "whether it has. Not required to submit to audits the attorney general can ask to see, but "
+    "gives the attorney general the power to demand the audit reports.\n"
+    "An auditor, assessor, certifier, or any other firm a company has to hire holds no power in "
+    "this sentence. The office that can demand its work or act on it holds the power, and the "
+    "sentence is about that office. Keep any limit the measure puts on the power, such as for "
+    "cause or after notice: dropping it makes the power larger than the measure makes it.\n"
     "So do not open with the jurisdiction and then requires, mandates, directs or orders followed "
-    "by a company. Open with what is put under whose control.\n"
+    "by a company. Open with the office and what it can now do, or with what is put under it.\n"
     "If a duty falls on everyone in order to identify some people, the sentence says everyone: a "
     "rule that checks whether a user is a child checks every user. If the measure deletes a "
     "condition that had narrowed who a duty applied to, it is widening that duty and the sentence "
@@ -254,13 +258,89 @@ POWER = re.compile(
     r"(?:decid\w+|licens\w+|approv\w+|inspect\w+|certif\w+|investigat\w+|revok\w+|"
     r"registers?|determin\w+|enforc\w+|permits?|refus\w+|withhold\w+|bars?|blocks?|"
     r"suspends?|suspend|suspending|issu\w+|audits?|holds?|keeps?)\b"
-    rf"|\b(?:gives?|hands?|grants?|leaves?)\s+(?:{BODY})"
+    rf"|\b(?:gives?|hands?|grants?|leaves?|lets?|allows?|authori[sz]es?)\s+(?:{BODY})"
     r"|\b(?:licen[sc]ed|approved|certified|registered|inspected|authoris?zed|vetted)\s+by\b", re.I)
 DUTY_FRAMED = "written as a duty on a company, not the power it creates"
 # Looked for in the main clause rather than the first few words, because "Health and Human Services
 # Department, Food and Drug Administration requires operators to file reports" is the same sentence
 # with a longer name on the front.
 DUTY_OPENER = re.compile(r"\b(requires?|mandates?|obligates?|directs?|orders?|compels?)\b", re.I)
+
+# Who a sentence puts the power under when it is not the government. A company told to hire an
+# auditor answers to the office that can demand the auditor's report, not to the auditor. The launch
+# edition led with "California puts companion chatbots under independent auditors whose reports the
+# Attorney General can demand", and its headline kept the auditors and dropped the Attorney General,
+# so an office gaining a power read as a consumer protection. The rules had asked for that shape
+# with an example, and the example is gone too. Capitals decide it where a word could be either:
+# "the State Auditor" is an office, "an independent auditor" is a firm.
+HIRED = re.compile(r"(?<![Ss]tate )(?<![Cc]ounty )(?<![Cc]ity )\b(?:auditors?|certifiers?|assessors?|"
+                   r"verifiers?|evaluators?|contractors?|consultants?|third[- ]part(?:y|ies))\b")
+OUTSIDE = (r"\b(?:independent|outside|third[- ]party|private)\s+(?:[a-z][\w-]*\s+){0,3}?"
+           r"(?:audits?|assessments?|evaluations?|reviews?|certifications?|testing)\b")
+# An office named in a sentence, as the model writes one: a proper name, or one of the few titles
+# that are an office in lower case as well.
+GOVERNMENT = re.compile(
+    r"\b(?:[Aa]ttorneys?\s+[Gg]eneral|[Gg]overnor|[Ll]egislature"
+    r"|(?:[A-Z][\w.'-]*\s+){0,4}(?:Department|Office|Bureau|Division|Board|Commission|Agency|"
+    r"Authority|Council|Registry|Administration|Secretary|Director|Administrator|Comptroller|"
+    r"Commissioner|Auditor|Inspector\s+General|Treasurer|Regulator)"
+    r"(?:\s+(?:of|for|on|and|the)\s+[A-Z][\w.'-]*|\s+[A-Z][\w.'-]*){0,5}"
+    r"|FTC|FCC|FDA|SEC|NIST|CISA|DOJ|DHS|HHS|OMB|OSTP|BIS|EPA|FERC|NRC|CFPB|EEOC|NTIA)\b")
+
+
+def government_named(text):
+    """The first office the sentence names, or an empty string."""
+    m = GOVERNMENT.search(text or "")
+    return m.group(0).strip() if m else ""
+
+
+UNDER_PHRASE = re.compile(r"\bunder\s+[^,.;]*", re.I)
+# where what follows under stops being the thing it is under: "under 18 from chatbots unless..."
+RELATIVE = re.compile(r"\b(?:which|whose|who|whom|that|where|unless|if|when|until|before|after|"
+                      r"from|to|for|and|or)\b", re.I)
+
+
+def private_holder(text):
+    """The hired party a sentence first says the power sits with, or an empty string.
+
+    Looked for only where a sentence puts its holder: after under, gives and the rest, or after
+    certified by, taken in the order they come. The first one that names an office or a power
+    settles it. An auditor named anywhere else is only named: "gives the Attorney General the
+    power to demand the auditor's report" leads with the office. And an under that holds nothing,
+    "under penalty of perjury" or "under 18", is passed over.
+    """
+    text = text or ""
+    slots = []
+    for m in POWER.finditer(text):
+        end = m.end()
+        while end < len(text) and (text[end].isalnum() or text[end] in "'-"):
+            end += 1  # the pattern can stop inside a word, "auditor" out of "auditors"
+        phrase = text[m.start():end]
+        if re.search(r"\sby$", phrase, re.I):
+            phrase += " " + re.split(r"[,.;]", text[end:], maxsplit=1)[0][:60]
+        slots.append((m.start(), phrase, True))
+    for m in UNDER_PHRASE.finditer(text):
+        slots.append((m.start(), RELATIVE.split(m.group(0), maxsplit=1)[0], False))
+    for _, phrase, power in sorted(slots, key=lambda s: (s[0], not s[2])):
+        hired = HIRED.search(phrase) or re.search(OUTSIDE, phrase, re.I)
+        gov = GOVERNMENT.search(phrase)
+        if hired and (not gov or hired.start() < gov.start()):
+            return hired.group(0)
+        if power or gov:
+            return ""
+    return ""
+
+
+def hired_fault(text):
+    """Why a sentence that sits the power with a hired firm is refused, naming the office to use."""
+    firm = private_holder(text)
+    if not firm:
+        return ""
+    gov = re.sub(r"^the\s+", "", government_named(text), flags=re.I)
+    who = f"the {gov}" if gov else "the state, or the office that can act on its work"
+    return (f"leads with {firm!r}, a private firm or its work, when the power belongs to {who}; "
+            f"open with what {who} can do")
+
 
 # When a measure that has passed says it starts in a later year, the present tense alone claims it
 # is in force now. Four of the strongest candidates in the pool are exactly this: California bills
@@ -381,6 +461,9 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
         return f"passed but starts in {starts}, and the sentence does not say so"
     if offices is not None and unpowered_body(text, offices):
         return "names a commission, council or board the measure gives no confirmed power"
+    hired = hired_fault(text)
+    if hired:
+        return hired
     # The quote is checked before the duty test, not after. A duty-framed sentence is kept in
     # reserve and posted when nothing better was written, and it used to be kept without its
     # quote ever being looked at, so the fallback could go out resting on words not in the bill.
@@ -621,7 +704,10 @@ HEAD_RULES = (
     "Do not add a number, a place, or anything else the sentence does not already say.\n"
     "If the sentence puts something under a body, or says a body certifies, approves, exempts or "
     "decides, name that body. A measure that lets one office decide who is exempt is not the same "
-    "as the requirement going away, and a headline without the body says the second one."
+    "as the requirement going away, and a headline without the body says the second one.\n"
+    "If the sentence says what a government office can do, the office and what it can do are the "
+    "headline, with the office doing it. A firm a company has to hire, such as an auditor, is not "
+    "an office, and it never takes the office's place."
 )
 
 NUMERAL = re.compile(r"\d[\d,.]*")
@@ -629,7 +715,8 @@ NUMERAL = re.compile(r"\d[\d,.]*")
 
 # The words the POWER pattern supplies itself, as opposed to the ones naming who holds it.
 POWER_GLUE = {"under", "that", "which", "who", "whom", "gives", "give", "hands", "hand", "grants",
-              "grant", "leaves", "leave", "authority", "state", "independent", "outside", "party",
+              "grant", "leaves", "leave", "lets", "allows", "allow", "authorizes", "authorize",
+              "authorises", "authorise", "authority", "state", "independent", "outside", "party",
               "third"}
 
 
@@ -648,6 +735,21 @@ def power_holder(text):
     return {w.lower() for w in re.findall(r"[A-Za-z]{4,}", m.group(0))} - POWER_GLUE
 
 
+def holder_words(text):
+    """The words a headline has to keep: who the power goes to.
+
+    The power phrase names it, unless what it names is a firm a company hires, or it names nothing
+    and the sentence says what an office can do some other way ("lets the Attorney General
+    demand"). Then the office the sentence names is the one the headline keeps.
+    """
+    if not private_holder(text):
+        held = power_holder(text)
+        if held:
+            return held
+    gov = government_named(text)
+    return {w.lower() for w in re.findall(r"\b[A-Z]{3,}\b|[A-Za-z]{4,}", gov)} - POWER_GLUE
+
+
 def power_clause(text, limit=13):
     """The sentence's own words up to the end of the phrase that names the power.
 
@@ -655,9 +757,12 @@ def power_clause(text, limit=13):
     everything up to it is the sentence's own wording, already checked against the measure.
     """
     m = POWER.search(text or "")
-    if not m:
+    if not m or private_holder(text):
         return ""
-    head = (text[:m.end()] or "").strip().rstrip(",;:")
+    end = m.end()
+    while end < len(text) and (text[end].isalnum() or text[end] in "'-"):
+        end += 1  # the pattern can stop inside a word, "auditor" out of "auditors"
+    head = (text[:end] or "").strip().rstrip(",;:")
     return head if 5 <= len(head.split()) <= limit else ""
 
 
@@ -696,7 +801,7 @@ def headline(key, lines, names, totals):
     source = set(NUMERAL.findall(text))
     place = lead.get("jurisdiction") or ""
     conditional = bool(CONDITIONAL.search(tense_of(text, place)))
-    holder = power_holder(text)
+    holder = holder_words(text)
     extra = ""
     for _ in range(2 if holder else 1):
         try:
@@ -708,12 +813,13 @@ def headline(key, lines, names, totals):
             break
         if holder and not any(w in line.lower() for w in holder):
             # Everything else here stops the headline saying something untrue. This stops it
-            # saying the true thing backwards, which is the only way it has gone wrong so far.
+            # saying the true thing backwards, or leaving out who gains the power, which are the
+            # two ways it has gone wrong so far.
             log(f"[brief] headline dropped who holds the power: {line!r}")
-            extra = ("\n\nThe attempt before this one dropped the body the sentence puts this "
-                     f"under. The headline has to name {' or '.join(sorted(holder))}. A measure "
-                     "that hands one office the power to decide is not the same as the rule it "
-                     "decides about going away, and without the body the line says the second.")
+            extra = ("\n\nThe attempt before this one dropped the office that holds the power. "
+                     f"The headline has to name {' or '.join(sorted(holder))}. A measure that "
+                     "hands one office a power is not the same as a rule on a company, and "
+                     "without the office the line says the second.")
             continue
         if line and len(line.split()) <= 10 \
                 and not sponsors_word(line, lead.get("office") or "", loose=True) \

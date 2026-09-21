@@ -433,7 +433,10 @@ def redo_briefs(db):
 # 8: the third reading now covers fears too, and the disclosure and reporting definitions were
 #    widened to take in real mandates on private parties they had refused. The launch counts change,
 #    so the edition is written once more to match them.
-REDO_EDITION = ("2026-09-21", 8)
+# 9: that one led with "California puts companion chatbots under independent auditors". The power in
+#    the law is the Attorney General's, to demand the audit reports, and the plate left that out. The
+#    lead now says what the office can do, and a firm a company hires cannot stand in for it.
+REDO_EDITION = ("2026-09-21", 9)
 
 
 def redo_today(db):

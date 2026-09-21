@@ -33,11 +33,16 @@ WORKERS = 6
 # share of 60 or more labels applies none of them and holds them for a person. The first full pass
 # refused 47%, and read by hand the refusals were right: mostly government bodies told to study,
 # report, advise or run a grant, which the tagger had counted as offices gaining power, and
-# disclosures to consumers counted as reporting to government. So the line sits well above that.
-HOLD_OVER, HOLD_MIN = 0.65, 60
+# disclosures to consumers counted as reporting to government. So the line sat well above that.
+# Then on 21 September it held 44 of 65 refusals on federal bills found through their CRS summaries,
+# and read by hand those were right too: a China tech-transfer bill is not the AI race, an agency
+# told to write voluntary standards gains no power. Twice now the hold kept wrong labels on the site,
+# and a wrong label says something false while a wrongly removed one only says less. So it now
+# catches only a check refusing nearly everything, which is what a misread prompt looks like.
+HOLD_OVER, HOLD_MIN = 0.9, 60
 # Bump to apply refusals a run held, once a person has read them. 1: the first full pass, 349
 # refusals of 749, read and found right on 2026-09-21.
-RELEASE = 1
+RELEASE = 2  # 2: the 44 held on 21 September, read by hand and right
 # Bump, with the groups listed, to ask again about labels refused under a definition since widened.
 # 1: disclosures now include a company telling the people it uses AI on, and reporting includes data
 # center owners and operators. About 40 real mandates on private parties had been refused only

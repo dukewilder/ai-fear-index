@@ -123,7 +123,8 @@ def pool(db, today, days=POOL_DAYS, limit=12):
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='control') AS controls, "
         "  (SELECT GROUP_CONCAT(value, '|') FROM tags t WHERE t.target=m.id AND t.kind='fear') AS fears, "
         "  (SELECT t.value FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency' "
-        "   ORDER BY LENGTH(t.value) LIMIT 1) AS office "
+        "   ORDER BY LENGTH(t.value) LIMIT 1) AS office, "
+        "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency') AS offices "
         "FROM measures m JOIN tag_runs r ON r.target = m.id "
         "WHERE r.ai_related = 1 AND controls IS NOT NULL AND m.kind != 'resolution' "
         "  AND m.id NOT IN (SELECT target FROM brief) "
@@ -325,7 +326,23 @@ def without_names(text, office="", loose=False):
     return out
 
 
-def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction="", raw=""):
+# A body the sentence says something is put under. A commission, council or board the measure only
+# creates, with no power the third reading could confirm, is not holding anything: "under a six-month
+# moratorium and a commission's review" was said of a New Jersey bill whose commission studies impacts.
+BODY_WORD = re.compile(r"\b(commission|council|task force|committee|working group|board)\b", re.I)
+
+
+def unpowered_body(text, offices):
+    """True when the sentence names a commission, council or board that is not a confirmed office."""
+    m = BODY_WORD.search(text or "")
+    if not m:
+        return False
+    word, said = m.group(1).lower(), set(re.findall(r"[a-z]{4,}", (text or "").lower()))
+    return not any(word in o.lower() and (set(re.findall(r"[a-z]{4,}", o.lower())) - {word}) & said
+                   for o in offices if o)
+
+
+def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction="", raw="", offices=None):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
     Named rather than returned as a bare False, so a run that throws every candidate away says
@@ -354,6 +371,8 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
         return f"says {loose.group(0)!r} instead of naming who is bound"
     if passed and starts and starts not in text:
         return f"passed but starts in {starts}, and the sentence does not say so"
+    if offices is not None and unpowered_body(text, offices):
+        return "names a commission, council or board the measure gives no confirmed power"
     # The quote is checked before the duty test, not after. A duty-framed sentence is kept in
     # reserve and posted when nothing better was written, and it used to be kept without its
     # quote ever being looked at, so the fallback could go out resting on words not in the bill.
@@ -410,9 +429,12 @@ def write_lines(key, rows, today, want=WANT, attempts=None):
             continue
         starts = starts_later(f"{row['title'] or ''} {row['summary'] or ''}", today)
 
+        confirmed = [o for o in ((row["offices"] if "offices" in row.keys() else "") or "").split("|") if o]
+
         def fault(t, q):
             return why_not(t, q, body, (row["status"] or "") == "passed", row["office"] or "", starts,
-                           row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}")
+                           row["jurisdiction_name"] or "", raw=f"{row['title'] or ''}\n{row['summary'] or ''}",
+                           offices=confirmed)
         reason = fault(text, quote)
         if reason:
             note(attempts, where, reason, sentence_text=text)

@@ -714,6 +714,10 @@ def check_second_attempt():
     assert len(said) == 2 and "child safety" in said[1], "the second attempt was not told what was wrong"
     assert lines and "child safety" not in lines[0]["sentence"], f"the fixed sentence was not used: {attempts}"
     print("a refused sentence gets one more attempt with its fault named: ok")
+    assert brief.unpowered_body("New Jersey would put approvals under a moratorium and a commission's review.", [])
+    assert not brief.unpowered_body("South Carolina would put data centers under a Public Service Commission certificate.",
+                                    ["South Carolina Public Service Commission"])
+    print("a sentence names a commission only when it holds a confirmed power: ok")
 
 
 def check_lobbying_money():

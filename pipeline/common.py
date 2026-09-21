@@ -423,7 +423,11 @@ def redo_briefs(db):
 # 5: that edition led with New York legislators disclosing AI-drafted remarks, after the three
 #    measures ahead of it were each refused for one fixable fault. A refused sentence is now written
 #    once more with the fault named before its measure is dropped.
-REDO_EDITION = ("2026-09-21", 5)
+# 6: that one led with New Jersey putting data center approvals "under a six-month moratorium and a
+#    commission's review". The bill creates a commission and gives it no power the third reading
+#    could confirm. A sentence may now name a commission, council or board only if it is a
+#    confirmed office of the measure.
+REDO_EDITION = ("2026-09-21", 6)
 
 
 def redo_today(db):

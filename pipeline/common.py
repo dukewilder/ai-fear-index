@@ -1,5 +1,6 @@
 """Shared plumbing for every collector: config, database, HTTP, matching, status."""
 import calendar
+import collections
 import contextlib
 import datetime as dt
 import hashlib
@@ -20,6 +21,41 @@ import requests
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 SINCE = "2025-01-01"  # current legislative sessions
+# Legislatures that number their sessions rather than naming them by year, and the year each of
+# these began. A session that began in 2025 is inside the report even for a bill filed before
+# January: Montana numbers its 2025 bills from draft requests made the summer before, and Texas
+# and Virginia pre-file in November. Montana's Right to Compute Act was left out that way.
+NUMBERED_SESSIONS = {
+    ("us", "119"): 2025, ("ak", "34"): 2025, ("az", "57th"): 2025, ("de", "153"): 2025,
+    ("il", "104th"): 2025, ("ma", "194th"): 2025, ("me", "132"): 2025, ("nd", "69"): 2025,
+    ("ne", "109"): 2025, ("nj", "221"): 2024, ("nj", "222"): 2026, ("nv", "83"): 2025,
+    ("oh", "136"): 2025, ("tn", "114"): 2025, ("tx", "89"): 2025,
+}
+
+
+def session_year(jurisdiction, session):
+    """The year a legislative session began, or None when it cannot be told from its name."""
+    s = str(session or "").strip()
+    m = re.match(r"(20\d\d)", s)
+    if m:
+        return int(m.group(1))
+    if (jurisdiction, s) in NUMBERED_SESSIONS:
+        return NUMBERED_SESSIONS[(jurisdiction, s)]
+    for (j, prefix), year in NUMBERED_SESSIONS.items():
+        if j == jurisdiction and s.startswith(prefix):
+            return year  # "57th-1st-regular", "89R" and "891" are sessions of the 57th and 89th
+    return None
+
+
+def in_window(m):
+    """Inside the report's period: a federal rule or order, a measure filed since it starts, or one
+    filed for a legislative session that began then."""
+    if (m["kind"] or "") in ("rule", "order") or (m["introduced_date"] or "") >= SINCE:
+        return True
+    year = session_year(m["jurisdiction"], m["session"])
+    return year is not None and year >= int(SINCE[:4])
+
+
 REPO_URL = "https://github.com/dukewilder/ai-fear-report"
 SITE_URL = "https://aifearreport.com"
 
@@ -555,6 +591,8 @@ def connect(path):
     retag_for_fears(db)
     drop_position_controls(db)
     retag_ai_titles(db)
+    retag_ai_bills(db)
+    restatus(db)
     return db
 
 
@@ -676,9 +714,8 @@ def measures_in_scope(db):
     """
     suppressed = set(config("suppress").get("urls", []))
     rows = [dict(r) for r in db.execute(
-        "SELECT m.* FROM measures m JOIN tag_runs tr ON tr.target = m.id WHERE tr.ai_related = 1 "
-        "AND (m.introduced_date >= ? OR m.kind IN ('rule','order'))", (SINCE,))]
-    return one_record_per_bill([r for r in rows if r["url"] not in suppressed])
+        "SELECT m.* FROM measures m JOIN tag_runs tr ON tr.target = m.id WHERE tr.ai_related = 1")]
+    return one_record_per_bill([r for r in rows if in_window(r) and r["url"] not in suppressed])
 
 
 def where_counted(codes):
@@ -791,11 +828,134 @@ def looks_ai(*texts):
     return any(AI_TEXT.search(t or "") for t in texts)
 
 
+# A bill's title that names AI settles whether the bill is about AI. The tagger is asked whether a
+# text is "substantially about" AI, and given a title and no summary it said no to 180 bills titled
+# with it: Utah's "Artificial Intelligence Amendments", Connecticut's "An Act Concerning Artificial
+# Intelligence", Congress's "AI Whistleblower Protection Act". Most states publish no summary, so
+# this is most of their record. Narrower than AI_TEXT: a data center bill is about AI only if its
+# text says so, and "AI" alone has to be the acronym, in capitals, standing for AI.
+AI_TITLE = re.compile(
+    r"(?i)\b(artificial intelligence|machine learning|deep ?fakes?|synthetic media|digital replicas?|"
+    r"chat ?bots?|large language models?|foundation models?|frontier (ai|models?)|generative (ai|artificial)|"
+    r"automated decision|algorithm(ic|s)?|autonomous weapons?|facial recognition|neural network)\b"
+    r"|(?-i:\bA\.?I\.?\b)")
+
+
+def title_names_ai(title):
+    t = re.sub(r"\bAI/AN\b", " ", title or "")  # American Indian and Alaska Native
+    if not re.search(r"artificial intelligence\s*\(\s*A\.?I\.?\s*\)", t, re.I):
+        t = re.sub(r"\(\s*A\.?I\.?\s*\)", " ", t)  # "Accelerating Innovation (AI) for Kids with Cancer"
+    return bool(AI_TITLE.search(t))
+
+
+# Bump to read again the bills whose title names AI that the tagger judged not about AI.
+RETAG_AI_BILLS = 1
+
+
+def retag_ai_bills(db):
+    """Queue those bills once, for a tagger that no longer lets a title naming AI be overruled."""
+    key = f"retag:ai-bills:{RETAG_AI_BILLS}"
+    if kv_get(db, key):
+        return 0
+    ids = [r["id"] for r in db.execute(
+        "SELECT m.id, m.title FROM measures m JOIN tag_runs t ON t.target = m.id "
+        "WHERE m.kind = 'bill' AND t.ai_related = 0") if title_names_ai(r["title"])]
+    for mid in ids:
+        db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target = ?", (mid,))
+    kv_set(db, key, True)
+    db.commit()
+    if ids:
+        log(f"[repair] {len(ids)} bills titled with AI queued to be read again")
+    return len(ids)
+
+
+# Bump when the reading of a last action changes, to read every stored one again.
+STATUS_RULES = 2
+
+
+def restatus(db):
+    """Read every stored last action again under the current rules, once per version of them.
+
+    A Federal Register document's status comes from its type, not from words, so it is left alone.
+    A Congress.gov bill that the API lists as a law stays passed whatever its last action says.
+    """
+    key = f"restatus:{STATUS_RULES}"
+    if kv_get(db, key):
+        return 0
+    moved = collections.Counter()
+    for r in db.execute("SELECT id, source, status, latest_action FROM measures WHERE source != 'Federal Register'").fetchall():
+        new = status_from_action(r["latest_action"])
+        if new == r["status"] or (r["source"] == "Congress.gov" and r["status"] == "passed"):
+            continue
+        db.execute("UPDATE measures SET status = ? WHERE id = ?", (new, r["id"]))
+        moved[(r["status"], new)] += 1
+    kv_set(db, key, dict((f"{a}>{b}", n) for (a, b), n in moved.items()))
+    db.commit()
+    if moved:
+        log("[repair] status read again: " + ", ".join(f"{n} {a} to {b}" for (a, b), n in moved.items()))
+    return sum(moved.values())
+
+
+# How each legislature writes a bill's last step. The first version of this knew the handful of
+# phrasings it was written against, "Signed by Governor" and "Chaptered", and read every other
+# state's signing as a bill still waiting: Colorado's "Governor Signed", Illinois's "Public Act",
+# New York's "SIGNED CHAP." and "APPROVAL MEMO", Arkansas's "is now Act 927", Montana's "Chapter
+# Number Assigned". New York's frontier AI law and Utah's 2025 AI laws were on the site as
+# pending. Every phrasing below is one found on file; tests.test_offline holds them.
+ENACTED = re.compile(
+    r"signed by (the )?gov(ernor|\.)|governor signed|signed by (the )?(governor|gov)\b"
+    r"|(approved|signed) by (the )?governor|governor approved|letter of approval from the governor"
+    r"|becomes? (public )?law|became (public )?law|without (the )?governor'?s signature"
+    r"|chaptered|chapter (no\.?|number)|assigned chapter number|signed chap\b|\bchap\.?\s*\d"
+    r"|acts? of assembly chapter|\bacts?,? ch(apter|\.)\s*\d|secretary of state chapter|session law chapter"
+    r"|^chapter\s+\d|chapter \d+,? (acts|statutes|laws|\(\d{4} laws\))|chapter \d+ of the acts"
+    r"|public act\b|public law|\bp\.\s?l\.\s?\d|approved p\.l\.|now act\b|^act (no\.?\s*)?\d|\bact no\.\s*\d"
+    r"|approval memo|signed into law|\benacted\b|^effective\b|effective (date|on|immediately)"
+    r"|(filed with|delivered to|presented to|sent to) (the )?secretary of state"
+    r"|passed notwithstanding|veto overrid|overrode the veto"
+    r"|^signed\.?$|final rule|interim final rule|^executive order", re.I)
+# A bill that was stopped. "Amendment failed" is not the bill failing, and a veto that was
+# overridden is a law, so those are looked for first.
+STOPPED = re.compile(
+    r"veto|\bfailed\b|\bdied\b|\bdead\b|withdrawn|postponed? indefinitely|indefinitely postponed"
+    r"|passed by indefinitely|inexpedient to legislate|enacting clause stricken|tabled"
+    r"|in committee upon adjournment|sine die adjournment|placed in legislative files", re.I)
+NOT_THE_BILL = re.compile(r"amendments?\s*(\(s\)\s*)?(no\.?\s*\d+\s*)?failed|motion[^.;]*failed", re.I)
+
+
+def status_label(status, action="", kind=""):
+    """What the site and the post may say about where a measure stands, and no more.
+
+    "Pending" and "still live" say a bill can still pass, which the record cannot show: most states
+    record nothing when a session ends, so a bill that died in May reads the same as one filed last
+    week. "Not passed" is true of both.
+    """
+    if kind == "rule":
+        return "Final" if status == "passed" else "Proposed"
+    if kind == "order":
+        return "Signed"
+    if status == "passed":
+        return "Adopted" if kind == "resolution" else "Passed"
+    if status == "failed":
+        a = (action or "").lower()
+        if "veto" in a or "notwithstanding the objections" in a:
+            return "Vetoed"
+        return "Withdrawn" if "withdrawn" in a else "Did not pass"
+    return "Not passed"
+
+
 def status_from_action(text):
-    t = (text or "").lower()
-    if re.search(r"signed by (the )?governor|chaptered|became (public )?law|enacted|approved by (the )?governor|"
-                 r"effective|public law|act no\.|signed into law|final rule", t):
+    """passed, failed or pending, from the words of the last action on a measure.
+
+    pending means only that no final action is on record. A bill whose session ended without one
+    is not pending in any sense a reader would use the word, which is why the site says "not
+    passed" rather than "pending" or "still live".
+    """
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if re.search(r"withdrawn because approved|failed to pass notwithstanding", t, re.I):
+        return "failed"  # a companion carried it into law, or the veto held
+    if ENACTED.search(t):
         return "passed"
-    if re.search(r"veto|failed|died|withdrawn|indefinitely postponed|tabled|dead", t):
+    if STOPPED.search(NOT_THE_BILL.sub(" ", t)):
         return "failed"
     return "pending"

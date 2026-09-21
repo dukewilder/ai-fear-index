@@ -12,7 +12,8 @@ import time
 
 import requests
 
-from .common import AI_TEXT, SINCE, config, env, iso, kv_get, kv_set, log, sha, states_a_position
+from .common import AI_TEXT, config, env, in_window, iso, kv_get, kv_set, log, sha, states_a_position, title_names_ai
+from . import known
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
@@ -243,11 +244,12 @@ def check_labels(db, key):
 
 
 def targets(db, limit):
-    rows = db.execute(
-        "SELECT m.id, m.jurisdiction_name, m.identifier, m.title, m.summary, t.text_hash FROM measures m "
-        "LEFT JOIN tag_runs t ON t.target = m.id "
-        "WHERE (m.introduced_date >= ? OR m.kind IN ('rule','order')) "
-        "ORDER BY m.introduced_date DESC", (SINCE,)).fetchall()
+    # Every measure inside the report's period, which includes a bill filed before January for a
+    # session that began then. Sixty-three of Montana's 2025 bills were never read at all.
+    rows = [r for r in db.execute(
+        "SELECT m.id, m.kind, m.jurisdiction, m.session, m.introduced_date, m.jurisdiction_name, m.identifier, "
+        "m.title, m.summary, t.text_hash FROM measures m LEFT JOIN tag_runs t ON t.target = m.id "
+        "ORDER BY m.introduced_date DESC").fetchall() if in_window(r)]
     out = []
     for r in rows:
         body = f"{r['title'] or ''}\n{r['summary'] or ''}"
@@ -284,7 +286,16 @@ def run(db, state, mode):
                             + (f"; dropped {dropped} unsupported labels" if dropped else "")
                             + f"; {check_labels(db, key)}")
         return
+    # The laws a person has confirmed are about AI are read as about AI whatever their text shows.
+    # Illinois's ban on AI therapy is titled "Therapy Resources Oversight" and has no summary on
+    # file, so nothing else here could have known.
+    known_ai = known.ids(db)
+    if known_ai:
+        marks = ",".join("?" * len(known_ai))
+        db.execute(f"UPDATE tag_runs SET text_hash = NULL WHERE ai_related = 0 AND target IN ({marks})", list(known_ai))
+        db.commit()
     work, backlog = targets(db, limit)
+    resolutions = {r["id"] for r in db.execute("SELECT id FROM measures WHERE kind = 'resolution'")}
     done, errors = 0, 0
     started = time.time()
 
@@ -301,6 +312,13 @@ def run(db, state, mode):
         # AI, and they were missing from the record. A title that names AI settles it.
         title = next((l[7:] for l in doc.split("\n") if l.startswith("Title: ")), "")
         if not ai and target.startswith("fr-") and AI_TEXT.search(title):
+            ai = True
+        # The same for a bill, and for the same reason: most states publish no summary, and the
+        # model given a bare title said "Artificial Intelligence Amendments" was not about AI.
+        # Not a resolution, which can name AI in honouring a school team.
+        if not ai and target not in resolutions and not target.startswith("fr-") and title_names_ai(title):
+            ai = True
+        if not ai and target in known_ai:
             ai = True
         verdict = verify(key, fears, controls, doc, proposal) if ai else {}
         return target, h, ai, verdict, norm(body), body, proposal

@@ -1215,6 +1215,146 @@ def check_mark_geometry():
 ALLOWED_HOSTS = {"gc.zgo.at"}   # the counter, and nothing else
 
 
+def check_status_and_coverage():
+    """What the site says has passed, and what it counts at all, against the records' own words.
+
+    It went live saying 86 measures had passed. The status rule knew "Signed by Governor" and
+    "Chaptered" and read every other state's signing as pending, so New York's frontier AI law and
+    Utah's AI laws were on the site as pending. The tagger was asked whether a bill was
+    "substantially about" AI and, given a bare title, said no to 180 bills titled with it. And a bill
+    filed before January for a session that began then was never read. Every phrasing below is one
+    found on file.
+    """
+    import sqlite3
+    from pipeline import known
+    from pipeline.common import (in_window, session_year, status_from_action, status_label,
+                                 title_names_ai)
+    for text, want in (
+            ("Governor Signed", "passed"), ("Public Act . . . . . . . . . 104-0054", "passed"),
+            ("SIGNED CHAP.438", "passed"), ("APPROVAL MEMO.76", "passed"), ("Chapter Number Assigned", "passed"),
+            ("Act 123, 06/30/2025 (Gov. Msg. No. 1234).", "passed"), ("Chapter No. 2025-120", "passed"),
+            ("Notification that HB1876 is now Act 927", "passed"), ("Signed", "passed"),
+            ("House message: Governor approved bill on June 12, 2025", "passed"),
+            ("delivered to Secretary of State (Acts Ch. 66)", "passed"), ("Secretary of State Chapter 20 5/2/2025", "passed"),
+            ("Acts of Assembly Chapter text (CHAP0452)", "passed"), ("Becomes law without Governor's signature 5/1/2025", "passed"),
+            ("Filed with Secretary Of State 04/10", "passed"), ("Signed by Gov. 7/1/2025", "passed"),
+            ("Approved P.L.2025, c.12.", "passed"), ("Chapter 12, Acts, Regular Session, 2025", "passed"),
+            ("Item passed notwithstanding objections of the Governor", "passed"), ("Letter of approval from the Governor", "passed"),
+            ("Chaptered by Secretary of State. Chapter 138, Statutes of 2025.", "passed"), ("Effective date 7/27/2025.", "passed"),
+            ("Became Public Law No: 119-12.", "passed"), ("Signed by the Governor. Becomes Act No. 312.", "passed"),
+            ("action postponed indefinitely", "failed"), ("In committee upon adjournment.", "failed"),
+            ("ENACTING CLAUSE STRICKEN", "failed"), ("Inexpedient to Legislate: MA VV 01/08/2026", "failed"),
+            ("House Committee on Judiciary Postpone Indefinitely", "failed"), ("House sustained Governor's veto", "failed"),
+            ("Consideration of Governor's veto stricken from file.", "failed"), ("Withdrawn Because Approved P.L.2025, c.3.", "failed"),
+            ("Failed to pass notwithstanding the objections of the Governor pursuant to Joint Rule", "failed"),
+            ("Passed by indefinitely in General Laws and Technology with letter (12-Y 10-N)", "failed"),
+            ("House Committee on Appropriations Lay Over Unamended - Amendment(s) Failed", "pending"),
+            ("Signed by the Speaker of the House", "pending"), ("Signed in the House", "pending"),
+            ("Enrolled and presented to the Governor at 3 p.m.", "pending"), ("Carried over to 2026 Regular Session.", "pending"),
+            ("Referred to Assignments", "pending"), ("SUBSTITUTED BY S6953B", "pending")):
+        assert status_from_action(text) == want, f"{text!r} read as {status_from_action(text)}, wanted {want}"
+    assert status_label("pending") == "Not passed" and status_label("passed") == "Passed"
+    assert status_label("failed", "House sustained Governor's veto") == "Vetoed"
+    assert status_label("failed", "Died in Committee") == "Did not pass"
+    assert status_label("pending", "", "rule") == "Proposed" and status_label("passed", "", "rule") == "Final"
+    assert status_label("passed", "", "resolution") == "Adopted" and status_label("passed", "", "order") == "Signed"
+    for title, want in (("Artificial Intelligence Amendments", True), ("AI Whistleblower Protection Act", True),
+                        ("AN ACT CONCERNING ARTIFICIAL INTELLIGENCE.", True), ("Regulate the use of pricing algorithms", True),
+                        ("CHATBOT Act", True), ("A.I. in Environmental Permitting.", True),
+                        ("AI/AN CAPTA", False), ("Accelerating Innovation (AI) for Kids with Cancer Act", False),
+                        ("Large-Load Data Centers", False), ("Hawaiian ai pono kitchens", False),
+                        ("Artificial Intelligence (AI) Literacy Act", True)):
+        assert title_names_ai(title) == want, f"title {title!r}"
+    assert session_year("mt", "2025") == 2025 and session_year("tx", "89R") == 2025 and session_year("tx", "891") == 2025
+    assert session_year("nj", "221") == 2024 and session_year("az", "57th-1st-regular") == 2025
+    assert session_year("zz", "12") is None
+    row = {"kind": "bill", "jurisdiction": "mt", "session": "2025", "introduced_date": "2024-09-23"}
+    assert in_window(row), "a bill filed in 2024 for Montana's 2025 session is outside the report"
+    assert not in_window(dict(row, jurisdiction="nj", session="221", introduced_date="2024-03-01")), \
+        "a 2024 session bill came into the report"
+    print("status is read from every legislature's wording, and a title naming AI counts: ok")
+
+    # the known-laws check finds what is missing, what is not counted, and what is marked wrong
+    laws = known.laws()
+    assert laws and all(l["outcome"] in ("passed", "failed") and l["jurisdiction"] and l["session"] and l["identifier"]
+                        and l["confirmed"] for l in laws), "config/known_laws.json is malformed"
+    db = connect(":memory:")
+    first = laws[0]
+    upsert(db, "measures", {"id": "k1", "kind": "bill", "jurisdiction": first["jurisdiction"], "session": first["session"],
+                            "identifier": first["identifier"], "title": first["name"], "status": "pending",
+                            "latest_action": "Referred", "introduced_date": "2025-02-01", "url": "u1",
+                            "jurisdiction_name": "X", "source": "Open States"})
+    db.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES('k1', 'h', 0, 'now')")
+    db.commit()
+    found = dict(((l["jurisdiction"], l["identifier"]), p) for l, p in known.problems(db))
+    key = (first["jurisdiction"], first["identifier"])
+    assert "judged not about AI" in found[key] or "known to be" in found[key], found[key]
+    second = laws[1]
+    assert "not in the record" in found[(second["jurisdiction"], second["identifier"])]
+    assert known.ids(db) == {"k1"}
+    print("the record is held against laws whose outcome is known from outside it: ok")
+
+    # Congress: a bill whose title is an acronym is found by its summary, and one already on file is
+    # followed whatever its title says.
+    from pipeline import collect_congress as cc
+    upsert(db, "measures", {"id": "us-119-hr-9", "kind": "bill", "jurisdiction": "us", "session": "119",
+                            "identifier": "H.R. 9", "title": "NO FAKES Act", "status": "pending", "url": "u9",
+                            "jurisdiction_name": "Congress", "source": "Congress.gov"})
+    db.commit()
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        def json(self, url, params=None, **kw):
+            if url.split("?")[0].endswith("/bill/119"):
+                return {"bills": [{"type": "S", "number": "146", "title": "TAKE IT DOWN Act", "updateDate": "a"},
+                                  {"type": "HR", "number": "1", "title": "AI Ads Act", "updateDate": "b"},
+                                  {"type": "HR", "number": "9", "title": "NO FAKES Act", "updateDate": "c"}]}
+            if url.split("?")[0].endswith("/summaries/119"):
+                return {"summaries": [{"bill": {"type": "S", "number": "146"}, "text": "<p>covers deepfakes</p>"},
+                                      {"bill": {"type": "HR", "number": "2"}, "text": "<p>highway funding</p>"}]}
+            raise AssertionError(url)
+    calls = []
+    saved = (cc.Http, cc.store_bill, cc.env, cc.current_congress)
+    cc.Http, cc.env, cc.current_congress = Fake, (lambda name: "k"), (lambda: 119)
+    cc.store_bill = lambda db, http, key, congress, kind, number, listing=None: calls.append((kind, int(number), bool(listing))) or 1
+    try:
+        cc.run(db, {}, "hourly")
+    finally:
+        cc.Http, cc.store_bill, cc.env, cc.current_congress = saved
+    assert ("HR", 1, True) in calls and ("HR", 9, True) in calls, calls
+    assert ("S", 146, False) in calls and not any(c[:2] == ("HR", 2) for c in calls), calls
+    print("Congress bills are found by their summaries as well as their titles: ok")
+
+    # State searches: the ones already caught up run first, so a backfill cannot starve them.
+    from pipeline import collect_openstates as cos
+    from pipeline.common import kv_set as _kv_set
+    _kv_set(db, "openstates_cursors", {"artificial intelligence": {"backfilling": False, "since": "2026-09-20", "page": 1},
+                                       "deepfake": {"backfilling": False, "since": "2026-09-20", "page": 1},
+                                       "chatbot": {"backfilling": False, "since": "2026-09-20", "page": 1},
+                                       "data center": {"backfilling": True, "page": 203}})
+    _kv_set(db, "openstates_offset", 3)
+    asked = []
+
+    class FakeOS:
+        def __init__(self, *a, **k):
+            pass
+
+        def json(self, url, params=None, **kw):
+            asked.append(params["q"])
+            return {"results": [], "pagination": {"max_page": 1}}
+    saved = (cos.Http, cos.env)
+    cos.Http, cos.env = FakeOS, (lambda name: "k")
+    try:
+        cos.run(db, {}, "hourly")
+    finally:
+        cos.Http, cos.env = saved
+    assert asked[:3] == ["artificial intelligence", "deepfake", "chatbot"], asked
+    assert asked[3] == "automated decision" and asked[-1] == "data center", asked
+    print("state searches already caught up run before any backfill: ok")
+
+
 def check_links_open_right(dist):
     """A link off the site opens a new tab; a link within it does not.
 
@@ -1433,6 +1573,7 @@ def main():
     check_second_attempt()
     check_power_is_the_office()
     check_brief_attempts()
+    check_status_and_coverage()
     check_lobbying_money()
     check_lobbying_keywords()
     check_position_carries_no_control()
@@ -1517,7 +1658,7 @@ def main():
     from pipeline.brief import totals as plate_totals  # noqa: E402
     plate = plate_totals(db)
     chain = {label: value for value, label in data["index"]["chain"]}
-    for word, key in (("bills, rules and orders", "measures"),
+    for word, key in (("bills, resolutions, rules and orders", "measures"),
                       ("new government control", "controlled"),
                       ("would hand new power", "offices")):
         label = next((l for l in chain if word in l), None)

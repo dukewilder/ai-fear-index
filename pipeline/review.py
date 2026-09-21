@@ -123,6 +123,19 @@ def build(db, today):
                      + "\n".join(f"| {cell(name, 60)} | {n} | ${amount:,.0f} | {cell(risk, 60)} |"
                                  for _, amount, name, n, risk in candidates))
 
+    # Laws whose outcome is known from outside the record, and that the record gets wrong. This is
+    # the one list here about what is missing rather than what is shown wrongly.
+    from . import known
+    wrong = known.problems(db)
+    if wrong:
+        items += len(wrong)
+        parts.insert(0, f"## Known AI laws the record gets wrong: {len(wrong)}\n\n"
+                     "Each is in config/known_laws.json with its outcome confirmed elsewhere. One that is "
+                     "not in the record means a search missed it; one marked wrongly means a legislature "
+                     "words its last step in a way the status rule does not read yet.\n\n"
+                     "| Law | Problem |\n|---|---|\n"
+                     + "\n".join(f"| {law['jurisdiction'].upper()} {law['identifier']}: {cell(law['name'], 70)} "
+                                 f"| {cell(problem, 160)} |" for law, problem in wrong))
     if not parts:
         return "", 0
     head = (f"The weekly list for a person to read. Nothing here changed the site by itself except "

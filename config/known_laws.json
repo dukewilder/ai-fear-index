@@ -1,0 +1,229 @@
+{
+  "about": "AI measures whose outcome is known from outside this tracker: enacted, or vetoed, since January 2025. Once a week each is looked up in the record. It has to be there, be counted, and carry the outcome below; anything that does not is listed in the weekly review for a person to read. Each entry names where its outcome was confirmed. Add to this list; it is the check on what the searches miss.",
+  "laws": [
+    {
+      "jurisdiction": "us",
+      "session": "119",
+      "identifier": "S. 146",
+      "outcome": "passed",
+      "name": "TAKE IT DOWN Act",
+      "confirmed": "Public Law 119-12, https://www.govinfo.gov/app/details/PLAW-119publ12"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "SB 53",
+      "outcome": "passed",
+      "name": "Transparency in Frontier Artificial Intelligence Act (Artificial intelligence models: large developers)",
+      "confirmed": "Chapter 138, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "SB 243",
+      "outcome": "passed",
+      "name": "Companion chatbots",
+      "confirmed": "Chapter 677, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "AB 853",
+      "outcome": "passed",
+      "name": "California AI Transparency Act",
+      "confirmed": "Chapter 674, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "SB 524",
+      "outcome": "passed",
+      "name": "Law enforcement agencies: artificial intelligence",
+      "confirmed": "Chapter 587, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "AB 489",
+      "outcome": "passed",
+      "name": "Health care professions: artificial intelligence",
+      "confirmed": "Chapter 615, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "AB 316",
+      "outcome": "passed",
+      "name": "Artificial intelligence: defenses",
+      "confirmed": "Chapter 672, Statutes of 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "SB 1119",
+      "outcome": "passed",
+      "name": "Companion chatbots: children's safety",
+      "confirmed": "Chapter 190, Statutes of 2026"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "SB 7",
+      "outcome": "failed",
+      "name": "No Robo Bosses Act",
+      "confirmed": "Vetoed October 2025"
+    },
+    {
+      "jurisdiction": "ca",
+      "session": "20252026",
+      "identifier": "AB 1064",
+      "outcome": "failed",
+      "name": "LEAD for Kids Act",
+      "confirmed": "Vetoed; consideration of the veto stricken from file, January 22, 2026"
+    },
+    {
+      "jurisdiction": "ny",
+      "session": "2025-2026",
+      "identifier": "S 6953",
+      "outcome": "passed",
+      "name": "RAISE Act (frontier AI models)",
+      "confirmed": "Approval memo 76, December 19, 2025"
+    },
+    {
+      "jurisdiction": "tx",
+      "session": "89R",
+      "identifier": "HB 149",
+      "outcome": "passed",
+      "name": "Texas Responsible Artificial Intelligence Governance Act",
+      "confirmed": "Effective January 1, 2026"
+    },
+    {
+      "jurisdiction": "ut",
+      "session": "2025",
+      "identifier": "HB 452",
+      "outcome": "passed",
+      "name": "Artificial Intelligence Amendments",
+      "confirmed": "Governor signed March 26, 2025"
+    },
+    {
+      "jurisdiction": "ut",
+      "session": "2025",
+      "identifier": "SB 226",
+      "outcome": "passed",
+      "name": "Artificial Intelligence Consumer Protection Amendments",
+      "confirmed": "Governor signed March 27, 2025"
+    },
+    {
+      "jurisdiction": "ut",
+      "session": "2025",
+      "identifier": "SB 332",
+      "outcome": "passed",
+      "name": "Artificial Intelligence Revisions",
+      "confirmed": "Governor signed March 26, 2025"
+    },
+    {
+      "jurisdiction": "ut",
+      "session": "2025",
+      "identifier": "SB 271",
+      "outcome": "passed",
+      "name": "Unauthorized Artificial Intelligence Impersonation Amendments",
+      "confirmed": "Governor signed March 27, 2025"
+    },
+    {
+      "jurisdiction": "ut",
+      "session": "2026",
+      "identifier": "HB 320",
+      "outcome": "passed",
+      "name": "Office of Artificial Intelligence Policy Amendments",
+      "confirmed": "Governor signed March 18, 2026"
+    },
+    {
+      "jurisdiction": "co",
+      "session": "2025B",
+      "identifier": "SB 4",
+      "outcome": "passed",
+      "name": "Increase Transparency for Algorithmic Systems (SB25B-004, delays the Colorado AI Act)",
+      "confirmed": "https://leg.colorado.gov/bills/sb25b-004"
+    },
+    {
+      "jurisdiction": "co",
+      "session": "2025A",
+      "identifier": "SB 25-288",
+      "outcome": "passed",
+      "name": "Intimate Digital Depictions Criminal & Civil Actions",
+      "confirmed": "Governor signed June 2, 2025"
+    },
+    {
+      "jurisdiction": "co",
+      "session": "2026A",
+      "identifier": "HB 1263",
+      "outcome": "passed",
+      "name": "Conversational Artificial Intelligence Service Operator Requirements",
+      "confirmed": "Governor signed May 29, 2026"
+    },
+    {
+      "jurisdiction": "co",
+      "session": "2026A",
+      "identifier": "HB 1195",
+      "outcome": "passed",
+      "name": "Psychotherapy Artificial Intelligence Restrictions",
+      "confirmed": "Governor signed June 3, 2026"
+    },
+    {
+      "jurisdiction": "co",
+      "session": "2026A",
+      "identifier": "HB 1139",
+      "outcome": "passed",
+      "name": "Use of Artificial Intelligence in Health Care",
+      "confirmed": "Governor signed June 2, 2026"
+    },
+    {
+      "jurisdiction": "mt",
+      "session": "2025",
+      "identifier": "SB 212",
+      "outcome": "passed",
+      "name": "Right to Compute Act",
+      "confirmed": "Chapter number assigned April 17, 2025"
+    },
+    {
+      "jurisdiction": "il",
+      "session": "104th",
+      "identifier": "HB 1806",
+      "outcome": "passed",
+      "name": "Wellness and Oversight for Psychological Resources Act",
+      "confirmed": "Public Act 104-0054"
+    },
+    {
+      "jurisdiction": "ky",
+      "session": "2025RS",
+      "identifier": "SB 4",
+      "outcome": "passed",
+      "name": "AN ACT relating to protection of information and declaring an emergency",
+      "confirmed": "Acts Chapter 66, 2025"
+    },
+    {
+      "jurisdiction": "me",
+      "session": "132",
+      "identifier": "LD 1727",
+      "outcome": "passed",
+      "name": "An Act To Ensure Transparency In Consumer Transactions Involving Artificial Intelligence",
+      "confirmed": "Signed by Governor June 12, 2025"
+    },
+    {
+      "jurisdiction": "ar",
+      "session": "2025",
+      "identifier": "HB 1876",
+      "outcome": "passed",
+      "name": "Regarding the ownership of model training and content generated by a generative artificial intelligence tool",
+      "confirmed": "Act 927 of 2025"
+    },
+    {
+      "jurisdiction": "va",
+      "session": "2025",
+      "identifier": "HB 2094",
+      "outcome": "failed",
+      "name": "High-Risk Artificial Intelligence Developer and Deployer Act",
+      "confirmed": "Vetoed; House sustained the veto April 2, 2025"
+    }
+  ]
+}

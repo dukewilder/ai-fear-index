@@ -11,7 +11,7 @@ import argparse
 import importlib
 import time
 
-from .common import (config, connect, kv_get, kv_set, log, now, retry_at, retry_clear,
+from .common import (annotate, config, connect, kv_get, kv_set, log, now, retry_at, retry_clear,
                      retry_due, source_run)
 
 HOURLY = ["gdelt", "news", "rss", "fedreg"]
@@ -106,6 +106,14 @@ def main():
             # a source that has never finished reaches all the way back, whatever the run mode
             module.run(db, state, "backfill" if name not in done else mode)
     ask_again(db, sources, asked)
+    # A known AI law that no search has reached is looked up by its number, so it is on the site
+    # today rather than whenever the keyword backfill gets to it.
+    if not args.only:
+        from . import known
+        try:
+            known.fetch_missing(db)
+        except Exception as exc:  # never the reason a run fails
+            log(f"[known] {str(exc)[:200]}")
     if not args.only or "tag" in args.only.split(","):
         from . import tag
         with source_run(db, "tag") as state:
@@ -122,6 +130,13 @@ def main():
         from . import review
         with source_run(db, "review") as state:
             review.run(db, state, mode)
+    # Every run, not only on Mondays: a known AI law the record is missing or has wrong shows as a
+    # warning on the run, where it is seen the same day.
+    from . import known
+    wrong = known.problems(db)
+    if wrong:
+        annotate("warning", f"{len(wrong)} known AI law records are wrong",
+                 "; ".join(f"{l['jurisdiction'].upper()} {l['identifier']}: {p}" for l, p in wrong[:8]))
     from . import export
     data = export.export(db, args.out, args.base)
     if mode == "daily":

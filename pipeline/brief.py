@@ -22,7 +22,7 @@ import re
 import sys
 
 from .common import (EUPHEMISM, STATES, Entities, annotate, config, connect, env, kv_set, log,
-                     measures_in_scope, name_key, now)
+                     measures_in_scope, name_key, now, status_label)
 from . import tag
 from .export import gave
 from .tag import agreed, norm
@@ -155,13 +155,16 @@ def pool(db, today, days=POOL_DAYS, limit=12):
     """Measures that carry a control, have not been in an edition, and moved recently.
 
     A resolution is left out on purpose: it states an opinion rather than binding anyone, and every
-    line of an edition claims somebody is bound. A measure that names an office is worth more than
-    one that does not, which the score handles, but it is not required: measures carrying both a
-    control and an office arrive at under three a week, and a daily post cannot wait on that.
+    line of an edition claims somebody is bound. So is a measure the record shows was stopped: the
+    post opens on power being taken today, and a vetoed bill takes nothing. A measure that names an
+    office is worth more than one that does not, which the score handles, but it is not required:
+    measures carrying both a control and an office arrive at under three a week, and a daily post
+    cannot wait on that.
     """
     since = (dt.date.fromisoformat(today) - dt.timedelta(days=days)).isoformat()
     rows = db.execute(
-        "SELECT m.id, m.kind, m.jurisdiction_name, m.identifier, m.title, m.summary, m.status, m.url, "
+        "SELECT m.id, m.kind, m.jurisdiction, m.session, m.jurisdiction_name, m.identifier, m.title, m.summary, "
+        "  m.status, m.latest_action, m.introduced_date, m.url, "
         "  COALESCE(m.latest_action_date, m.updated, m.first_seen) AS moved, "
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='control') AS controls, "
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='fear') AS fears, "
@@ -170,6 +173,7 @@ def pool(db, today, days=POOL_DAYS, limit=12):
         "  (SELECT GROUP_CONCAT(t.value, '|') FROM tags t " + PASSED + " WHERE t.target=m.id AND t.kind='agency') AS offices "
         "FROM measures m JOIN tag_runs r ON r.target = m.id "
         "WHERE r.ai_related = 1 AND controls IS NOT NULL AND m.kind != 'resolution' "
+        "  AND COALESCE(m.status, '') != 'failed' "
         "  AND m.id NOT IN (SELECT target FROM brief) "
         "  AND moved >= ? AND moved <= ? "
         "ORDER BY moved DESC", (since, today)).fetchall()
@@ -739,7 +743,9 @@ def made(row, text, quote):
     return {"target": row["id"], "sentence": text, "quote": quote,
             "office": row["office"] or "", "controls": row["controls"] or "",
             "fears": row["fears"] or "", "jurisdiction": row["jurisdiction_name"],
-            "url": row["url"], "status": row["status"] or ""}
+            "url": row["url"], "status": row["status"] or "",
+            "action": (row["latest_action"] if "latest_action" in row.keys() else "") or "",
+            "kind": (row["kind"] if "kind" in row.keys() else "") or ""}
 
 
 NUMBERS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
@@ -1087,7 +1093,10 @@ def cited(lead, fears):
     return ""
 
 
-STATUS = {"passed": "Passed.", "failed": "Died in committee.", "pending": "Still live."}
+# Where the measure stands, in words the record supports. It said "Still live." of every bill with
+# no final action, and "Died in committee." of every one stopped, vetoes included. Most states
+# record nothing when a session ends, so "still live" was a guess, and a veto is not a committee.
+STATUS = ("passed", "failed", "pending")
 
 
 def compose(lead, spare, tot, cfg, fears):
@@ -1100,7 +1109,7 @@ def compose(lead, spare, tot, cfg, fears):
     parts = [cfg["opener"], ""]
     first = [lead["sentence"]]
     if lead.get("status") in STATUS:
-        first.append(STATUS[lead["status"]])
+        first.append(status_label(lead["status"], lead.get("action", ""), lead.get("kind", "")) + ".")
     fear = cited(lead, fears)
     if fear:
         first.append(f"It cites the fear that {fear}.")

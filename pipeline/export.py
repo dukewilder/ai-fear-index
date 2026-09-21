@@ -13,12 +13,11 @@ import re
 import urllib.parse
 
 from .common import (FEDERAL, REPO_URL, SITE_URL, STATES, Entities, config, fear_keywords, fears_mentioned, iso,
-                     kv_get, kv_set, measures_in_scope, name_key, now, own_post, sha, spell, tidy_headline,
-                     where_counted)
+                     kv_get, kv_set, measures_in_scope, name_key, now, own_post, sha, spell, status_label,
+                     tidy_headline, where_counted)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
 ACRONYMS = {"AI", "US", "USA", "UK", "EU", "PAC", "TV", "IT", "AG", "DC", "PC", "ML", "IP", "HR"}
-STATUS_LABEL = {"passed": "Passed", "pending": "Pending", "failed": "Failed"}
 KIND_LABEL = {"bill": "Bill", "resolution": "Resolution", "rule": "Rule", "order": "Executive order"}
 # Organizations whose stated purpose is the fear, as opposed to companies and trade groups
 # whose lobbying touches it among everything else they work on.
@@ -354,7 +353,7 @@ def export(db, out_dir, base=""):
                              "definition": c["definition"],
                              "fears": [fear_by[fs]["name"] for fs, _ in fear_mix.most_common(3)],
                              "passed": str(sum(m["status"] == "passed" for m in ms)),
-                             "pending": str(sum(m["status"] == "pending" for m in ms)), "n": len(ms)})
+                             "not_passed": str(sum(m["status"] != "passed" for m in ms)), "n": len(ms)})
     control_rows.sort(key=lambda r: -r["n"])
     for i, r in enumerate(control_rows, 1):
         r["rank"] = i
@@ -444,17 +443,17 @@ def export(db, out_dir, base=""):
     n_states, other_places, _ = where_counted(jurisdictions)
     beyond = and_list(other_places + [federal_word(jurisdictions)])
     index = {"value": f"{len(measures):,}", "suffix": "",
-             "text": "bills, rules and orders about AI since January 2025",
+             "text": "bills, resolutions, rules and orders about AI since January 2025",
              "second": f"{len(controlled):,}",
              "second_text": "of them would put AI, the people building it or the people using it under new government control",
              "where": where_phrase(jurisdictions),
              "change": f"▲ {new_week:,} new this week" if new_week else None, "trend": trend, "series": series,
-             "series_label": "Bills, rules and orders about AI, running total over the last 90 days",
+             "series_label": "Bills, resolutions, rules and orders about AI, running total over the last 90 days",
              "total_measures": len(measures), "controlled": len(controlled)}
     index["chain"] = [c for c in [
         [compact(sum(int(v) for v in wiki30.values())), f"Wikipedia views on the {spell(len(fears))} fears, last 30 days"]
         if wiki30 else None,
-        [f"{len(measures):,}", "bills, rules and orders about AI since January 2025"] if measures else None,
+        [f"{len(measures):,}", "bills, resolutions, rules and orders about AI since January 2025"] if measures else None,
         [f"{len(controlled):,}", "of them would put AI under new government control"] if controlled else None,
         [f"{len(agency_count):,}", "agencies and officials they would hand new power"] if agency_count else None,
     ] if c]
@@ -816,7 +815,7 @@ def own_words(db, measures, fear_by, control_by, suppressed=(), per_fear=None, l
                 continue
             out.append({"fear": fear_by[slug]["name"], "slug": slug, "quote": quote,
                         "bill": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "url": m["url"],
-                        "status": STATUS_LABEL.get(m["status"], "Pending"), "words": words,
+                        "status": status_label(m["status"], m["latest_action"], m["kind"]), "words": words,
                         "controls": chips, "agency": cut(who[0], 58) if who else "",
                         "when": m["introduced_date"] or ""})
     # the heaviest bills first: the most controls, an office named, already passed,
@@ -844,7 +843,7 @@ POWER_WORDS = re.compile(r"\b(requir|prohibit|mandat|authoriz|licens|regist|repo
 
 def damning(q):
     """How much power the quoted bill hands out, as far as the record shows."""
-    return (3 * len(q["controls"]) + (2 if q["agency"] else 0) + (2 if q["status"] == "Passed" else 0)
+    return (3 * len(q["controls"]) + (2 if q["agency"] else 0) + (2 if q["status"] in ("Passed", "Adopted", "Final", "Signed") else 0)
             + min(3, len(POWER_WORDS.findall(q["quote"]))) + (1 if 8 <= q["words"] <= 30 else 0))
 
 
@@ -1195,7 +1194,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
                  "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(agencies.most_common(5), 1)]
     bills = sorted(st["measures"], key=lambda m: (len(m["controls"]), m["introduced_date"] or ""), reverse=True)[:10]
     bill_rows = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 160),
-                  "status": STATUS_LABEL.get(m["status"], "Pending"), "url": m["url"],
+                  "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["url"],
                   "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in bills]
     buying = collections.Counter(c for m in st["measures"] for c in m["controls"])
     buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n),
@@ -1207,7 +1206,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
     if st["news30"]:
         evidence.append([f"{st['news30']:,}", f"news articles about it {st.get('news_span', 'in the last 30 days')}"])
     if st["measures"]:
-        evidence.append([f"{len(st['measures']):,}", "bills, rules and orders cite it since January 2025"
+        evidence.append([f"{len(st['measures']):,}", "bills, resolutions, rules and orders cite it since January 2025"
                          + (f", in {where_phrase(st['codes'])}" if st["codes"] else "")])
     if st["controls"]:
         evidence.append([f"{st['controls']:,}", "new government controls written into those bills"])
@@ -1333,9 +1332,10 @@ def save_snapshot(db, today, snap):
 def write_csvs(folder, measures, lob_recent, ranked, com_ranked):
     with open(folder / "measures.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["id", "kind", "jurisdiction", "identifier", "title", "status", "introduced", "url", "fears", "controls", "agencies"])
+        w.writerow(["id", "kind", "jurisdiction", "identifier", "title", "status", "last_action", "introduced", "url", "fears", "controls", "agencies"])
         for m in sorted(measures, key=lambda m: m["introduced_date"] or "", reverse=True):
-            w.writerow([m["id"], m["kind"], m["jurisdiction_name"], m["identifier"], m["title"], m["status"],
+            w.writerow([m["id"], m["kind"], m["jurisdiction_name"], m["identifier"], m["title"],
+                        status_label(m["status"], m["latest_action"], m["kind"]).lower(), m["latest_action"] or "",
                         m["introduced_date"], m["url"], "; ".join(m["fears"]), "; ".join(m["controls"]), "; ".join(m["agencies"])])
     with open(folder / "lobbying.csv", "w", newline="") as fh:
         w = csv.writer(fh)

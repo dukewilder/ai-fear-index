@@ -10,8 +10,13 @@ from .common import (SINCE, Http, HttpError, congress_id, env, iso, kv_get, kv_s
                      status_from_action, upsert)
 
 BASE = "https://v3.openstates.org/bills"
-QUERIES = ["artificial intelligence", "deepfake", "chatbot", "data center", "automated decision",
-           "synthetic media", "digital replica", "algorithmic"]
+# "data center" goes last. It matches every bill that mentions one, most of them not about AI, and
+# its backfill had used four days of the allowance at page 203 while "automated decision",
+# "algorithmic", "synthetic media" and "digital replica" had not been searched once. California's
+# No Robo Bosses Act and Colorado's delay of its AI Act were missing because of it. The stored
+# offset points at the fourth query, which in this order is the first of the four never searched.
+QUERIES = ["artificial intelligence", "deepfake", "chatbot", "automated decision", "algorithmic",
+           "synthetic media", "digital replica", "data center"]
 MAX_REQUESTS = 240  # per run
 DAY_BUDGET = 240    # the free tier allows 250 a day, so stop short of it and resume tomorrow
 RETRY_HOURS = 3     # a refusal is their rolling day, not ours, so wait it out and go again
@@ -47,7 +52,16 @@ def run(db, state, mode):
     # Start where the last run stopped. Without this the first query spends the whole
     # allowance every day and the last ones are never searched at all.
     offset = kv_get(db, "openstates_offset", 0) % len(QUERIES)
-    ordered = QUERIES[offset:] + QUERIES[:offset]
+    # The searches already caught up go first, every run: each is a page or two of what changed
+    # since yesterday. Put behind a backfill, they waited days, and a bill signed this week read as
+    # not passed until the backfill was done. The backfills share what is left, starting where the
+    # last run stopped.
+    caught_up = [q for q in QUERIES if q in cursors and not cursors[q].get("backfilling", True)]
+    behind = [q for q in QUERIES if q not in caught_up]
+    if QUERIES[offset] in behind:
+        at = behind.index(QUERIES[offset])
+        behind = behind[at:] + behind[:at]
+    ordered = caught_up + behind
     stopped_at = None
     for i, query in enumerate(ordered):
         cursor = cursors.get(query, {})
@@ -86,15 +100,15 @@ def run(db, state, mode):
             page += 1
             cursors[query] = {"backfilling": True, "page": page} if cursor.get("backfilling", True) else cursor
         if ran_out:
-            stopped_at = (offset + i) % len(QUERIES)
+            stopped_at = QUERIES.index(query)
             log(f"[openstates] out of time at '{query}'; the cursor keeps the place")
             break
         if capped:
-            stopped_at = (offset + i) % len(QUERIES)
+            stopped_at = QUERIES.index(query)
             log("[openstates] allowance refused the run; backing off")
             break
         if requests_used >= budget:
-            stopped_at = (offset + i) % len(QUERIES)
+            stopped_at = QUERIES.index(query)
             log(f"[openstates] request budget used; resuming '{query}' next run")
             break
         kv_set(db, "openstates_cursors", cursors)

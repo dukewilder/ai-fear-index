@@ -362,6 +362,12 @@ def export(db, out_dir, base=""):
     # ---------------- fears: every channel counted, then scored
     news30, news_end = window_30(db, "news", today)
     wiki30, wiki_end = window_30(db, "wiki", today)
+    news_stop = (stalled({"news30": news_end}, "news30", today) or "").removeprefix("to ")
+    # How the news count is dated wherever it appears: the last 30 days, or the 30 days to the last
+    # day GDELT has counted when it has fallen behind.
+    counted = days_counted(db, "news", news_end)
+    base = f"the 30 days to {news_stop}" if news_stop else "the last 30 days"
+    news_span = f"in {base}" if counted >= 30 else f"from the {counted} of {base} that GDELT has counted"
     # Statements that still exist, were judged about AI, and are the organization's own words. The
     # count read every label on a post, including labels on posts long since deleted.
     post_fears = collections.Counter(t["value"] for t in db.execute(
@@ -396,6 +402,7 @@ def export(db, out_dir, base=""):
             # a zero there would be a claim nobody has checked rather than a count.
             "has_wiki": bool(f.get("wikipedia")) and slug in wiki30,
             "wiki_article": bool(f.get("wikipedia")),
+            "news_span": news_span,
         }
     for slug, score in index_scores(fears, fear_stats).items():
         fear_stats[slug]["index"] = score
@@ -412,7 +419,6 @@ def export(db, out_dir, base=""):
                           "bar": max(3, st["index"]), "move": move, "line": fear_line(st),
                           "new_week": st["new_week"], "segments": segments(st)})
     grid = build_grid(order, fear_stats, {"news30": news_end, "wiki30": wiki_end}, today)
-    news_stop = (stalled({"news30": news_end}, "news30", today) or "").removeprefix("to ")
 
     # ---------------- feed
     feed = [i for i in build_feed(db, ents, measures, lob, receipts, today) if i["url"] not in suppressed]
@@ -483,8 +489,7 @@ def export(db, out_dir, base=""):
         [f"{n_states}", "states" + (f", plus {beyond}," if beyond else "") + " with AI measures on the books or in motion"]
         if n_states else None,
         [f"{filings_naming:,}", f"federal lobbying filings naming one of the {spell(len(fears))} fears, past year"] if filings_naming else None,
-        [f"{news_total:,}", f"news articles on the {spell(len(fears))} fears, "
-         + (f"30 days to {news_stop}" if news_stop else "last 30 days")] if news_total else None,
+        [f"{news_total:,}", f"news articles on the {spell(len(fears))} fears {news_span}"] if news_total else None,
     ] if n]
 
     # ---------------- in their own words: the quotes the labels rest on
@@ -646,12 +651,23 @@ def window_30(db, prefix, today):
     A source that stops answering must not quietly shorten the window and leave every
     fear looking quieter than it is. The count stays a true thirty days and lags instead.
     """
-    last = db.execute("SELECT MAX(date) FROM series WHERE series LIKE ?", (prefix + ":%",)).fetchone()[0]
+    # The last day with anything in it. GDELT answers for days it has not counted yet with zeros,
+    # so the latest date on file was today at a count of nought while the real coverage stopped a
+    # week earlier, and "last 30 days" summed 23 days of news and a week of nothing.
+    last = db.execute("SELECT MAX(date) FROM series WHERE series LIKE ? AND value > 0", (prefix + ":%",)).fetchone()[0]
     end = min(last, today.isoformat()) if last else today.isoformat()
     start = (dt.date.fromisoformat(end) - dt.timedelta(days=29)).isoformat()
     rows = db.execute("SELECT series s, SUM(value) v FROM series WHERE series LIKE ? AND date BETWEEN ? AND ? "
                       "GROUP BY series", (prefix + ":%", start, end)).fetchall()
     return {r["s"][len(prefix) + 1:]: r["v"] or 0 for r in rows}, end
+
+
+def days_counted(db, prefix, end):
+    """How many of the thirty days a window covers have any count on file. GDELT goes quiet for
+    days at a time, and a sum over the days it did count is not thirty days of coverage."""
+    start = (dt.date.fromisoformat(end) - dt.timedelta(days=29)).isoformat()
+    return db.execute("SELECT COUNT(DISTINCT date) FROM series WHERE series LIKE ? AND date BETWEEN ? AND ?",
+                      (prefix + ":%", start, end)).fetchone()[0]
 
 
 # ---------------------------------------------------------------- the index
@@ -757,7 +773,7 @@ def fear_line(st):
     if st["wiki30"] and len(parts) < 3:
         parts.append(f"{compact(st['wiki30'])} Wikipedia views this month")
     if st["news30"] and len(parts) < 3:
-        parts.append(count(st["news30"], "news article") + " this month")
+        parts.append(count(st["news30"], "news article") + " " + st.get("news_span", "in the last 30 days"))
     return " · ".join(parts[:3])
 
 
@@ -1026,10 +1042,10 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
     if st["wiki30"] or st["news30"]:
         att = []
         if st["wiki30"]:
-            att.append(f"{st['wiki30']:,} Wikipedia views")
+            att.append(f"{st['wiki30']:,} Wikipedia views in the last 30 days")
         if st["news30"]:
-            att.append(f"{st['news30']:,} news articles")
-        rows.append(["Attention", ", ".join(att) + " this month"])
+            att.append(f"{st['news30']:,} news articles {st.get('news_span', 'in the last 30 days')}")
+        rows.append(["Attention", ", ".join(att)])
     if st["measures"]:
         where = where_phrase(st["codes"])
         rows.append(["Bills", f"{len(st['measures']):,} since January 2025" + (f", in {where}" if where else "")])
@@ -1185,7 +1201,7 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
     if st["wiki30"]:
         evidence.append([f"{st['wiki30']:,}", "Wikipedia views on this fear in the last 30 days"])
     if st["news30"]:
-        evidence.append([f"{st['news30']:,}", "news articles about it in the last 30 days"])
+        evidence.append([f"{st['news30']:,}", f"news articles about it {st.get('news_span', 'in the last 30 days')}"])
     if st["measures"]:
         evidence.append([f"{len(st['measures']):,}", "bills, rules and orders cite it since January 2025"
                          + (f", in {where_phrase(st['codes'])}" if st["codes"] else "")])

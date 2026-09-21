@@ -90,7 +90,9 @@ one_pass() {
       # Pages keeps the custom domain in this file, and every pass replaces the branch
       printf 'aifearreport.com\n' > dist/CNAME
       [ -d state/brief ] && cp -r state/brief dist/brief
-      intact && save dist gh-pages Site
+      # Not published from a database that shrank, and not left for the Pages artifact to upload
+      # either: the first pass's upload step would otherwise publish what this line refused.
+      intact && save dist gh-pages Site || rm -rf dist
     else
       echo "::error::pass $1 built no site; the last one stays up"
       failed=1

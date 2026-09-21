@@ -408,7 +408,10 @@ def redo_briefs(db):
 #    bills twice, said offices "hold" powers that bills in committee would hand them, and could
 #    lead with a label since taken off by hand. Written again by the code that fixed all three,
 #    well before it posts at nine.
-REDO_EDITION = ("2026-09-21", 1)
+#    2: its plate read "Health and Human Services Department, Food and Drug Administration: reports
+#    companies must file with the state" for a federal rule. The fallback headline for reporting
+#    said the state whoever the measure was, and named a federal rule by its parent department.
+REDO_EDITION = ("2026-09-21", 2)
 
 
 def redo_today(db):

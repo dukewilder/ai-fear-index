@@ -37,7 +37,7 @@
     "chip": "Mandatory reporting",
     "definition": "Requires developers or deployers to report, disclose, register, or submit plans, incidents, audits, or impact assessments to a government body, or to produce them on government demand.",
     "pattern": "require a company to file reports with a government body, or hand them over on demand",
-    "head": "reports companies must file with the state"
+    "head": "reports companies must file with the government"
   },
   {
     "slug": "labeling-mandates",

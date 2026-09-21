@@ -612,7 +612,9 @@ def plain(line, names):
         return held
     best = sorted((c for c in (line.get("controls") or "").split("|") if c in names),
                   key=lambda c: -WEIGHT.get(c, 1))
-    where = line.get("jurisdiction") or ""
+    # A federal rule's jurisdiction is its agencies, parent first: "Health and Human Services
+    # Department, Food and Drug Administration". The office that acted is the last of them.
+    where = (line.get("jurisdiction") or "").rsplit(", ", 1)[-1]
     if best and where:
         return f"{where}: {names[best[0]]['head']}"
     return names[best[0]]["head"].capitalize() if best else where

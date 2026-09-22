@@ -986,9 +986,16 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
     d7 = (today - dt.timedelta(days=7)).isoformat()
     best = order[0]
     st = fear_stats[best["slug"]]
+    # The headline goes under the fear's name as its loudest story, so it has to name the fear in its
+    # own words. GDELT files a story under a fear when the fear is anywhere in its text, so a speech
+    # on tax cuts that mentions deepfakes once came up as the loudest deepfake headline. A story
+    # counts here only when every pattern the fear lists is in the headline itself; with none left,
+    # the newest bill speaks for the fear instead.
+    pats = [re.compile(p, re.I) for p in best.get("match") or []]
     arts = [dict(a) for a in db.execute(
-        "SELECT * FROM articles WHERE fear=? AND seen > ? AND length(title) > 25 ORDER BY seen DESC LIMIT 120",
+        "SELECT * FROM articles WHERE fear=? AND seen > ? AND length(title) > 25 ORDER BY seen DESC LIMIT 400",
         (best["slug"], d7)) if a["url"] not in suppressed]
+    arts = [a for a in arts if pats and all(p.search(a["title"]) for p in pats)][:120]
     line, line_url, source, source_label = None, None, None, "Headline from"
     ours = [a for a in arts if our_domain(a["domain"], read_directly())]
     arts = ours or arts   # nothing from them on this fear this week: take what there is, and say so

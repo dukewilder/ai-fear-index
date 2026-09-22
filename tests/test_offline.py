@@ -2001,6 +2001,13 @@ def main():
         upsert(db, "articles", {"id": f"a{i}", "fear": "deepfakes", "title": f"Deepfake scam wave hits voters in state {i}",
                                 "url": "https://example.com", "domain": "example.com",
                                 "seen": (today - dt.timedelta(days=1)).isoformat() + "T10:00:00", "entity": None})
+    # GDELT files a story under a fear when the fear is anywhere in its text. These say nothing about
+    # deepfakes in the headline and outnumber the ones that do, so they would lead without the rule.
+    for i in range(15):
+        upsert(db, "articles", {"id": f"u{i}", "fear": "deepfakes",
+                                "title": f"Liberal Democrats to focus on tax cuts and Europe, says leader {i}",
+                                "url": f"https://example.org/{i}", "domain": "example.org",
+                                "seen": today.isoformat() + "T09:00:00", "entity": None})
     db.execute("INSERT INTO status VALUES('congress',?,1,5,'ok',?)", (iso(), iso()))
     db.commit()
     data = export.export(db, tmp)
@@ -2039,6 +2046,9 @@ def main():
     # The top of the page has to say who ends up holding the controls, not just that they exist
     assert "office" in (data["exhibit"]["bought"] or ""), \
         f"the hero stopped naming who holds the controls: {data['exhibit']['bought']!r}"
+    # The headline under the fear's name names the fear.
+    assert "Deepfake" in (data["exhibit"]["line"] or ""), \
+        f"the loudest deepfake headline does not mention deepfakes: {data['exhibit']['line']!r}"
     assert data["funders"], "advocacy lobbying should rank separately"
     assert data["industry"], "company and trade group lobbying should rank separately"
     assert not ({f["name"] for f in data["funders"]} & {i["name"] for i in data["industry"]}), \

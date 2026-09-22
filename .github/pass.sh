@@ -47,12 +47,13 @@ intact() {
 }
 
 save() {  # push a folder as a fresh orphan branch; the old history is left to GitHub's gc
-  local folder="$1" branch="$2" label="$3"
+  local folder="$1" branch="$2" label="$3" ok=0
   ( cd "$folder" && rm -rf .git && git init -q && git checkout -q --orphan "$branch" && git add -A \
     && git -c user.name="ai-fear-report" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
            commit -qm "$label $(date -u +%Y-%m-%dT%H:%MZ)" \
-    && git push -qf "$REMOTE" "$branch" ) || { echo "::error::could not save $branch"; failed=1; }
+    && git push -qf "$REMOTE" "$branch" ) || { echo "::error::could not save $branch"; failed=1; ok=1; }
   rm -rf "$folder/.git"
+  return "$ok"
 }
 
 one_pass() {
@@ -85,14 +86,23 @@ one_pass() {
   fi
   if [ -f state/site_data.json ]; then
     rm -rf dist
-    if python site/build.py --data state/site_data.json --out dist --base "" > /dev/null; then
+    # state/pages.json is each page's fingerprint and last change, kept with the data: the sitemap
+    # dates come from it, and so does what IndexNow is told after publishing.
+    if python site/build.py --data state/site_data.json --out dist --base "" --pages state/pages.json > /dev/null; then
       touch dist/.nojekyll
       # Pages keeps the custom domain in this file, and every pass replaces the branch
       printf 'aifearreport.com\n' > dist/CNAME
       [ -d state/brief ] && cp -r state/brief dist/brief
       # Not published from a database that shrank, and not left for the Pages artifact to upload
       # either: the first pass's upload step would otherwise publish what this line refused.
-      intact && save dist gh-pages Site || rm -rf dist
+      if intact && save dist gh-pages Site; then
+        # Bing and the other engines that take IndexNow are told which pages changed. It logs a
+        # line and never stops a pass.
+        python -m pipeline.indexnow --pages state/pages.json --data state/site_data.json \
+          || echo "::warning::pass $1 could not tell IndexNow what changed"
+      else
+        rm -rf dist
+      fi
     else
       echo "::error::pass $1 built no site; the last one stays up"
       failed=1

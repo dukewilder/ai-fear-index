@@ -1743,6 +1743,170 @@ def check_states(dist, data):
     print(f"a map of {len(m['tiles'])} squares, {len(pages)} place pages, ranked by what they would control: ok")
 
 
+def check_search(dist, data_path, tmp):
+    """What search engines are told, page by page.
+
+    The site, its publisher and its dataset are said once, on the front page; every other page gives
+    its breadcrumbs. They used to ride on every fear and organization page too, each claiming to be
+    the website at its own address. A place with too little on it is kept out of search and out of
+    the sitemap. Titles lead with what people search for and carry the page's own numbers, so no
+    two are the same sentence with a name swapped. Nothing a page needs to render comes from another
+    host: the type was a Google Fonts stylesheet in front of every first paint.
+    """
+    def graph(body):
+        m = re.search(r'<script type="application/ld\+json">(.*?)</script>', body, re.S)
+        return json.loads(m.group(1))["@graph"] if m else []
+
+    data = json.loads(pathlib.Path(data_path).read_text())
+    home = (dist / "index.html").read_text()
+    types = [g["@type"] for g in graph(home)]
+    assert {"WebSite", "Organization", "Dataset"} <= set(types), f"the front page says {types}"
+    ds = next(g for g in graph(home) if g["@type"] == "Dataset")
+    assert 50 <= len(ds["description"]) <= 5000 and len(ds["distribution"]) == 4, ds
+    org = next(g for g in graph(home) if g["@type"] == "Organization")
+    assert org["logo"]["url"].endswith("/icon/512.png") and "https://x.com/aiFearReport" in org["sameAs"], org
+    sitemap = (dist / "sitemap.xml").read_text()
+    assert "changefreq" not in sitemap and "priority" not in sitemap, "the sitemap still carries fields both engines ignore"
+    listed = set(re.findall(r"<loc>([^<]+)</loc>", sitemap))
+    assert sitemap.count("<lastmod>") == len(listed), "a sitemap entry has no date"
+    titles = {}
+    thin = {p["slug"] for p in data["state_pages"] if p["n"] < 3}
+    for page in dist.rglob("index.html"):
+        body, rel = page.read_text(), page.relative_to(dist).as_posix()
+        title = re.search(r"<title>(.*?)</title>", body).group(1)
+        assert title not in titles, f"{rel} and {titles.get(title)} share the title {title!r}"
+        titles[title] = rel
+        robots = re.search(r'<meta name="robots" content="([^"]*)"', body).group(1)
+        url = "https://aifearreport.com/" + rel[:-len("index.html")]
+        slug = rel.split("/")[1] if rel.startswith("states/") and rel.count("/") == 2 else None
+        if slug in thin:
+            assert robots == "noindex" and url not in listed, f"{rel} is too thin for search but is offered to it"
+        else:
+            assert robots == "max-image-preview:large" and url in listed, f"{rel}: robots {robots!r}, listed {url in listed}"
+        if rel != "index.html":
+            kinds = [g["@type"] for g in graph(body)]
+            assert "WebSite" not in kinds and "Dataset" not in kinds, f"{rel} claims to be the site: {kinds}"
+            assert "BreadcrumbList" in kinds, f"{rel} has no breadcrumbs"
+        for tag in re.findall(r'<link[^>]+rel="(?:stylesheet|preload|preconnect|dns-prefetch)"[^>]*>', body):
+            assert 'href="/' in tag, f"{rel} loads from another host: {tag}"
+        assert "fonts.googleapis" not in body and "fonts.gstatic" not in body, f"{rel} still asks Google for its type"
+        for src in re.findall(r"src:url\(([^)]+)\)", body):
+            assert src.startswith("/fonts/") and (dist / src.lstrip("/")).exists(), f"{rel} names a font that is not there: {src}"
+    for p in data["state_pages"]:
+        title = next(t for t, r in titles.items() if r == f"states/{p['slug']}/index.html")
+        if p.get("kind") == "rules and executive orders":
+            assert title.startswith("Federal AI rules and executive orders:"), title
+        elif p["code"] == "us":
+            assert title.startswith("AI bills in Congress:"), title
+        else:
+            assert title.startswith(f"{p['name']} AI bills and laws: {p['n']:,} measure"), title
+    key = (data.get("site") or {}).get("indexnow_key")
+    assert key and (dist / f"{key}.txt").read_text() == key, "the IndexNow key is not at the site root"
+    print(f"search sees one site, {len(listed)} pages in the sitemap, {len(thin)} kept out, no fonts from elsewhere: ok")
+
+
+def check_page_dates(data_path, tmp):
+    """A page's date in the sitemap moves when what it says changes, and only then.
+
+    It used to be the export time for every page, every twenty minutes, which is a date search
+    engines learn to ignore. Built twice from the same data, every date holds; built again after one
+    state's receipt changes, that page and only that page is dated anew and marked to announce.
+    """
+    site = ROOT / "site" / "build.py"
+    record = tmp / "pages.json"
+    record.unlink(missing_ok=True)
+
+    def build(data, out):
+        path = tmp / "dated.json"
+        path.write_text(json.dumps(data))
+        subprocess.run([sys.executable, str(site), "--data", str(path), "--out", str(tmp / out), "--base", "",
+                        "--pages", str(record)], check=True, stdout=subprocess.DEVNULL)
+        return json.loads(record.read_text())
+
+    data = json.loads(pathlib.Path(data_path).read_text())
+    first = build(data, "d1")
+    assert first and all(e["lastmod"] == data["built_at"] and e["pending"] == data["built_at"] for e in first.values())
+    data["built_at"] = "2030-01-01T00:20:00+00:00"   # a later pass, same data
+    second = build(data, "d2")
+    assert {u: e["lastmod"] for u, e in second.items()} == {u: e["lastmod"] for u, e in first.items()}, \
+        "a page was dated anew though nothing on it changed"
+    target = next(p for p in data["state_pages"] if p["n"] >= 3)   # one that is in the sitemap
+    target["receipt"] = target["receipt"].replace(":", ": changed,", 1)
+    data["built_at"] = "2030-01-01T00:40:00+00:00"
+    third = build(data, "d3")
+    moved = sorted(u for u in third if third[u]["lastmod"] != second[u]["lastmod"])
+    assert moved == [f"https://aifearreport.com/states/{target['slug']}/"], f"dated anew: {moved}"
+    lastmods = re.findall(r"<lastmod>([^<]+)</lastmod>", (tmp / "d3" / "sitemap.xml").read_text())
+    assert sorted(set(lastmods)) == sorted({first[next(iter(first))]["lastmod"], data["built_at"]}), set(lastmods)
+    # A page that leaves the site is announced once and then forgotten.
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "site"))
+    import build as sitebuild
+    gone = sitebuild.dated([], {"https://aifearreport.com/org/x/": {"hash": "a", "lastmod": "t0", "sent": "t0",
+                                                                   "pending": None, "index": True}},
+                           "t1", "https://aifearreport.com")
+    assert gone["https://aifearreport.com/org/x/"]["gone"] and gone["https://aifearreport.com/org/x/"]["pending"] == "t1"
+    gone["https://aifearreport.com/org/x/"]["pending"] = None   # announced
+    assert sitebuild.dated([], gone, "t2", "https://aifearreport.com") == {}, "an announced removal was kept"
+    print("a page is dated when what it says changes, and only then: ok")
+
+
+def check_indexnow():
+    """Changed pages are announced once they have settled, no page more often than every six hours,
+    a refusal waits instead of hammering, and nothing here touches the network."""
+    from pipeline import indexnow
+    room = pathlib.Path(tempfile.mkdtemp())
+    path, key, site = room / "pages.json", "0123456789abcdef0123456789abcdef", "https://aifearreport.com"
+    t0 = dt.datetime(2030, 1, 1, 12, 0, tzinfo=dt.timezone.utc)
+    stamp = t0.isoformat(timespec="seconds")
+    path.write_text(json.dumps({
+        f"{site}/": {"hash": "a", "lastmod": stamp, "pending": stamp, "sent": None, "index": True},
+        f"{site}/states/": {"hash": "b", "lastmod": "2029-12-01T00:00:00+00:00", "pending": None,
+                            "sent": "2029-12-01T00:00:00+00:00", "index": True},
+        f"{site}/org/gone/": {"hash": None, "lastmod": stamp, "pending": stamp, "sent": None, "gone": True,
+                              "index": False}}))
+    calls = []
+
+    def ok(body):
+        calls.append(body)
+        return 202, None
+
+    indexnow.run(path, site, key, now=t0 + dt.timedelta(minutes=5), send=ok)
+    assert not calls, "a change was announced before the published page could settle"
+    later = t0 + dt.timedelta(minutes=21)
+    line = indexnow.run(path, site, key, now=later, send=ok)
+    assert len(calls) == 1 and calls[0]["host"] == "aifearreport.com" and calls[0]["key"] == key, calls
+    assert calls[0]["keyLocation"] == f"{site}/{key}.txt"
+    assert sorted(calls[0]["urlList"]) == [f"{site}/", f"{site}/org/gone/"], calls[0]["urlList"]
+    rec = json.loads(path.read_text())
+    assert rec[f"{site}/"]["pending"] is None and rec[f"{site}/"]["sent"] == later.isoformat(timespec="seconds"), line
+    # the front page changes again an hour on: it waits out six hours from the last announcement
+    rec[f"{site}/"]["pending"] = (later + dt.timedelta(hours=1)).isoformat(timespec="seconds")
+    path.write_text(json.dumps(rec))
+    indexnow.run(path, site, key, now=later + dt.timedelta(hours=2), send=ok)
+    assert len(calls) == 1, "a page was announced twice inside six hours"
+    indexnow.run(path, site, key, now=later + dt.timedelta(hours=6, minutes=1), send=ok)
+    assert len(calls) == 2 and calls[1]["urlList"] == [f"{site}/"], calls[-1]
+
+    def refused(body):
+        calls.append(body)
+        return 429, "7200"
+
+    rec = json.loads(path.read_text())
+    rec[f"{site}/states/"]["pending"] = (later + dt.timedelta(hours=7)).isoformat(timespec="seconds")
+    path.write_text(json.dumps(rec))
+    now = later + dt.timedelta(hours=8)
+    indexnow.run(path, site, key, now=now, send=refused)
+    assert json.loads(path.read_text())[f"{site}/states/"]["pending"], "a refused announcement was marked sent"
+    n = len(calls)
+    indexnow.run(path, site, key, now=now + dt.timedelta(minutes=30), send=ok)
+    assert len(calls) == n, "it asked again inside the wait the endpoint gave"
+    indexnow.run(path, site, key, now=now + dt.timedelta(hours=2, minutes=1), send=ok)
+    assert calls[-1]["urlList"] == [f"{site}/states/"], calls[-1]
+    assert "not set up" in indexnow.run(path, site, None, send=ok), "it ran without a key"
+    print("IndexNow hears about changed pages once they settle, at most every six hours: ok")
+
+
 def check_every_page_asks(dist, db, day):
     """The brief and the pitch-in are on every page, in that order, and the card is real.
 
@@ -1883,13 +2047,13 @@ def check_share_card_fits():
                  "1,420 measures tracked across 51 jurisdictions, 513 of them carrying at least "
                  "one new government control held by 180 named offices"),
     }
-    for name, (big, label, sub) in cases.items():
-        path = room / f"{name}.png"
-        sitebuild.share_card(path, big, label, sub)
+    for (name, (big, label, sub)), tall in [(c, t) for c in cases.items() for t in (630, 675)]:
+        path = room / f"{name}-{tall}.png"
+        sitebuild.share_card(path, big, label, sub, h=tall)
         im = Image.open(path).convert("RGB")
         px = im.load()
         w, h = im.size
-        assert (w, h) == (1200, 630), f"{name}: card is {w} by {h}"
+        assert (w, h) == (1200, tall), f"{name}: card is {w} by {h}"
 
         def inked(y):
             return sum(1 for x in range(8, w - 8)
@@ -1897,7 +2061,7 @@ def check_share_card_fits():
 
         # The content lives between the rule under the mark and the rule above the address. Find
         # where it actually reaches, rather than probing rows and hoping the overflow lands on one.
-        band, foot = 118, 556
+        band, foot = 118, tall - 74
         rows = [y for y in range(band + 3, foot - 2) if inked(y) > 3]
         assert rows, f"{name}: the card came out empty between its rules"
         assert rows[0] >= band + 18, \
@@ -1908,6 +2072,7 @@ def check_share_card_fits():
 
 
 def main():
+    check_indexnow()
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()
@@ -2081,6 +2246,8 @@ def main():
     check_every_page_asks(tmp / "dist", db, brief_day)
     check_links_open_right(tmp / "dist")
     check_states(tmp / "dist", data)
+    check_search(tmp / "dist", tmp / "site_data.json", tmp)
+    check_page_dates(tmp / "site_data.json", tmp)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))
     print("pages:", len(pages), pages[:6])
     print("index:", json.dumps(data["index"])[:200])

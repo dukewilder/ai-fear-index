@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title }}{% if home and d.site and d.site.tagline %}: {{ d.site.tagline }}{% endif %}</title>
+<title>{{ title }}</title>
 {% set blurb = description or 'Every fear about AI, and what it buys: ' ~ d.fear_word ~ ' fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' %}
 <meta name="description" content="{{ blurb }}">
+{# Large previews for every page in search, which Discover needs; noindex for a page too thin to
+   be a search result yet, and for the 404. #}
+<meta name="robots" content="{{ robots or 'max-image-preview:large' }}">
 {% if canonical %}<link rel="canonical" href="{{ canonical }}">
-{% endif %}<meta property="og:title" content="{{ title }}">
+{% endif %}<meta property="og:title" content="{{ og_title or title }}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{ d.site.name if d.site and d.site.name else 'AI Fear Report' }}">
 <meta property="og:locale" content="en_US">
@@ -20,7 +23,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{{ og_image }}">
 {% else %}<meta name="twitter:card" content="summary">
-{% endif %}<meta name="twitter:title" content="{{ title }}">
+{% endif %}<meta name="twitter:title" content="{{ og_title or title }}">
 <meta name="twitter:description" content="{{ blurb }}">
 {% if d.site and d.site.x_handle %}<meta name="twitter:site" content="@{{ d.site.x_handle }}">
 {% endif %}
@@ -28,35 +31,26 @@
 <link rel="icon" type="image/png" sizes="32x32" href="{{ base }}{{ (icons or {}).get(32) or '/icon/32.png' }}">
 <link rel="apple-touch-icon" sizes="180x180" href="{{ base }}{{ (icons or {}).get(180) or '/icon/180.png' }}">
 <link rel="manifest" href="{{ base }}/site.webmanifest">
-{% if canonical and nav == '' %}
-<script type="application/ld+json">{{ {
-  "@context": "https://schema.org",
-  "@graph": [
-    {"@type": "WebSite", "@id": canonical + "#website", "url": canonical,
-     "name": d.site.name if d.site and d.site.name else "AI Fear Report",
-     "description": blurb, "inLanguage": "en-US"},
-    {"@type": "Dataset", "@id": canonical + "#dataset",
-     "name": (d.site.name if d.site and d.site.name else "AI Fear Report") + ": AI fears, the money behind them, and the laws that cite them",
-     "description": blurb, "url": canonical, "isAccessibleForFree": True,
-     "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-     "creator": {"@type": "Organization", "name": d.site.name if d.site and d.site.name else "AI Fear Report", "url": canonical},
-     "temporalCoverage": "2025-01-01/..",
-     "keywords": ["artificial intelligence", "AI regulation", "AI legislation", "AI policy",
-                  "lobbying", "state legislation", "Congress", "AI risk", "data centers",
-                  "deepfakes", "age verification", "super PAC", "FEC"],
-     "distribution": [{"@type": "DataDownload", "encodingFormat": "text/csv",
-                       "contentUrl": d.links.csv}] if d.links and d.links.csv else [],
-     "dateModified": d.built_at[:10] if d.built_at else None}
-  ]
-} | tojson }}</script>
-{% endif %}
-<meta name="theme-color" content="#F1EDE3" media="(prefers-color-scheme: light)">
+{% if ld %}<script type="application/ld+json">{{ ld | tojson }}</script>
+{% endif %}<meta name="theme-color" content="#F1EDE3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10131A" media="(prefers-color-scheme: dark)">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+{# The faces come from the site itself; the three a first screen paints with are fetched first. #}
+<link rel="preload" href="{{ base }}/fonts/barlow-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ base }}/fonts/barlow-condensed-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ base }}/fonts/ibm-plex-mono-500.woff2" as="font" type="font/woff2" crossorigin>
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <style>
+@font-face{font-family:'Barlow';font-style:normal;font-weight:400;font-display:swap;src:url({{ base }}/fonts/barlow-400.woff2) format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:500;font-display:swap;src:url({{ base }}/fonts/barlow-500.woff2) format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:600;font-display:swap;src:url({{ base }}/fonts/barlow-600.woff2) format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:700;font-display:swap;src:url({{ base }}/fonts/barlow-700.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;src:url({{ base }}/fonts/barlow-condensed-600.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;src:url({{ base }}/fonts/barlow-condensed-700.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:800;font-display:swap;src:url({{ base }}/fonts/barlow-condensed-800.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url({{ base }}/fonts/ibm-plex-mono-400.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url({{ base }}/fonts/ibm-plex-mono-500.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:600;font-display:swap;src:url({{ base }}/fonts/ibm-plex-mono-600.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:700;font-display:swap;src:url({{ base }}/fonts/ibm-plex-mono-700.woff2) format('woff2')}
 {% include "style.css" %}
 </style>
 {% if not preview and d.analytics and d.analytics.goatcounter %}

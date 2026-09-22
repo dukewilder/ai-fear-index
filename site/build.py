@@ -16,6 +16,8 @@ import html
 import json
 import hashlib
 import pathlib
+import re
+import shutil
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -138,7 +140,7 @@ def wrap_text(draw, text, font, width):
     return lines
 
 
-def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com"):
+def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com", h=None):
     """A 1200 by 630 card in the site's own style: paper, ink, one stamped figure.
 
     The mark itself goes on it, drawn by the same function that draws the avatar and the banner.
@@ -147,6 +149,7 @@ def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com"):
     """
     from PIL import Image, ImageDraw
     from brand import font as bfont, ink as bink, wordmark, PAPER, INK, VERMILLION
+    CARD_H = h or globals()["CARD_H"]
     im = Image.new("RGB", (CARD_W, CARD_H), PAPER)
     d = ImageDraw.Draw(im)
     d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline=INK, width=3)
@@ -210,10 +213,11 @@ def card_specs(d):
 HEAT = ["#EDE9DE", "#EFDCD0", "#DFB09C", "#C76F55", "#B3321F"]
 
 
-def map_card(path, m, foot="aifearreport.com"):
+def map_card(path, m, foot="aifearreport.com", h=None):
     """The states page's card: the tile map itself, which is the thing people share it for."""
     from PIL import Image, ImageDraw
     from brand import font as bfont, ink as bink, wordmark, PAPER, INK, VERMILLION
+    CARD_H = h or globals()["CARD_H"]
     im = Image.new("RGB", (CARD_W, CARD_H), PAPER)
     d = ImageDraw.Draw(im)
     d.rectangle([0, 0, CARD_W - 1, CARD_H - 1], outline=INK, width=3)
@@ -294,33 +298,79 @@ def site_name(d):
     return (d.get("site") or {}).get("name") or "AI Fear Report"
 
 
+# A place page with fewer measures than this is left out of search until it has more. The page is
+# still there for the map to link to; it is the search result that would be thin, not the square.
+THIN = 3
+
+
+def count(n, one, many=None):
+    return f"{n:,} {one if n == 1 else (many or one + 's')}"
+
+
+def place_head(p):
+    """A place page's title: the words people search for, then this place's own numbers.
+
+    Each title carries its own counts, so no two read the same with only the name swapped, which
+    is the boilerplate Google says it rewrites. "Measures" rather than "bills" in the count, since a
+    state's count includes resolutions and the title is held to the same standard as the page.
+    """
+    n, c = p["n"], p["c"]
+    control = f"{c:,} would add government control" if c else "none would add government control"
+    if p.get("kind") == "rules and executive orders":
+        return f"Federal AI rules and executive orders: {n:,} since 2025, {control}"
+    if p.get("code") == "us":
+        return f"AI bills in Congress: {count(n, 'measure')} since 2025, {control}"
+    return f"{p['name']} AI bills and laws: {count(n, 'measure')} since 2025, {control}"
+
+
+def fear_head(f):
+    """A fear page's title: the fear, then how many bills cite it and how many filings name it."""
+    parts = {x.get("name"): str(x.get("value") or "0") for x in f.get("parts") or []}
+    bills, filings = parts.get("Bills", "0"), parts.get("Lobbying filings", "0")
+    filed = f"lobbying filing{'' if filings == '1' else 's'} in the past year"
+    if bills != "0":
+        return f"{f['name']}: {bills} AI bill{'' if bills == '1' else 's'} since 2025, {filings} {filed}"
+    if filings != "0":
+        return f"{f['name']}: {filings} AI {filed}"
+    return f"{f['name']}: the AI bills and the money"
+
+
+def org_head(o):
+    """An organization's title: its name, then the money, worded the way its page words it."""
+    if o.get("group") == "election":
+        return f"{o['name']}: {o['spent']} raised for AI politics this cycle"
+    if " and " in (o.get("breakdown") or ""):  # lobbying and election money both, added together
+        return f"{o['name']}: AI lobbying and election money, {o['spent']} in all"
+    return f"{o['name']}: {o['spent']} reported on AI lobbying filings, past year"
+
+
 def page_specs(d):
     name = site_name(d)
+    tagline = (d.get("site") or {}).get("tagline")
     specs = [{"kind": "home", "route": "", "out": "index.html", "template": "home.html",
-              "title": name, "ctx": {}}]
+              "head": name, "title": f"{name}: {tagline}" if tagline else name, "ctx": {}}]
     for f in d["fear_pages"]:
         specs.append({"kind": "fear", "route": f"fear/{f['slug']}", "out": f"fear/{f['slug']}/index.html",
-                      "template": "fear.html",
-                      "title": f"{f['name']}: the AI bills and the money, {name}",
+                      "template": "fear.html", "head": fear_head(f), "crumb": f["name"],
                       "ctx": {"f": f, "timeline": timeline_svg(f["timeline"])}})
     for o in d["org_pages"]:
         specs.append({"kind": "org", "route": f"org/{o['slug']}", "out": f"org/{o['slug']}/index.html",
-                      "template": "org.html",
-                      "title": f"{o['name']}: {'election money' if o.get('group') == 'election' else 'AI lobbying'}, {name}",
-                      "ctx": {"o": o}})
-    for kind, title in (("feed", "Feed: AI bills, rules and filings as they arrive"),
-                        ("method", "How the numbers work")):
+                      "template": "org.html", "head": org_head(o), "crumb": o["name"], "ctx": {"o": o}})
+    for kind, head, crumb in (("feed", "Feed: AI bills, rules and filings as they arrive", "Feed"),
+                              ("method", "How the numbers work", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
-                      "title": f"{title}, {name}", "ctx": {}})
+                      "head": head, "crumb": crumb, "ctx": {}})
     if d.get("state_pages"):
         specs.append({"kind": "states", "route": "states", "out": "states/index.html", "template": "states.html",
-                      "title": f"The states: where AI measures would add government control, {name}", "ctx": {}})
+                      "head": "AI bills and laws by state: a map of where they would add government control",
+                      "crumb": "The states", "ctx": {}})
         for p in d["state_pages"]:
             specs.append({"kind": "state", "route": f"states/{p['slug']}", "out": f"states/{p['slug']}/index.html",
-                          "template": "state.html",
-                          "title": f"{p['name']}: AI measures and who they would hand power, {name}",
-                          "ctx": {"p": p}})
+                          "template": "state.html", "head": place_head(p), "crumb": p["name"],
+                          "robots": "noindex" if p["n"] < THIN else None, "ctx": {"p": p}})
     for s in specs:
+        s.setdefault("title", f"{s['head']} | {name}")
+        s["robots"] = s.get("robots") or "max-image-preview:large"
         s["nav"] = NAV_FOR[s["kind"]]
         s["card"] = (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else
                      f"state-{s['ctx']['p']['slug']}" if s["kind"] == "state" else
@@ -358,7 +408,135 @@ def page_specs(d):
     return specs
 
 
-def build(data_path, out_dir=None, preview_path=None, base=""):
+def page_url(site_url, route):
+    return f"{site_url}/{route}{'/' if route else ''}"
+
+
+# What changes on every build without the page saying anything new: the times the relative
+# "updated 4 minutes ago" labels count from, and the stamps on image addresses. They are taken out
+# before a page is fingerprinted, so its date in the sitemap moves only when what it says does.
+VOLATILE = [re.compile(r'\sdata-rel="[^"]*"'),
+            re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?"),
+            re.compile(r"\?v=[0-9a-f]{6,}")]
+
+
+def fingerprint(page):
+    text = "\n".join([page["title"], page.get("description") or "", page.get("robots") or "", page["html"]])
+    for pattern in VOLATILE:
+        text = pattern.sub("", text)
+    return hashlib.sha1(text.encode()).hexdigest()[:16]
+
+
+def dated(pages, record, now, site_url):
+    """Each page's last real change, carried from the last build's record.
+
+    A page whose fingerprint matches the record keeps the date it had; one that differs, or is new,
+    is dated now and marked pending, for the IndexNow step after publishing to announce. A page that
+    has left the site is kept once, marked gone, so its removal is announced too, and then dropped.
+    The sitemap used to carry the export time for every page, and a lastmod that says every page
+    changed every twenty minutes is one search engines learn to ignore.
+    """
+    out = {}
+    for page in pages:
+        loc = page_url(site_url, page["route"])
+        old = record.get(loc) or {}
+        h = fingerprint(page)
+        if old.get("hash") == h and not old.get("gone"):
+            entry = dict(old)
+        else:
+            entry = {"hash": h, "lastmod": now, "sent": old.get("sent"), "pending": old.get("pending") or now}
+        entry["index"] = page.get("robots") != "noindex"
+        out[loc] = entry
+    for loc, old in record.items():
+        if loc in out:
+            continue
+        if not old.get("gone"):
+            out[loc] = {"hash": None, "lastmod": now, "sent": old.get("sent"), "pending": now,
+                        "gone": True, "index": False}
+        elif old.get("pending"):
+            out[loc] = old   # announced yet? not until the IndexNow step clears pending
+    return out
+
+
+def structured(page, d, site_url, name, image, logo):
+    """What a page is, in the terms search engines read, as one JSON-LD graph.
+
+    The site, its publisher and its dataset are said once, on the front page. They used to ride on
+    every fear and organization page too, each claiming to be the website at its own address, which
+    is 53 contradictory answers to "what is this site called". Every other page says where it sits,
+    as a trail of breadcrumbs, and every page names its wide picture for Discover.
+    """
+    if not site_url:
+        return None
+    root = site_url + "/"
+    url = page_url(site_url, page["route"])
+    webpage = {"@type": "WebPage", "@id": url + "#page", "url": url, "name": page["title"],
+               "isPartOf": {"@id": root + "#website"}, "inLanguage": "en-US"}
+    if image:
+        webpage["primaryImageOfPage"] = {"@type": "ImageObject", "url": image, "width": CARD_W, "height": WIDE_H}
+    if page["kind"] == "home":
+        org = {"@type": "Organization", "@id": root + "#organization", "name": name, "url": root}
+        if logo:
+            org["logo"] = {"@type": "ImageObject", "url": logo, "width": 512, "height": 512}
+        same = []
+        if (d.get("site") or {}).get("x_handle"):
+            same.append(f"https://x.com/{d['site']['x_handle']}")
+        if (d.get("links") or {}).get("code"):
+            same.append(d["links"]["code"])
+        if same:
+            org["sameAs"] = same
+        site = {"@type": "WebSite", "@id": root + "#website", "url": root, "name": name,
+                "description": page.get("description") or "", "inLanguage": "en-US",
+                "publisher": {"@id": root + "#organization"}}
+        graph = [site, org, webpage]
+        csv = (d.get("links") or {}).get("csv")
+        if csv:
+            folder = csv.rsplit("/", 1)[0]
+            files = [("measures.csv", "Every AI measure on file since January 2025, with its status, the fears "
+                                      "it cites, the controls it would create and the agencies it would hand power to."),
+                     ("lobbying.csv", "Federal lobbying filings from the past year that mention AI, with client, "
+                                      "registrant, amount, bills and the fears they mention."),
+                     ("funders.csv", "Advocacy groups and foundations ranked by what they reported on lobbying "
+                                     "filings that mention a tracked fear, past year."),
+                     ("election.csv", "Political committees working on AI policy, ranked by the election money "
+                                      "they raised this cycle.")]
+            graph.append({
+                "@type": "Dataset", "@id": root + "#dataset",
+                "name": f"{name}: AI fears, the money behind them, and the laws that cite them",
+                "description": page.get("description") or "", "url": root, "isAccessibleForFree": True,
+                "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+                "creator": {"@id": root + "#organization"}, "publisher": {"@id": root + "#organization"},
+                "temporalCoverage": "2025-01-01/..",
+                "spatialCoverage": {"@type": "Place", "name": "United States"},
+                "keywords": ["artificial intelligence", "AI regulation", "AI legislation", "AI policy",
+                             "lobbying", "state legislation", "Congress", "AI risk", "data centers",
+                             "deepfakes", "super PAC", "FEC"],
+                "variableMeasured": ["status of each measure", "fears cited", "government controls",
+                                     "agencies given new power", "lobbying amounts reported",
+                                     "election money raised"],
+                "distribution": [{"@type": "DataDownload", "encodingFormat": "text/csv",
+                                  "contentUrl": f"{folder}/{f}", "name": f, "description": text}
+                                 for f, text in files],
+                "dateModified": (d.get("built_at") or "")[:10] or None})
+        return {"@context": "https://schema.org", "@graph": graph}
+    trail = [(name, root)]
+    if page["kind"] == "state":
+        trail.append(("The states", page_url(site_url, "states")))
+    trail.append((page.get("crumb") or page["head"], url))
+    webpage["breadcrumb"] = {"@id": url + "#breadcrumb"}
+    crumbs = {"@type": "BreadcrumbList", "@id": url + "#breadcrumb",
+              "itemListElement": [{"@type": "ListItem", "position": i, "name": n, "item": u}
+                                  for i, (n, u) in enumerate(trail, 1)]}
+    return {"@context": "https://schema.org", "@graph": [webpage, crumbs]}
+
+
+# The same cards drawn 16:9 for search. Discover asks for an image at least 1200 wide and says 16:9
+# works best; the 1200 by 630 ones stay the social cards, the shape X and the rest show whole.
+WIDE_H = 675
+FONTS = HERE / "static" / "fonts"
+
+
+def build(data_path, out_dir=None, preview_path=None, base="", pages_path=None):
     d = json.loads(pathlib.Path(data_path).read_text())
     if d.get("built_at") in (None, "", "now"):
         d["built_at"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -376,16 +554,16 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
     shell = env.get_template("base.html")
     if preview:
         pathlib.Path(preview_path).write_text(shell.render(pages=pages, preview=True,
-                                                           title=name, nav="", home=True))
+                                                           title=pages[0]["title"], nav="", home=True))
         return [preview_path]
     written = []
     site_url = (d.get("site_url") or "").rstrip("/")
-    cards = {}
-    icons = {}
+    cards, wide, icons = {}, {}, {}
     try:
         import sys
         sys.path.insert(0, str(HERE))
         from brand import share as share_image
+
         def stamped(name):
             """The card's address, with a stamp of what is in it.
 
@@ -399,17 +577,24 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             body = (pathlib.Path(out_dir) / "og" / name).read_bytes()
             return f"{site_url}/og/{name}?v={hashlib.sha1(body).hexdigest()[:8]}"
 
-        share_image(pathlib.Path(out_dir) / "og" / "share.png",
-                    (d.get("site") or {}).get("tagline") or "Every fear about AI, and what it buys.")
+        tagline = (d.get("site") or {}).get("tagline") or "Every fear about AI, and what it buys."
+        (pathlib.Path(out_dir) / "og" / "wide").mkdir(parents=True, exist_ok=True)
+        share_image(pathlib.Path(out_dir) / "og" / "share.png", tagline)
         cards["share"] = stamped("share.png")
+        share_image(pathlib.Path(out_dir) / "og" / "wide" / "share.png", tagline, h=WIDE_H)
+        wide["share"] = stamped("wide/share.png")
+        foot = site_url.replace("https://", "") or name
         for card, big, label, sub in card_specs(d):
-            share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub,
-                       kicker=name.upper(), foot=site_url.replace("https://", "") or name)
+            share_card(pathlib.Path(out_dir) / "og" / f"{card}.png", big, label, sub, kicker=name.upper(), foot=foot)
             cards[card] = stamped(f"{card}.png")
+            share_card(pathlib.Path(out_dir) / "og" / "wide" / f"{card}.png", big, label, sub,
+                       kicker=name.upper(), foot=foot, h=WIDE_H)
+            wide[card] = stamped(f"wide/{card}.png")
         if d.get("state_map"):
-            map_card(pathlib.Path(out_dir) / "og" / "states.png", d["state_map"],
-                     foot=site_url.replace("https://", "") or name)
+            map_card(pathlib.Path(out_dir) / "og" / "states.png", d["state_map"], foot=foot)
             cards["states"] = stamped("states.png")
+            map_card(pathlib.Path(out_dir) / "og" / "wide" / "states.png", d["state_map"], foot=foot, h=WIDE_H)
+            wide["states"] = stamped("wide/states.png")
         # The tab, the bookmark, the home screen and the manifest all want a real file, and
         # they want the same mark. 16 because that is what a tab is at 1x, and a browser handed
         # only a 32 downsamples it itself and smears the letters.
@@ -423,49 +608,69 @@ def build(data_path, out_dir=None, preview_path=None, base=""):
             icons[px] = f"/icon/{px}.png?v={hashlib.sha1(icon_file.read_bytes()).hexdigest()[:8]}"
     except Exception as exc:  # cards are a nicety; the pages must still build
         print("share cards skipped:", exc)
+    # The type is served from the site itself. It came from Google Fonts, which put a stylesheet on
+    # another host in front of every first paint, the one thing holding up the page on a phone, and
+    # told Google the address of every reader. The files are the same faces, cut to the Latin set
+    # the site uses, under the Open Font License, which travels with them.
+    if FONTS.is_dir():
+        (pathlib.Path(out_dir) / "fonts").mkdir(parents=True, exist_ok=True)
+        for f in sorted(FONTS.iterdir()):
+            if f.suffix in (".woff2", ".txt"):
+                shutil.copyfile(f, pathlib.Path(out_dir) / "fonts" / f.name)
+    logo = f"{site_url}/icon/512.png" if site_url and icons.get(512) else None
     for page in pages:
         target = pathlib.Path(out_dir) / page["out"]
         target.parent.mkdir(parents=True, exist_ok=True)
         route = page["route"]
         target.write_text(shell.render(
-            pages=[page], preview=False, title=page["title"], nav=page["nav"],
+            pages=[page], preview=False, title=page["title"], og_title=page["head"], nav=page["nav"],
             home=page["kind"] == "home", og_image=cards.get(page.get("card")) or cards.get("share"),
-            icons=icons,
-            canonical=f"{site_url}/{route}{'/' if route else ''}" if site_url else None,
+            icons=icons, robots=page["robots"],
+            ld=structured(page, d, site_url, name, wide.get(page.get("card")) or wide.get("share"), logo),
+            canonical=page_url(site_url, route) if site_url else None,
             description=page.get("description")))
         written.append(str(target))
     # What GitHub Pages serves for a path that does not exist. It is built last and kept out of
     # the sitemap, so nothing points a crawler at it.
     gone = {"kind": "method", "route": "404", "out": "404.html", "template": "notfound.html",
-            "title": f"Page not found, {name}", "ctx": {}, "nav": "", "card": None,
+            "title": f"Page not found | {name}", "head": "Page not found", "ctx": {}, "nav": "", "card": None,
             "description": "That page is not on the AI Fear Report."}
     gone["html"] = env.get_template("pages/notfound.html").render()
     target = pathlib.Path(out_dir) / gone["out"]
-    target.write_text(shell.render(pages=[gone], preview=False, title=gone["title"], nav="",
-                                   home=False, og_image=cards.get("share"), icons=icons,
-                                   canonical=None, description=gone["description"]))
+    target.write_text(shell.render(pages=[gone], preview=False, title=gone["title"], og_title=gone["head"],
+                                   nav="", home=False, og_image=cards.get("share"), icons=icons,
+                                   robots="noindex", ld=None, canonical=None, description=gone["description"]))
     written.append(str(target))
     if site_url:
-        written += write_index_files(out_dir, site_url, pages, d)
+        record = {}
+        if pages_path and pathlib.Path(pages_path).exists():
+            try:
+                record = json.loads(pathlib.Path(pages_path).read_text())
+            except ValueError:
+                record = {}   # a damaged record costs one round of dates, not the build
+        entries = dated(pages, record, d["built_at"], site_url)
+        written += write_index_files(out_dir, site_url, pages, d, entries)
+        if pages_path:
+            pathlib.Path(pages_path).write_text(json.dumps(entries, indent=0, sort_keys=True) + "\n")
     return written
 
 
-def write_index_files(out_dir, site_url, pages, d):
-    """robots.txt and a sitemap, so a crawler is told what exists rather than guessing.
+def write_index_files(out_dir, site_url, pages, d, entries=None):
+    """robots.txt, a sitemap and the IndexNow key, so a crawler is told what exists rather than guessing.
 
-    Every page is worth indexing and none of them change on a schedule a crawler could predict, so
-    the sitemap carries one lastmod for the lot: the moment the data was last exported.
+    Each page in the sitemap carries the date its content last changed, from the record the build
+    keeps; a page left out of search is left out of the sitemap too. changefreq and priority are
+    gone: Google and Bing both say they ignore them.
     """
     out = pathlib.Path(out_dir)
-    stamp = (d.get("built_at") or "")[:10]
+    entries = entries or {}
     urls = []
     for page in pages:
-        route = page["route"]
-        loc = f"{site_url}/{route}{'/' if route else ''}"
-        urls.append(f"  <url><loc>{loc}</loc>"
-                    f"{f'<lastmod>{stamp}</lastmod>' if stamp else ''}"
-                    f"<changefreq>{'daily' if page['kind'] in ('home', 'feed', 'states') else 'weekly'}</changefreq>"
-                    f"<priority>{'1.0' if page['kind'] == 'home' else '0.7'}</priority></url>")
+        if page.get("robots") == "noindex":
+            continue
+        loc = page_url(site_url, page["route"])
+        stamp = (entries.get(loc) or {}).get("lastmod") or d.get("built_at") or ""
+        urls.append(f"  <url><loc>{loc}</loc>" + (f"<lastmod>{stamp}</lastmod>" if stamp else "") + "</url>")
     (out / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -480,7 +685,13 @@ def write_index_files(out_dir, site_url, pages, d):
         "icons": [{"src": "/icon/180.png", "sizes": "180x180", "type": "image/png"},
                   {"src": "/icon/512.png", "sizes": "512x512", "type": "image/png"}],
     }, indent=1) + "\n")
-    return [str(out / "sitemap.xml"), str(out / "robots.txt"), str(out / "site.webmanifest")]
+    written = [str(out / "sitemap.xml"), str(out / "robots.txt"), str(out / "site.webmanifest")]
+    # IndexNow checks that a submission comes from the site by fetching this file from its root.
+    key = (d.get("site") or {}).get("indexnow_key")
+    if key:
+        (out / f"{key}.txt").write_text(key)
+        written.append(str(out / f"{key}.txt"))
+    return written
 
 
 if __name__ == "__main__":
@@ -489,8 +700,9 @@ if __name__ == "__main__":
     ap.add_argument("--out", help="output folder for the production site")
     ap.add_argument("--preview", help="write a single-file preview here instead")
     ap.add_argument("--base", default="", help="URL prefix, for serving under a subpath rather than a domain root")
+    ap.add_argument("--pages", help="the record of each page's fingerprint and last change, read and rewritten")
     args = ap.parse_args()
     if not args.out and not args.preview:
         ap.error("give --out or --preview")
-    for path in build(args.data, args.out, args.preview, args.base):
+    for path in build(args.data, args.out, args.preview, args.base, args.pages):
         print("wrote", path)

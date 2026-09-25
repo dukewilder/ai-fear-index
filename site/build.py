@@ -255,8 +255,7 @@ def map_card(path, m, foot="aifearreport.com", h=None):
         d.text((left - lx, y - ty), line, font=f_head, fill=INK)
         y += h + 10
     y += 14
-    for line in wrap_text(d, "AI measures that would put AI, the people building it or the people using it "
-                             "under new government control", f_sub, room)[:5]:
+    for line in wrap_text(d, "AI measures that would put AI under new government control", f_sub, room)[:5]:
         lx, ty, _, h = bink(d, line, f_sub)
         d.text((left - lx, y - ty), line, font=f_sub, fill="#33302A")
         y += h + 11
@@ -344,6 +343,9 @@ def org_head(o):
     """An organization's title: its name, then the money, worded the way its page words it."""
     if o.get("group") == "election":
         return f"{o['name']}: {o['spent']} raised for AI politics this cycle"
+    if o.get("by_filings"):  # companies and trade groups: counted in filings, the way their page counts them
+        n = o["spent"]
+        return f"{o['name']}: {n} lobbying filing{'' if n == '1' else 's'} naming a fear, past year"
     if " and " in (o.get("breakdown") or ""):  # lobbying and election money both, added together
         return f"{o['name']}: AI lobbying and election money, {o['spent']} in all"
     return f"{o['name']}: {o['spent']} reported on AI lobbying filings, past year"
@@ -404,19 +406,18 @@ def page_specs(d):
                                 f"the amounts they report, and the bills they list.")
         elif s["kind"] == "feed":
             s["description"] = ("AI bills, rules, lobbying filings, donations and statements as they "
-                                "arrive, tagged with the fears they cite and the controls they would impose.")
+                                "arrive, labeled with the fears they cite and the controls they would impose.")
         elif s["kind"] == "method":
-            s["description"] = ("Where every number on this site comes from: the government sources, "
-                                "how measures are tagged, and what each label means.")
+            s["description"] = ("Where every number on this site comes from: the public records behind it, "
+                                "how the fears were chosen, and what each label means.")
         elif s["kind"] == "bills":
             m = d["bills_meta"]
             s["description"] = (f"Every AI bill, resolution, rule and order in the US since January 2025, {m['total']:,} "
                                 f"in all, by state, the fear it cites, the government control it would create and "
                                 f"where it stands. {m['controlled']:,} would add government control.")
         elif s["kind"] == "states":
-            s["description"] = ("Every state, DC and Puerto Rico, shaded by the AI measures that would put AI, "
-                                "the people building it or the people using it under new government control, "
-                                "with a page for each.")
+            s["description"] = ("Every state, DC and Puerto Rico, shaded by its AI measures that would put AI "
+                                "under new government control, with a page for each.")
         elif s["kind"] == "state":
             p = s["ctx"]["p"]
             s["description"] = (p["receipt"].rsplit(" http", 1)[0] if p["n"] else

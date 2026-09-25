@@ -132,11 +132,13 @@ def store_bill(db, http, key, congress, btype, number, listing=None):
     except Exception as exc:  # summaries are optional
         log(f"[congress] no summary for {ident}: {exc}")
     latest = bill.get("latestAction") or listing.get("latestAction") or {}
-    status = "passed" if bill.get("laws") else status_from_action(latest.get("text"))
+    kind = "resolution" if btype.upper() in ("HRES", "SRES", "HCONRES", "SCONRES") else "bill"
+    ident_label = f"{TYPE_LABEL.get(btype, btype)} {number}"
+    status = "passed" if bill.get("laws") else status_from_action(latest.get("text"), ident_label, kind)
     sponsors = [s.get("fullName") for s in bill.get("sponsors", []) if s.get("fullName")]
     return upsert(db, "measures", {
-        "id": ident, "kind": "bill", "jurisdiction": "us", "jurisdiction_name": "Congress",
-        "session": str(congress), "identifier": f"{TYPE_LABEL.get(btype, btype)} {number}",
+        "id": ident, "kind": kind, "jurisdiction": "us", "jurisdiction_name": "Congress",
+        "session": str(congress), "identifier": ident_label,
         "title": listing.get("title") or bill.get("title"), "summary": summary[:SUMMARY_MAX], "status": status,
         "latest_action": latest.get("text"), "latest_action_date": latest.get("actionDate"),
         "introduced_date": bill.get("introducedDate"),

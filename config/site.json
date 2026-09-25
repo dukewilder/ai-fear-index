@@ -11,6 +11,5 @@
   "retired_fears": [
     "ai-cyberattacks",
     "bioweapons"
-  ],
-  "fears_chosen_note": "GDELT had not returned news counts for some candidates that day; the same 17 come out on top at any value those counts could take."
+  ]
 }

@@ -17,6 +17,28 @@ SPACING = 11.0   # seconds between calls, double what GDELT asks for
 BUDGET = 540     # seconds for the whole source, so it cannot eat the hour
 
 
+# Fears that joined the list on 25 September 2026 and were measured as candidates under the very
+# query the list now uses for them. Their three months of daily counts carry over once, so they are
+# scored on the news from the first pass instead of waiting for GDELT to answer again. Only these:
+# a candidate counted under a different query would be carrying a different number.
+CARRY_NEWS = ("copyright", "self-driving")
+
+
+def carry_candidate_counts(db):
+    if kv_get(db, "news_carried:1"):
+        return 0
+    n = 0
+    for slug in CARRY_NEWS:
+        if db.execute("SELECT 1 FROM series WHERE series=? LIMIT 1", (f"news:{slug}",)).fetchone():
+            continue
+        n += db.execute("INSERT OR IGNORE INTO series(series,date,value) "
+                        "SELECT ?, date, value FROM series WHERE series=?",
+                        (f"news:{slug}", f"cand-news:{slug}")).rowcount
+    kv_set(db, "news_carried:1", True)
+    db.commit()
+    return n
+
+
 def run(db, state, mode):
     http = Http(min_interval=SPACING)
     ents = Entities()
@@ -25,6 +47,11 @@ def run(db, state, mode):
     # rate limit every hour and the last ones never get any news at all.
     offset = kv_get(db, "gdelt_offset", 0) % len(fears)
     ordered = fears[offset:] + fears[:offset]
+    # A fear with no count yet goes first, so a fear new to the list has its news within a pass or
+    # two rather than waiting its turn in the rotation behind fears that already have one.
+    ordered.sort(key=lambda f: db.execute("SELECT 1 FROM series WHERE series=? LIMIT 1",
+                                          (f"news:{f['slug']}",)).fetchone() is not None)
+    carried = carry_candidate_counts(db)
     started = time.time()
     added, errors, read, skipped, handled, series_ok = 0, [], 0, 0, 0, 0
     unserved = None  # the first fear that came away with nothing; next run starts there
@@ -33,7 +60,7 @@ def run(db, state, mode):
         if time.time() - started > BUDGET:
             skipped += 1
             if unserved is None:
-                unserved = (offset + i) % len(fears)
+                unserved = fears.index(fear)
             continue
         handled += 1
         query = f"{fear['gdelt']} sourcelang:english"
@@ -68,7 +95,7 @@ def run(db, state, mode):
                 errors.append(f"{fear['slug']}: {short(exc)}")
         read += len(arts)
         if not arts and not got_series and unserved is None:
-            unserved = (offset + i) % len(fears)
+            unserved = fears.index(fear)
         for a in arts:
             url = a.get("url") or ""
             if not url:
@@ -89,7 +116,9 @@ def run(db, state, mode):
     db.execute("DELETE FROM articles WHERE seen < ?", (cutoff,))
     db.commit()
     state["added"] = added
-    note = f"{read} articles and {series_ok} volume series read for {handled} fears, starting at {fears[offset]['slug']}"
+    note = f"{read} articles and {series_ok} volume series read for {handled} fears, starting at {ordered[0]['slug']}"
+    if carried:
+        note += f"; {carried} daily counts carried over from the candidate measurement"
     if skipped:
         note += f"; {skipped} fears left for the next run"
     if errors:

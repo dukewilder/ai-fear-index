@@ -1297,6 +1297,24 @@ def check_status_and_coverage():
             ("Enrolled and presented to the Governor at 3 p.m.", "pending"), ("Carried over to 2026 Regular Session.", "pending"),
             ("Referred to Assignments", "pending"), ("SUBSTITUTED BY S6953B", "pending")):
         assert status_from_action(text) == want, f"{text!r} read as {status_from_action(text)}, wanted {want}"
+    # A one-chamber resolution is adopted when that chamber adopts it. The Senate agreed to S.Res. 896
+    # and the site called it not passed. An amendment or a motion adopted is not the resolution, and a
+    # concurrent resolution one chamber adopts still needs the other.
+    for text, ident, kind, want in (
+            ("Submitted in the Senate, considered, and agreed to without amendment and with a preamble by "
+             "Unanimous Consent.", "S.Res. 896", "resolution", "passed"),
+            ("Senate Passed/Adopted By Substitute", "SR 789", "resolution", "passed"),
+            ("House Read and Adopted", "HR 43", "resolution", "passed"),
+            ("Report and Resolution Adopted.  Transmitted to House.", "HCR 206", "resolution", "pending"),
+            ("Resolution agreed to in House", "H.Con.Res. 5", "resolution", "pending"),
+            ("Motion to table agreed to", "S.Res. 5", "resolution", "pending"),
+            ("Committee amendment adopted", "SR 5", "resolution", "pending"),
+            ("Perfected with Amendments (H) - HA 1, adopted", "HB 362", "bill", "pending"),
+            ("Senate floor amendments read and adopted.", "SB 474", "bill", "pending"),
+            ("Referred to Energy", "HR 630", "resolution", "pending"),
+            ("Died, not introduced, companion bill(s) passed, see HR 8003 (Adopted)", "SR 1768", "resolution", "failed")):
+        got = status_from_action(text, ident, kind)
+        assert got == want, f"{ident} {text!r} read as {got}, wanted {want}"
     assert status_label("pending") == "Not passed" and status_label("passed") == "Passed"
     assert status_label("failed", "House sustained Governor's veto") == "Vetoed"
     assert status_label("failed", "Died in Committee") == "Did not pass"
@@ -1804,24 +1822,31 @@ def check_fears_explained(dist, data):
 
     A reader pointed out that the method page ranked the fears without saying how the list was
     made or that it was a list of ten, while the tagline said "every fear about AI". The list is now
-    the highest-scoring of every fear measured on the day it was set, the ones left off are still
-    measured, and the controls are counted whatever a measure cites. The method page says all of it,
-    with the counts, and the front page says how many.
+    the highest-scoring of every fear measured on the day it was set, the ones left off are named and
+    still measured, and the controls are counted whatever a measure cites. The method page says so
+    without a count that moves, so it is true on any day, and it names every control.
     """
     method = re.sub(r"\s+", " ", (dist / "method" / "index.html").read_text())
     home = re.sub(r"\s+", " ", (dist / "index.html").read_text())
-    word, bm = data["fear_word"], data["bills_meta"]
+    word = data["fear_word"]
     fl = data["fear_list"]
     assert f'id="fears">The {word} fears' in method and fl["chosen"] and \
         f"scored highest on the Fear Index out of {fl['measured']} fears measured on {fl['chosen']}" in method, \
         "the method page does not say how the fears were chosen"
-    assert f"Every day the {fl['candidates']} candidates are scored" in method, "the fears left off are not said to be measured"
-    assert f"{bm['controlled_no_fear']:,} of the {bm['controlled']:,} that would add government control cite none" in method
+    assert fl["left_off"] and "The fears measured and left off are " + ", ".join(fl["left_off"][:-1]) in method, \
+        "the fears left off are not named"
+    assert "They are scored every day the same way" in method, "the fears left off are not said to be measured"
+    assert "A measure counts whether or not it cites a fear, and so does every control it would create" in method
+    assert "The controls are " + ", ".join(data["control_names"][:-1]) in method, "the controls are not all named"
+    # Evergreen: no running total on the method page, where it would go stale beside the live ones.
+    body = method.split('id="sources"')[0]
+    for n in (data["bills_meta"]["total"], data["bills_meta"]["controlled"]):
+        assert n < 100 or f"{n:,}" not in body, f"the method page carries a running total ({n:,})"
     assert f"The {word} fears this report follows" in home and 'href="/method/#fears"' in home
     for page in dist.rglob("*.html"):
         assert "Every fear about AI" not in page.read_text(), f"{page} still claims every fear"
     assert "Every fear" not in data["site"]["tagline"]
-    print(f"the {word} fears are said to be the top {word} of {fl['measured']} measured, with what they leave out: ok")
+    print(f"the {word} fears are said to be the top {word} of {fl['measured']} measured, with the ones left off named: ok")
 
 
 def check_bills_page(dist, data):
@@ -2307,6 +2332,36 @@ def check_government_own_use():
     print("rules for the government's own use of AI are not counted as controls: ok")
 
 
+def check_loss_of_control_reread():
+    """A measure that has frontier developers assess and report catastrophic risk cites loss of control.
+
+    California's SB 53 did exactly that and was refused the fear, because "catastrophic risk, as
+    defined" read to the check as a defined term. The fear's definition names catastrophic risk, so the
+    check is told as much for measures, and the measures it refused are asked once more. Statements
+    keep their verdicts.
+    """
+    from pipeline import check
+    fears = {f["slug"]: f for f in config("fears")}
+    assert "catastrophic" in fears["loss-of-control"]["definition"]
+    m = {"jurisdiction_name": "California", "identifier": "SB 53", "title": "Artificial intelligence models",
+         "summary": "requires a summary of any assessment of catastrophic risk, as defined"}
+    asked = check.question(m, "fear", "loss-of-control", "catastrophic risk, as defined", {}, fears)
+    assert check.FEAR_NOTES["loss-of-control"] in asked, "the check is not told what the fear includes"
+    post = {"post": True, "org": "Org", "entity": "org", "title": "t", "summary": "catastrophic risk"}
+    assert check.FEAR_NOTES["loss-of-control"] not in check.question(post, "fear", "loss-of-control", "q", {}, fears)
+    db = connect(":memory:")
+    for target, value, verdict in (("m1", "loss-of-control", "no"), ("post:1", "loss-of-control", "no"),
+                                   ("m2", "deepfakes", "no"), ("m3", "loss-of-control", "yes")):
+        db.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) "
+                   "VALUES(?,'fear',?,'q',?,'r','m','t')", (target, value, verdict))
+    db.commit()
+    assert check.recheck_fears(db) == 1
+    assert {r[0] for r in db.execute("SELECT target FROM tags WHERE kind='fear'")} == {"m1"}
+    assert {r[0] for r in db.execute("SELECT target FROM checks")} == {"post:1", "m2", "m3"}
+    assert check.recheck_fears(db) == 0, "asked again a second time"
+    print("a measure acting on catastrophic risk is asked again about loss of control: ok")
+
+
 def check_every_page_asks(dist, db, day):
     """The brief and the pitch-in are on every page, in that order, and the card is real.
 
@@ -2475,6 +2530,7 @@ def main():
     check_indexnow()
     check_bill_links()
     check_government_own_use()
+    check_loss_of_control_reread()
     check_candidates()
     check_use_restrictions()
     check_brief_prompt()

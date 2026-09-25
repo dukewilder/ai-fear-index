@@ -1,4 +1,4 @@
-{% from "macros.html" import benefit_row, quote_card, law_row, buying_row, bill_item %}
+{% from "macros.html" import benefit_row, quote_card, law_row, buying_row, bill_item, unit %}
 {# Sections come and go with the data, so the shading alternates on the ones present rather than
    being fixed to each: a state with no offices named would otherwise stack two bands together. #}
 {% set ns = namespace(i=0) %}
@@ -8,9 +8,9 @@
 <h1 class="title">{{ p.name }}</h1>
 {% if p.n %}
 <p class="hero-num sm">{{ p.c }}</p>
-<p class="hero-text sm">AI measure{{ '' if p.c == 1 else 's' }} that would put AI, the people building it or the people using it under new government control.</p>
+<p class="hero-text sm">AI measure{{ '' if p.c == 1 else 's' }} that would put AI under new government control.</p>
 {% else %}
-<p class="hero-text">No AI measures on file here yet.</p>
+<p class="hero-text">No AI measures here since January 2025.</p>
 {% endif %}
 {% if p.n %}<button type="button" class="copy" data-copy="{{ p.receipt }}" data-goatcounter-click="copy-state-receipt">Copy the receipt</button>{% endif %}
 </div></section>
@@ -25,7 +25,7 @@
 {% if p.beneficiaries %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Who benefits</h2>
-<p class="sub">Agencies and officials these measures would hand new power over AI or data centers, by number of measures.</p>
+<p class="sub">Agencies and officials these bills would hand new power, by number of bills.</p>
 <ol class="rank">{% for b in p.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
@@ -41,7 +41,7 @@
 {% if p.quotes %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">In their own words</h2>
-<p class="sub">The fear as each measure's official summary states it, and the controls the same measure would create.</p>
+<p class="sub">The fear as each bill's official summary states it, and the controls the same bill would create.</p>
 <ul class="quotes">{% for q in p.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
 </div></section>
 {% endif %}
@@ -49,7 +49,7 @@
 {% if p.buying %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">What it's buying</h2>
-<p class="sub">The government controls written into these measures.</p>
+<p class="sub">The government controls written into these bills.</p>
 <ol class="rank">{% for c in p.buying %}{{ buying_row(c, url('bills') ~ '?place=' ~ p.code ~ '&control=' ~ c.slug) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
@@ -57,15 +57,15 @@
 {% if p.fears %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The fears they cite</h2>
-<p class="sub">Each fear as the measure's own text states it, by number of measures.</p>
-<ol class="rank">{% for f in p.fears %}<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="meta">{{ f.controlled }} of them carry a control</span></span><span class="val accent">{{ f.bills }}<span class="unit">bills</span></span></a></li>{% endfor %}</ol>
+<p class="sub">The fears these bills cite, by number of bills.</p>
+<ol class="rank">{% for f in p.fears %}<li><a class="row" href="{{ url('fear', f.slug) }}"><span class="rank-n">{{ f.rank }}</span><span><span class="row-name">{{ f.name }}</span><span class="meta">{{ f.controlled }} carr{{ 'ies' if f.controlled|string == '1' else 'y' }} a control</span></span><span class="val accent">{{ f.bills }}{{ unit(f.bills) }}</span></a></li>{% endfor %}</ol>
 </div></section>
 {% endif %}
 
 {% if p.bills %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
-<h2 class="h">Every measure</h2>
-<p class="sub">The ones carrying the most controls first, then what has passed, then the most recent. <a href="{{ url('bills') }}?place={{ p.code }}">Filter them by fear, control or status</a>.</p>
+<h2 class="h">Every bill</h2>
+<p class="sub">Most controls first, then what has passed, then the newest. <a href="{{ url('bills') }}?place={{ p.code }}">Filter them by fear, control or status</a>.</p>
 <ul class="list">{% for b in p.bills %}{{ bill_item(b) }}{% endfor %}</ul>
 </div></section>
 {% endif %}

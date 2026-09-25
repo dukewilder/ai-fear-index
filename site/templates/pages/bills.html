@@ -3,8 +3,8 @@
 <section class="block first"><div class="wrap">
 <a class="back" href="{{ url('home') }}">{{ chevron|safe }}The report</a>
 <h1 class="title">Every bill</h1>
-<p class="lead">All {{ "{:,}".format(m.total) }} AI bills, resolutions, rules and orders since January 2025. {{ "{:,}".format(m.controlled) }} of them would put AI, the people building it or the people using it under new government control.</p>
-<p class="sub">Filter them by place, by the fear a measure cites, by the control it would create, or by where it stands. Each links to the legislature's own page where one is on record, and says which site it opens. The address keeps the filters, so any view can be shared.</p>
+<p class="lead">All {{ "{:,}".format(m.total) }} AI bills, resolutions, rules and orders since January 2025. {{ "{:,}".format(m.controlled) }} of them would put AI under new government control.</p>
+<p class="sub">Filter by place, fear, control or status. The address keeps the filters, so any view can be shared.</p>
 {# Inert without script, so it starts hidden and the whole list shows instead. #}
 <form class="bf" data-bills-form hidden>
 <label class="bf-q"><span>Search</span><input type="search" name="q" placeholder="Title words, or a number like SB 53" autocomplete="off" enterkeyhint="search"></label>

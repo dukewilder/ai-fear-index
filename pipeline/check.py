@@ -56,6 +56,12 @@ RECHECK = (1, ("labeling-mandates", "mandatory-reporting"))
 #    committee led the front page's "goes to" line under deepfakes. Rules a government sets for its
 #    own use of AI bind the government, not the people the site is counting controls over.
 NARROWED = (1, ("control", "agency"))
+# Bump, with the fears listed, to ask again about the measures refused a fear whose question has
+# since been told more. Statements keep their verdicts; they were read under the same question.
+# 1: California's SB 53 has frontier developers assess and report catastrophic risk from their
+#    models, and was refused loss of control because "catastrophic risk, as defined" read as a
+#    defined term. The fear's own definition names catastrophic risk.
+RECHECK_FEARS = (1, ("loss-of-control",))
 
 # The heavy, rare controls first: they decide which measure leads the post, and they were the ones
 # most often wrong. Offices next, since the front page counts them.
@@ -80,6 +86,13 @@ NOT_THIS = (
     "agencies, schools, or police buy or run, inventories or assessments of those systems, or "
     "disclosures of the government's own use, and no one outside government;\n"
     "- the quote is about something the definition does not cover.")
+
+# What a fear has turned out to include, where the check read it more narrowly than its definition.
+FEAR_NOTES = {
+    "loss-of-control": ("A measure that has developers of frontier or other advanced AI models assess, report, "
+                        "prevent or manage catastrophic risk from them acts on this harm, even where it defines "
+                        "the term: catastrophic risk is part of this definition."),
+}
 
 # What each control has turned out not to be, from the labels taken off by hand.
 CONTROL_NOTES = {
@@ -255,8 +268,9 @@ def question(m, kind, value, quote, controls, fears=None):
                 'Return JSON: {"verdict": "yes" or "no", "reason": "one short sentence"}')
     if kind == "fear":
         f = (fears or {})[value]
-        ask_this = (f"LABEL: a fear this {what.lower()} cites: {f['name']}\nDEFINITION: {f['definition']}\n\n"
-                    f"{FEAR_QUESTION}")
+        note = FEAR_NOTES.get(value, "") if not m.get("post") else ""
+        ask_this = (f"LABEL: a fear this {what.lower()} cites: {f['name']}\nDEFINITION: {f['definition']}\n"
+                    + (f"{note}\n" if note else "") + f"\n{FEAR_QUESTION}")
     elif kind == "agency":
         ask_this = f"LABEL: an office this measure would hand new power: {value}\n\n{OFFICE_QUESTION}"
     else:
@@ -359,6 +373,26 @@ def recheck(db):
     return len(rows)
 
 
+def recheck_fears(db):
+    """Put back, once, the measures refused one of the listed fears, so they are asked again."""
+    version, fears = RECHECK_FEARS
+    key = f"check:recheck-fears:{version}"
+    if kv_get(db, key):
+        return 0
+    marks = ",".join("?" * len(fears))
+    rows = db.execute(f"SELECT * FROM checks WHERE kind = 'fear' AND verdict = 'no' AND value IN ({marks}) "
+                      "AND target NOT LIKE 'post:%'", fears).fetchall()
+    for r in rows:
+        db.execute("INSERT OR IGNORE INTO tags(target, kind, value, evidence, model, tagged_at) VALUES(?,?,?,?,?,?)",
+                   (r["target"], r["kind"], r["value"], r["evidence"], "recheck", iso()))
+        db.execute("DELETE FROM checks WHERE target=? AND kind=? AND value=?", (r["target"], r["kind"], r["value"]))
+    kv_set(db, key, True)
+    db.commit()
+    if rows:
+        log(f"[check] {len(rows)} fear labels refused under a narrower reading put back to be asked again")
+    return len(rows)
+
+
 def reask_narrowed(db):
     """Ask again, once per wording, about every label of the listed kinds that passed under a wider one.
 
@@ -422,7 +456,7 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
     ask_fn = ask_fn or ask
     released = release_holds(db)
     reasked_about = reask_about(db)
-    reasked = recheck(db)
+    reasked = recheck(db) + recheck_fears(db)
     narrowed = reask_narrowed(db)
     controls = {c["slug"]: c for c in config("controls")}
     fears = {f["slug"]: f for f in config("fears")}

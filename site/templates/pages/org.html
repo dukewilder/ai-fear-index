@@ -1,7 +1,7 @@
 {% from "macros.html" import feed_item %}
 <section class="block first"><div class="wrap">
-{% set g = o.group or 'funders' %}<a class="back" href="{{ url('home', anchor={'funders': 'funding'}.get(g, g)) }}">{{ chevron|safe }}{{ {'funders': 'Who is funding it', 'industry': 'Everyone else lobbying', 'election': 'Election money'}[g] }}</a>
-<p class="kicker">Rank {{ o.rank }} of {{ o.of }} {{ {'funders': 'advocacy groups and foundations', 'industry': 'other lobbying groups', 'election': 'committees'}[g] }} <span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}</p>
+{% set g = o.group or 'funders' %}<a class="back" href="{{ url('home', anchor={'funders': 'funding'}.get(g, g)) }}">{{ chevron|safe }}{{ {'funders': 'Who\'s funding it', 'industry': 'Everyone else lobbying', 'election': 'Election money'}[g] }}</a>
+<p class="kicker">Rank {{ o.rank }} of {{ o.of }} {{ {'funders': 'advocacy groups and foundations', 'industry': 'companies and other groups lobbying', 'election': 'committees'}[g] }} <span class="chip">{{ o.type }}</span>{% if o.flag %}<span class="chip">{{ o.flag }}</span>{% endif %}</p>
 <h1 class="title">{{ o.name }}</h1>
 <p class="hero-num money">{{ o.spent }}</p>
 <p class="hero-text sm">{{ o.breakdown }}</p>
@@ -10,7 +10,7 @@
 {% if o.fears %}
 <section class="block band"><div class="wrap">
 <h2 class="h">Fears its lobbying mentions</h2>
-<p class="sub">What each filing reported, counted once for every fear it names, {{ o.period }}. One filing naming three fears appears against all three, so these do not add up.</p>
+<p class="sub">{% if o.by_filings %}Filings naming each fear{% else %}Reported on filings naming each fear{% endif %}, {{ o.period }}. A filing that names three fears counts under all three.</p>
 <ol class="rank">{% for f in o.fears %}<li><a class="row norank" href="{{ url('fear', f.slug) }}"><span><span class="row-name">{{ f.name }}</span><span class="bar" style="width:{{ f.bar }}%"></span></span><span class="val">{{ f.amount }}</span></a></li>{% endfor %}</ol>
 </div></section>
 {% endif %}
@@ -18,7 +18,7 @@
 {% if o.lobbying %}
 <section class="block"><div class="wrap">
 <h2 class="h">Lobbying that mentions AI</h2>
-<p class="sub">The latest filings on file, whether or not they name one of the fears. A filing reports one total for everything the registrant lobbied on that quarter.</p>
+<p class="sub">The latest filings that mention AI. Each reports one total for everything lobbied on that quarter.</p>
 <ul class="list" style="margin-top:12px">{% for l in o.lobbying %}<li class="item"><span class="item-top"><a class="row-name" href="{{ l.url }}" rel="noopener" target="_blank">{{ l.bill }}</a><span class="val small">{{ l.amount }}</span></span><span class="meta" style="margin-top:0">{{ l.period }}</span>{% if l.fears or l.controls %}<span class="chips">{% for f in l.fears %}<span class="chip">{{ f }}</span>{% endfor %}{% for c in l.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
 </div></section>
 {% endif %}

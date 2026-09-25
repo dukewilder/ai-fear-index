@@ -95,8 +95,8 @@
 {% endif %}
 {% if d.site and (d.site.donate_url or d.site.donate_btc) %}
 <section class="block" id="keep"><div class="wrap">
-<h2 class="h">Pitch in to keep the report running</h2>
-<p class="sub">{{ d.site.donate_text or "It costs money to keep running." }}</p>
+<h2 class="h">Keep the report running</h2>
+{% if d.site.donate_text %}<p class="sub">{{ d.site.donate_text }}</p>{% endif %}
 {# Two ways to pay, side by side where there is room and stacked where there is not. Card first:
    it is how most people will do it, so it gets the filled button and the other gets an outline. #}
 <div class="pay{% if d.site.donate_url and d.site.donate_btc %} two{% endif %}">

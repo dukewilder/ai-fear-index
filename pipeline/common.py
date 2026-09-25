@@ -494,7 +494,11 @@ def redo_briefs(db):
 # 13: that one was right and said "an operator's audit report" without saying an operator of what,
 #    and the plate read "can request operator audit reports for cause". A sentence and its plate
 #    now have to say what AI the measure is about, in the measure's words.
-REDO_EDITION = ("2026-09-21", 13)
+# 2026-09-25: written just after midnight, when every measure had been queued to be read again against
+#    the seventeen fears and the new control for bans and limits. Its totals (355 measures carrying a
+#    control, 68 offices) were counted mid-reading. Written again once the reading is done, before it
+#    posts at nine, so the post counts what the page counts.
+REDO_EDITION = ("2026-09-25", 1)
 
 
 def redo_today(db):
@@ -677,6 +681,22 @@ def source_run(db, name):
 SUFFIXES = re.compile(
     r"\b(inc|incorporated|llc|l l c|corp|corporation|co|company|ltd|limited|lp|llp|plc|pbc|opco|"
     r"holdings|group|the|na|n a|us|usa)\b")
+
+
+# A bill that lets "district attorneys, county counsels, city attorneys and city prosecutors" enforce
+# it names one class of local official four ways, and counted apart they read as four agencies.
+LOCAL_PROSECUTORS = re.compile(r"\b(district|city|county|public|local) (attorneys|prosecutors|counsels)\b|"
+                               r"\bprosecuting attorneys\b", re.I)
+
+
+def office_label(name):
+    """The name an office is counted and shown under."""
+    name = (name or "").strip()
+    m = LOCAL_PROSECUTORS.search(name)
+    if m:
+        prefix = name[:m.start()].strip()
+        return f"{prefix} local prosecutors" if prefix else "Local prosecutors"
+    return name
 
 
 def name_key(name):
@@ -1006,7 +1026,9 @@ def recheck_data_center_labels(db):
 
 
 # Bump when the reading of a last action changes, to read every stored one again.
-STATUS_RULES = 2
+# 3: a one-chamber resolution that chamber adopted is adopted. The Senate agreed to S.Res. 896 and
+#    the site called it not passed, along with state resolutions "Read and Adopted".
+STATUS_RULES = 3
 
 
 def restatus(db):
@@ -1019,8 +1041,13 @@ def restatus(db):
     if kv_get(db, key):
         return 0
     moved = collections.Counter()
-    for r in db.execute("SELECT id, source, status, latest_action FROM measures WHERE source != 'Federal Register'").fetchall():
-        new = status_from_action(r["latest_action"])
+    for r in db.execute("SELECT id, source, status, latest_action, identifier, kind FROM measures "
+                        "WHERE source != 'Federal Register'").fetchall():
+        kind = r["kind"]
+        if r["source"] == "Congress.gov" and CONGRESS_RESOLUTION.match(r["identifier"] or "") and kind != "resolution":
+            kind = "resolution"
+            db.execute("UPDATE measures SET kind = 'resolution' WHERE id = ?", (r["id"],))
+        new = status_from_action(r["latest_action"], r["identifier"], kind)
         if new == r["status"] or (r["source"] == "Congress.gov" and r["status"] == "passed"):
             continue
         db.execute("UPDATE measures SET status = ? WHERE id = ?", (new, r["id"]))
@@ -1101,7 +1128,26 @@ def can_still_pass(m, today, closed=None):
                 and not AT_SIGNER.search(m["latest_action"] or ""))
 
 
-def status_from_action(text):
+# A resolution of one chamber is done when that chamber adopts it. A concurrent or joint resolution
+# still needs the other chamber, and a joint one the signer, so only the one-chamber kind is read
+# this way: Congress's H.Res. and S.Res., and a state's HR, SR or R that Open States calls a
+# resolution. An amendment, a motion or a report adopted is not the resolution adopted.
+CONGRESS_RESOLUTION = re.compile(r"^[HS]\.\s?(?:Con\.\s?)?Res\.\s*\d", re.I)
+ONE_CHAMBER = re.compile(r"^(?:[HS]\.\s?Res\.|[HSA]?\s?R(?:es)?\.?)\s*\d", re.I)
+ADOPTED = re.compile(r"\b(?:adopted|agreed to)\b", re.I)
+NOT_ADOPTION = re.compile(r"\b(?:amendments?|motion|report|committee)\b[^.;]*\b(?:adopted|agreed to)\b"
+                          r"|\b(?:adopted|agreed to)\b[^.;]*\bby (?:the )?committee\b"
+                          r"|\b(?:died|dead|failed|withdrawn|companion)\b", re.I)
+
+
+def one_chamber_resolution(identifier, kind):
+    ident = (identifier or "").strip()
+    if CONGRESS_RESOLUTION.match(ident):
+        return "Con." not in ident
+    return kind == "resolution" and bool(ONE_CHAMBER.match(ident))
+
+
+def status_from_action(text, identifier="", kind=""):
     """passed, failed or pending, from the words of the last action on a measure.
 
     pending means only that no final action is on record. A bill whose session ended without one
@@ -1113,6 +1159,8 @@ def status_from_action(text):
         return "failed"  # a companion carried it into law, or the veto held
     if ENACTED.search(t):
         return "passed"
+    if one_chamber_resolution(identifier, kind) and ADOPTED.search(t) and not NOT_ADOPTION.search(t):
+        return "passed"  # adopted
     if STOPPED.search(NOT_THE_BILL.sub(" ", t)):
         return "failed"
     return "pending"

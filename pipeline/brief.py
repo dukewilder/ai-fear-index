@@ -22,6 +22,7 @@ import re
 import sys
 
 from .common import (EUPHEMISM, STATES, SUMMARY_MAX, Entities, annotate, config, connect, env, kv_set, log,
+                     office_label,
                      can_still_pass, closed_sessions, measures_in_scope, name_key, now, status_label)
 from . import tag
 from .export import gave
@@ -848,10 +849,10 @@ def patterns(db, today, recent):
     for t in db.execute("SELECT target, value FROM tags WHERE kind='agency'"):
         if t["target"] not in controlled:
             continue
-        k = name_key(t["value"])
+        k = name_key(office_label(t["value"]))
         if not k:
             continue
-        named.setdefault(k, (t["value"] or "").strip())
+        named.setdefault(k, office_label(t["value"]))
         by_office[k].add(t["target"])
     if named:
         k = max(by_office, key=lambda x: len(by_office[x]))
@@ -1080,8 +1081,8 @@ def totals(db):
             continue
         if t["kind"] == "control" and t["value"] in known:
             controlled.add(t["target"])
-        elif t["kind"] == "agency" and name_key(t["value"]):
-            named[name_key(t["value"])].add(t["target"])
+        elif t["kind"] == "agency" and name_key(office_label(t["value"])):
+            named[name_key(office_label(t["value"]))].add(t["target"])
     # An office counts when a measure that carries a control names it, which is the page's rule.
     offices = {k for k, ids in named.items() if ids & controlled}
     return {"measures": len(keep), "controlled": len(controlled), "offices": len(offices)}

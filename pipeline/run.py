@@ -90,10 +90,13 @@ def main():
     # first time it sees one, so asking again costs one pass and settles it. Once a day, though:
     # the collector marks a fear done only when it comes back with something, so an article that
     # has no readership to report would otherwise pull this in on every pass for good.
-    if "wikipedia" not in sources and kv_get(db, "wiki_catchup") != today and any(
-            f.get("wikipedia") and not kv_get(db, f"wiki_done:{f['slug']}") for f in config("fears")):
+    # The day is kept with the fears still waiting, so an article given to a fear later the same
+    # day is read that day too, not after tomorrow's.
+    waiting = sorted(f["slug"] for f in config("fears")
+                     if f.get("wikipedia") and not kv_get(db, f"wiki_done:{f['slug']}"))
+    if "wikipedia" not in sources and waiting and kv_get(db, "wiki_catchup") != f"{today}:{','.join(waiting)}":
         sources.append("wikipedia")
-        kv_set(db, "wiki_catchup", today)
+        kv_set(db, "wiki_catchup", f"{today}:{','.join(waiting)}")
         db.commit()
     if args.only:
         sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]

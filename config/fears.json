@@ -357,7 +357,10 @@
       "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative|software|algorithmic device|pricing tool",
       "rent(al)? pric|rental rate|amount of rent|set(ting)? rents?|rent.setting|pricing algorithm|algorithmic pricing|price.fixing|surveillance pricing|dynamic pricing|personali[sz]ed pric|individuali[sz]ed pric|coordinated pric|algorithmic device"
     ],
-    "wikipedia": [],
+    "wikipedia": [
+      "Surveillance_pricing",
+      "RealPage"
+    ],
     "because": "an algorithm decides what people pay"
   },
   {
@@ -402,7 +405,9 @@
       "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
       "\\bscams?\\b|scammer|phishing|robocall|swindl|defraud"
     ],
-    "wikipedia": [],
+    "wikipedia": [
+      "Voice_phishing"
+    ],
     "because": "AI makes scams easier to run"
   },
   {

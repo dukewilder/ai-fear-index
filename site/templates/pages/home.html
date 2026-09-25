@@ -77,7 +77,7 @@
 {% if d.states %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="states">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Where it's happening</h2>
-<p class="sub">Every state, shaded by the AI measures that would put AI, the people building it or the people using it under new government control.</p>
+<p class="sub">Every state, shaded by its AI measures that would put AI under new government control.</p>
 {% if d.state_map %}{{ tile_map(d.state_map) }}{% endif %}
 <p class="kicker tmap-top">The five with the most</p>
 <ol class="rank">{% for s in d.states[:5] %}{{ state_row(s) }}{% endfor %}</ol>
@@ -111,14 +111,14 @@
 {% endif %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="buying">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">What the fear is buying</h2>
-<p class="sub">The government controls written into AI bills, rules and orders, by number of measures.</p>
+<p class="sub">The government controls written into AI bills, rules and orders, by number of bills.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
 <a class="more" href="{{ url('bills') }}">Every bill, by state, fear and control</a>
 </div></section>
 {% if d.beneficiaries %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="benefits">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Who benefits</h2>
-<p class="sub">Agencies and officials that bills carrying a control would hand new power over AI or data centers, by number of bills.</p>
+<p class="sub">Agencies and officials these bills would hand new power, by number of bills.</p>
 <ol class="rank">{% for b in d.beneficiaries %}{{ benefit_row(b) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
@@ -127,7 +127,7 @@
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_passed }} measures have passed. {{ d.law_total }} of them carry a control.{% if d.law_total > d.already_law|length %} The {{ d.already_law|length }} carrying the most are shown.{% endif %}</p>
 <ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>
-<a class="more" href="{{ url('bills') }}?status=passed">Everything that passed, with filters</a>
+<a class="more" href="{{ url('bills') }}?status=passed">Every bill that passed, with filters</a>
 </div></section>
 {% endif %}
 {# The daily brief and the pitch-in sit in base.html now, so every page carries them, not the

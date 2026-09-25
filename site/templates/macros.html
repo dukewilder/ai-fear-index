@@ -1,3 +1,7 @@
+{% macro unit(n, word="bills") -%}
+<span class="unit">{{ word[:-1] if (n|string) == "1" and word.endswith("s") else word }}</span>
+{%- endmacro %}
+
 {% macro move(m) -%}
 {% if m %}{% if m.dir == 'new' %}<span class="mv">New</span>{% elif m.dir == 'down' %}<span class="mv down">▼ {{ m.text }}</span>{% else %}<span class="mv">▲ {{ m.text }}</span>{% endif %}{% endif %}
 {%- endmacro %}
@@ -14,7 +18,7 @@
 {%- endmacro %}
 
 {% macro buying_row(c, href=None) -%}
-<li>{% if href %}<a class="row" href="{{ href }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} already passed</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span>{% if href %}</a>{% else %}</div>{% endif %}</li>
+<li>{% if href %}<a class="row" href="{{ href }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed</span></span><span class="val accent">{{ c.bills }}{{ unit(c.bills) }}</span>{% if href %}</a>{% else %}</div>{% endif %}</li>
 {%- endmacro %}
 
 {% macro org_row(o, stat='fears') -%}
@@ -26,17 +30,17 @@
 {%- endmacro %}
 
 {% macro benefit_row(b) -%}
-<li class="row"><span class="rank-n">{{ b.rank }}</span><span><span class="row-name">{{ b.name }}</span><span class="meta"><span class="chip">{{ b.type }}</span>{% if b.gains %}most common control: {{ b.gains }}{% endif %}</span></span><span class="val accent">{{ b.score }}<span class="unit">{{ b.unit or 'bills' }}</span></span></li>
+<li class="row"><span class="rank-n">{{ b.rank }}</span><span><span class="row-name">{{ b.name }}</span><span class="meta"><span class="chip">{{ b.type }}</span>{% if b.gains %}most common control: {{ b.gains }}{% endif %}</span></span><span class="val accent">{{ b.score }}{{ unit(b.score, b.unit or 'bills') }}</span></li>
 {%- endmacro %}
 
 {% macro control_row(c) -%}
-<li><a class="row" href="{{ url('bills') }}?control={{ c.slug }}" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.not_passed }} not passed{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></a></li>
+<li><a class="row" href="{{ url('bills') }}?control={{ c.slug }}" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.not_passed }} not passed{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}{{ unit(c.bills) }}</span></a></li>
 {%- endmacro %}
 
 {# Ranked by what the report is about: the measures that would put AI under new government control.
    The total rides in the line under the name, so the number on the right is never read as it. #}
 {% macro state_row(s) -%}
-<li><a class="row" href="{{ url('state', s.slug) }}"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} of {{ s.bills }} AI measure{{ '' if s.bills == '1' else 's' }} carry a control · {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.controlled }}<span class="unit">bills</span></span></a></li>
+<li><a class="row" href="{{ url('state', s.slug) }}"><span class="rank-n">{{ s.rank }}</span><span><span class="row-name">{{ s.name }}</span><span class="meta">{{ s.controlled }} of {{ s.bills }} AI measure{{ '' if s.bills == '1' else 's' }} carry a control · {{ s.passed }} passed{% if s.top_fear %} · loudest fear: {{ s.top_fear }}{% endif %}</span></span><span class="val accent">{{ s.controlled }}{{ unit(s.controlled) }}</span></a></li>
 {%- endmacro %}
 
 {# The state map: one square per state, shaded by the measures that would put AI under new government

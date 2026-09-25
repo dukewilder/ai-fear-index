@@ -337,8 +337,11 @@
     function level(v, top) {
       return !v || !top ? 0 : Math.min(4, 1 + Math.floor(3.99 * Math.log(1 + v) / Math.log(1 + top)));
     }
+    // The fear as it reads mid-sentence: "the China race", "AI scams", never "china race" or "ai scams".
     function fearName() {
-      return sel && fear !== "all" ? sel.options[sel.selectedIndex].text : "";
+      if (!sel || fear === "all") return "";
+      var o = sel.options[sel.selectedIndex];
+      return o.getAttribute("data-say") || o.text;
     }
     function paint() {
       var top = 0;
@@ -354,7 +357,7 @@
         if (b) b.textContent = counts(t.getAttribute("data-code"))[metric];
       });
       if (topEl) topEl.textContent = top;
-      if (cap) cap.textContent = CAPS[metric] + (fearName() ? ", citing " + fearName().toLowerCase() : "");
+      if (cap) cap.textContent = CAPS[metric] + (fearName() ? ", citing " + fearName() : "");
       if (picked) read(picked, false);
     }
     function words(n, one, many) { return n + " " + (n === 1 ? one : many); }
@@ -381,7 +384,7 @@
         var line = el("p", "tmap-line");
         line.appendChild(el("b", null, String(c[1])));
         line.appendChild(document.createTextNode(" of " + words(c[0], "AI measure", "AI measures") +
-          (f ? " citing " + f.toLowerCase() : "") + " would put AI under new government control."));
+          (f ? " citing " + f : "") + " would put AI under new government control."));
         out.appendChild(line);
         var stats = el("ul", "tmap-stats");
         var stat = function (n, label) {
@@ -395,7 +398,7 @@
         out.appendChild(stats);
         if (!f && info[3]) out.appendChild(el("p", "tmap-fear", "Loudest fear: " + info[3]));
       } else {
-        out.appendChild(el("p", "tmap-line", "No AI measures" + (f ? " citing " + f.toLowerCase() : "") + " on file yet."));
+        out.appendChild(el("p", "tmap-line", "No AI measures" + (f ? " citing " + f : "") + " since January 2025."));
       }
       var go = el("a", "tmap-go", "Open " + name + " \u2192");
       go.href = t.getAttribute("href");

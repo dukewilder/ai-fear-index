@@ -223,6 +223,8 @@ RULES = (
     "the sentence. Not required to restore the water, but put under the department that decides "
     "whether it has. Not required to submit to audits an office can ask to see, but gives that "
     "office the power to demand the audit reports.\n"
+    "Duties a measure puts on an office are that office's job, not a power it gains to put duties "
+    "on anyone else. Do not turn them into one.\n"
     "An auditor, assessor, certifier, or any other firm a company has to hire holds no power in "
     "this sentence. The office that can demand its work or act on it holds the power, and the "
     "sentence is about that office. Keep any limit the measure puts on the power, such as for "
@@ -580,6 +582,15 @@ def unpowered_body(text, offices):
                    for o in offices if o)
 
 
+# Pennsylvania's HB 2800 is titled as "imposing duties on the Pennsylvania Emergency Management Agency
+# and the Attorney General", and the 25 September edition was written as giving both "the power to impose
+# duties on frontier developers". The duties are the offices' own; the measure sets the developers'.
+DUTIES_ON_OFFICE = re.compile(r"\bimpos\w* (?:certain |new |additional )?(?:duties|responsibilities|obligations) "
+                              r"(?:on|upon)\b", re.I)
+POWER_TO_IMPOSE = re.compile(r"\bpower to (?:impose|set|place|put) (?:\w+ ){0,2}(?:duties|obligations|requirements)\b",
+                             re.I)
+
+
 def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction="", raw="", offices=None):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
@@ -631,6 +642,9 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     hired = hired_fault(text)
     if hired:
         return hired
+    if raw and DUTIES_ON_OFFICE.search(raw) and POWER_TO_IMPOSE.search(text):
+        return ("turns the duties the measure puts on an office into a power to impose duties; those duties "
+                "are the office's own job, so say what the measure does to the people it covers, in its words")
     if raw:
         borrowed = borrowed_office(text, raw, jurisdiction)
         if borrowed:

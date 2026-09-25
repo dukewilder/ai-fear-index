@@ -81,6 +81,16 @@ def check_brief_prompt():
              "submit to independent audits reported to the attorney general")
     assert "duty" in brief.why_not(duty, "requires operators of companion chatbots to perform risk",
                                    dbody, True, "", "", "California"), "the duty gate is not wired in"
+    # Duties a measure puts on an office are the office's job, not a power to impose duties on others.
+    pa_raw = ("An Act providing for artificial intelligence risk prevention; establishing standards for frontier "
+              "developers in addressing critical safety incidents and catastrophic risks; imposing duties on the "
+              "Pennsylvania Emergency Management Agency and the Attorney General; and imposing penalties.")
+    pa_bad = ("Pennsylvania would give the Pennsylvania Emergency Management Agency and the Attorney General the "
+              "power to impose duties on frontier developers over critical incidents and catastrophic risks.")
+    pa_body = brief.norm(pa_raw)
+    assert "duties" in brief.why_not(pa_bad, "imposing duties on the Pennsylvania Emergency Management Agency",
+                                     pa_body, False, "", "", "Pennsylvania", raw=pa_raw), "the duties gate is not wired in"
+    assert "Duties a measure puts on an office" in brief.RULES
     assert brief.starts_later("commencing January 1, 2029, the agency", "2026-09-20") == "2029"
     assert brief.starts_later("effective January 1, 2025, the agency", "2026-09-20") == ""
     later = ("California puts AI auditors under registration with the Government Operations Agency, "
@@ -1843,6 +1853,12 @@ def check_fears_explained(dist, data):
     for n in (data["bills_meta"]["total"], data["bills_meta"]["controlled"]):
         assert n < 100 or f"{n:,}" not in body, f"the method page carries a running total ({n:,})"
     assert f"The {word} fears this report follows" in home and 'href="/method/#fears"' in home
+    # Each fear's page says what the fear covers: the one definition every label rests on.
+    import html as _html
+    for fp in data["fear_pages"]:
+        page = _html.unescape(re.sub(r"\s+", " ", (dist / "fear" / fp["slug"] / "index.html").read_text()))
+        assert fp["definition"] and fp["definition"] in page, \
+            f"the {fp['slug']} page does not show its definition"
     for page in dist.rglob("*.html"):
         assert "Every fear about AI" not in page.read_text(), f"{page} still claims every fear"
     assert "Every fear" not in data["site"]["tagline"]

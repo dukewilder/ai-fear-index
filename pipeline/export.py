@@ -460,7 +460,7 @@ def export(db, out_dir, base=""):
         if prev and f["slug"] in prev.get("fear_rank", {}):
             delta = prev["fear_rank"][f["slug"]] - i
             move = {"dir": "up", "text": str(delta)} if delta > 0 else {"dir": "down", "text": str(-delta)} if delta < 0 else None
-        fear_rows.append({"rank": i, "name": f["name"], "slug": f["slug"], "score": str(st["index"]),
+        fear_rows.append({"rank": i, "name": f["name"], "say": f["sentence"], "slug": f["slug"], "score": str(st["index"]),
                           "bar": max(3, st["index"]), "move": move, "line": fear_line(st),
                           "new_week": st["new_week"], "segments": segments(st)})
     grid = build_grid(order, fear_stats, {"news30": news_end, "wiki30": wiki_end}, today)
@@ -1291,7 +1291,8 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
     if st["advocacy"]:
         evidence.append([money(st["advocacy"]), "spent lobbying on it by advocacy groups, past year"])
     latest = [i for i in feed if f["slug"] in (i.get("fears") or [])][:6]
-    return {"slug": f["slug"], "name": f["name"], "rank": str(rank), "of": str(of), "score": str(st["index"]),
+    return {"slug": f["slug"], "name": f["name"], "definition": f["definition"],
+            "rank": str(rank), "of": str(of), "score": str(st["index"]),
             "score_text": "on the Fear Index",
             "parts": [{"name": "Bills", "cls": "k1", "pct": (st.get("parts") or {}).get("bills", 0), "value": f"{len(st['measures']):,}"},
                       {"name": "Lobbying filings", "cls": "k2", "pct": (st.get("parts") or {}).get("filings", 0), "value": f"{st['filings']:,}"},

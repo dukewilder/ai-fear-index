@@ -56,7 +56,7 @@
 <button type="button" class="filter" data-metric="2" aria-pressed="false">Already law</button>
 <button type="button" class="filter" data-metric="0" aria-pressed="false">All AI measures</button>
 </div>
-<label class="tmap-sel"><span>Citing</span><select data-fear><option value="all">Any fear</option>{% for f in d.fears %}<option value="{{ f.slug }}">{{ f.name }}</option>{% endfor %}</select></label>
+<label class="tmap-sel"><span>Citing</span><select data-fear><option value="all">Any fear</option>{% for f in d.fears %}<option value="{{ f.slug }}" data-say="{{ f.say or f.name }}">{{ f.name }}</option>{% endfor %}</select></label>
 </div>
 <p class="tmap-cap"><span data-map-cap>AI measures that would put AI under new government control</span></p>
 {% endif %}

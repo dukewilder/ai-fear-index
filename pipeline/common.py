@@ -498,7 +498,11 @@ def redo_briefs(db):
 #    the seventeen fears and the new control for bans and limits. Its totals (355 measures carrying a
 #    control, 68 offices) were counted mid-reading. Written again once the reading is done, before it
 #    posts at nine, so the post counts what the page counts.
-REDO_EDITION = ("2026-09-25", 1)
+#    2: written again, it led with Pennsylvania giving its Emergency Management Agency and Attorney
+#    General "the power to impose duties on frontier developers". The measure imposes duties on those
+#    two offices and sets the developers' standards itself. A duty on an office is now its job, not a
+#    power over anyone, in the rules and in the gate.
+REDO_EDITION = ("2026-09-25", 2)
 
 
 def redo_today(db):

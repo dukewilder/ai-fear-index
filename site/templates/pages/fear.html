@@ -3,6 +3,7 @@
 <a class="back" href="{{ url('home', anchor='index') }}">{{ chevron|safe }}The Fear Index</a>
 <p class="kicker">Rank {{ f.rank }} of {{ f.of }}</p>
 <h1 class="title">{{ f.name }}</h1>
+{% if f.definition %}<p class="sub def">{{ f.definition }}</p>{% endif %}
 <p class="hero-num sm">{{ f.score }}</p>
 <p class="hero-text sm">{{ f.score_text }}</p>
 {% if f.parts %}<div class="parts">{% for p in f.parts %}<div class="part"><span class="part-l">{{ p.name }}</span><span class="part-bar"><i class="{{ p.cls }}" style="width:{{ p.pct }}%"></i></span><span class="part-v">{{ p.value }}</span></div>{% endfor %}</div>{% endif %}

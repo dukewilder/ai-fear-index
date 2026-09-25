@@ -6,6 +6,10 @@ from .common import (SUMMARY_MAX, Http, env, iso, kv_get, kv_set, log, looks_ai,
 
 BASE = "https://api.congress.gov/v3"
 SUMMARY_CAP = 150  # new bills found by summary per run, at two requests each
+# Bump to read every title, and every summary, this Congress has once more, for a subject the report
+# has started counting. 2 and 4: self-driving vehicles, counted from 25 September 2026.
+TITLE_SCAN = 2
+SUMMARY_SCAN = 4
 TYPE_LABEL = {"HR": "H.R.", "S": "S.", "HRES": "H.Res.", "SRES": "S.Res.", "HJRES": "H.J.Res.",
               "SJRES": "S.J.Res.", "HCONRES": "H.Con.Res.", "SCONRES": "S.Con.Res."}
 TYPE_SLUG = {"HR": "house-bill", "S": "senate-bill", "HRES": "house-resolution", "SRES": "senate-resolution",
@@ -30,7 +34,9 @@ def run(db, state, mode):
     since = kv_get(db, "congress_since")
     started = iso()
     params = {"api_key": key, "format": "json", "limit": 250}
-    if since and mode != "backfill":
+    # A subject the report starts counting is looked for in every title this Congress has, once.
+    whole = not kv_get(db, f"congress_titles:{congress}:{TITLE_SCAN}")
+    if since and mode != "backfill" and not whole:
         params["fromDateTime"] = since[:19] + "Z"
     matched, offset, pages = [], 0, 0
     # A bill already on file is followed whatever its title, so one found by its summary still has
@@ -49,6 +55,8 @@ def run(db, state, mode):
             break
         offset += params["limit"]
     log(f"[congress] scanned {pages} pages, {len(matched)} AI-titled bills")
+    if whole and len(bills) < params["limit"]:
+        kv_set(db, f"congress_titles:{congress}:{TITLE_SCAN}", iso())
     added = 0
     for b in matched:
         added += store_bill(db, http, key, congress, (b.get("type") or "").upper(), b.get("number"), b)
@@ -58,7 +66,7 @@ def run(db, state, mode):
     by_summary, capped = 0, False
     try:
         # The first scan reads every summary this Congress has; after that, what changed since.
-        full = not kv_get(db, f"congress_summaries:{congress}:3")
+        full = not kv_get(db, f"congress_summaries:{congress}:{SUMMARY_SCAN}")
         seen = {(b.get("type") or "").upper() + str(b.get("number")) for b in matched}
         # The full scan names its start: asked with no date, the API answered with one short page.
         begin = f"{2 * congress + 1787}-01-01T00:00:00Z"
@@ -73,7 +81,7 @@ def run(db, state, mode):
             added += store_bill(db, http, key, congress, kind, number)
             db.commit()
         if full and not capped:
-            kv_set(db, f"congress_summaries:{congress}:3", iso())
+            kv_set(db, f"congress_summaries:{congress}:{SUMMARY_SCAN}", iso())
     except Exception as exc:  # the title scan still stands
         log(f"[congress] summary scan failed: {str(exc)[:200]}")
     kv_set(db, "congress_since", started)

@@ -23,9 +23,12 @@ INCLUDE = ["abstracts", "sponsorships", "sources", "versions"]
 # No Robo Bosses Act and Colorado's delay of its AI Act were missing because of it. The stored
 # offset points at the fourth query, which in this order is the first of the four never searched.
 # Data center bills are counted whether or not they say AI, and the tagger sorts the ones about
-# data centers from the ones that mention one in passing.
+# data centers from the ones that mention one in passing. So are bills on vehicles that drive
+# themselves, from 25 September 2026, searched by the four names statutes give them; they sit
+# before "data center" so that search stays last.
 QUERIES = ["artificial intelligence", "deepfake", "chatbot", "automated decision", "algorithmic",
-           "synthetic media", "digital replica", "data center"]
+           "synthetic media", "digital replica", "autonomous vehicle", "automated driving", "self-driving",
+           "driverless", "data center"]
 MAX_REQUESTS = 240  # per run
 DAY_BUDGET = 240    # the free tier allows 250 a day, so stop short of it and resume tomorrow
 RETRY_HOURS = 3     # a refusal is their rolling day, not ours, so wait it out and go again

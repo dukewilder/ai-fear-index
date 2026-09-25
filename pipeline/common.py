@@ -613,6 +613,7 @@ def connect(path):
     retag_ai_titles(db)
     retag_ai_bills(db)
     retag_data_centers(db)
+    retag_self_driving(db)
     recheck_data_center_labels(db)
     restatus(db)
     return db
@@ -879,11 +880,21 @@ def strip_html(text):
     return re.sub(r"\s+", " ", text.replace("\u00a0", " ")).strip()
 
 
+# Vehicles that drive themselves, as statutes and sponsors name them: the owner's decision of 25
+# September 2026 counts them with AI whether or not a bill says AI, as data centers are counted. An
+# AI is the driver, and a bill on robotaxis or driverless trucks decides who may put one on the road.
+# Not a bare "automated vehicle": Washington's "automated vehicle noise enforcement cameras" are
+# cameras, and "automated vehicle identification" is a toll reader.
+AV_TERMS = (r"autonomous (?:motor )?vehicles?|self[- ]driving|driverless|automated driving(?: systems?)?|"
+            r"automated motor vehicles?|(?:highly|fully) automated vehicles?|robo[- ]?taxis?|"
+            r"autonomous (?:trucks?|buses|shuttles?)")
+AV_TEXT = re.compile(rf"(?i)\b(?:{AV_TERMS})\b")
+
 AI_TEXT = re.compile(
     r"(?i)\b(artificial intelligence|machine learning|algorithm(ic|s)?|automated decision|deep ?fakes?|"
     r"synthetic media|digital replicas?|chat ?bots?|large language models?|foundation models?|"
     r"frontier (ai|models?)|generative|data cent(er|re)s?|autonomous weapons?|facial recognition|"
-    r"neural network|computer vision)\b|\bA\.?I\.?\b")
+    r"neural network|computer vision|" + AV_TERMS + r")\b|\bA\.?I\.?\b")
 
 
 def looks_ai(*texts):
@@ -929,9 +940,14 @@ def title_names_data_centers(title):
     return bool(DC_TITLE.search(t)) and not NOT_A_BUILDING.search(t)
 
 
+def title_names_self_driving(title):
+    return bool(AV_TEXT.search(title or ""))
+
+
 def title_settles(title):
-    """A title that decides on its own that a bill is in the report: it names AI or data centers."""
-    return title_names_ai(title) or title_names_data_centers(title)
+    """A title that decides on its own that a bill is in the report: it names AI, data centers, or
+    vehicles that drive themselves."""
+    return title_names_ai(title) or title_names_data_centers(title) or title_names_self_driving(title)
 
 
 # Bump to send the tagger again every measure it turned down that names data centers.
@@ -978,6 +994,34 @@ def retag_data_centers(db):
     if ids or offices:
         log(f"[repair] {len(ids)} data center measures queued to be read again, "
             f"{len(offices)} offices refused on them put back to be asked again")
+    return len(ids)
+
+
+# Bump to send the tagger and the check again every measure that names vehicles that drive themselves.
+RETAG_SELF_DRIVING = 1
+
+
+def retag_self_driving(db):
+    """Queue once, under the rule that counts self-driving vehicles, every measure on file naming them.
+
+    Turned down by the tagger or taken out by the check's question about AI, they were read under a
+    rule that did not count them; counted already, they were read for power over AI and not over the
+    vehicles. Each is read again, and a verdict that took one out is asked again under the new wording.
+    """
+    key = f"retag:self-driving:{RETAG_SELF_DRIVING}"
+    if kv_get(db, key):
+        return 0
+    ids = [r["id"] for r in db.execute(
+        "SELECT m.id, m.kind, m.jurisdiction, m.session, m.introduced_date, m.title, m.summary "
+        "FROM measures m JOIN tag_runs t ON t.target = m.id")
+        if in_window(r) and AV_TEXT.search(f"{r['title'] or ''}\n{r['summary'] or ''}")]
+    for mid in ids:
+        db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target = ?", (mid,))
+        db.execute("DELETE FROM checks WHERE target = ? AND kind = 'about'", (mid,))
+    kv_set(db, key, True)
+    db.commit()
+    if ids:
+        log(f"[repair] {len(ids)} measures naming self-driving vehicles queued to be read again")
     return len(ids)
 
 

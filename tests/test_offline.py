@@ -1376,6 +1376,33 @@ def check_status_and_coverage():
         assert title_names_data_centers(title) == want, f"data center title {title!r}"
     assert title_settles("Large-Load Data Centers") and title_settles("AI Whistleblower Protection Act")
     assert not title_settles("Relating to property tax exemptions")
+    # Self-driving vehicle bills count whether or not they say AI (the owner's call, 25 September 2026),
+    # and a title naming them settles it, by any of the names statutes give them.
+    from pipeline.common import AI_TEXT, retag_self_driving, RETAG_SELF_DRIVING
+    for title, want in (("Autonomous vehicles; operation without a human driver", True),
+                        ("Relating to the operation of automated motor vehicles", True),
+                        ("Automated driving systems; commercial vehicles", True), ("Self-Driving Trucks Safety Act", True),
+                        ("Prohibits driverless heavy-duty trucks", True), ("Robotaxi permits; local authority", True),
+                        ("Highly automated vehicles; insurance", True), ("Relating to motor vehicle registration fees", False),
+                        ("Authorizing the use of automated vehicle noise enforcement cameras", False)):
+        assert title_settles(title) == want, f"self-driving title {title!r}"
+    assert AI_TEXT.search("requires a permit before an automated driving system operates on a highway")
+    sdb = connect(":memory:")
+    for mid, title, summary, ai in (("s1", "Motor vehicles; amendments", "Allows autonomous vehicles without a driver.", 0),
+                                    ("s2", "Autonomous vehicles; permits", "", 1),
+                                    ("s3", "Relating to fishing licenses", "Raises the fee.", 0)):
+        upsert(sdb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "session": "89R",
+                                 "identifier": mid, "title": title, "summary": summary, "status": "pending",
+                                 "introduced_date": "2025-03-01", "url": f"u-{mid}"})
+        sdb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', ?, 'then')", (mid, ai))
+    # s1 was taken out by the question about AI under the wording that did not count these vehicles
+    sdb.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) VALUES("
+                "'s1', 'about', 'ai', 'x', 'no', 'not about AI', 'fake', 'then')")
+    sdb.execute("DELETE FROM kv WHERE key = ?", (f"retag:self-driving:{RETAG_SELF_DRIVING}",))
+    sdb.commit()
+    assert retag_self_driving(sdb) == 2 and retag_self_driving(sdb) == 0, "the self-driving requeue is not once only"
+    assert {r[0] for r in sdb.execute("SELECT target FROM tag_runs WHERE text_hash IS NULL")} == {"s1", "s2"}
+    assert not sdb.execute("SELECT 1 FROM checks WHERE target = 's1'").fetchall(), "the old verdict still takes it out"
     rdb = connect(":memory:")
     for mid, title, summary, ai in (("d1", "Large-Load Data Centers", "", 0),
                                     ("d2", "Relating to utilities", "Sets a rate class for large load customers.", 0),
@@ -1693,7 +1720,7 @@ def check_status_and_coverage():
     # What the report counts with AI is not the second reading's to narrow. The first wording took
     # out 171 data center bills the site launched with, and an ELVIS Act; the question names them.
     yes_part = check.ABOUT_QUESTION.split("Answer no")[0]
-    for subject in ("data centers", "voice and likeness", "synthetic", "automated decision"):
+    for subject in ("data centers", "voice and likeness", "synthetic", "automated decision", "drive themselves"):
         assert subject in yes_part, f"the about question no longer counts {subject}"
     # Measures the first wording took out are put back and asked again, once. One the tagger has
     # read again since, on new text, keeps the tagger's answer.

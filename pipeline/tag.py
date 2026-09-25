@@ -75,14 +75,17 @@ def propose(key, fears, controls, doc, is_measure):
     control_block = f"\nCONTROLS (what the measure itself would impose):\n{definitions(controls)}\n" if is_measure else ""
     schema = ('{"ai_related": true or false, "fears": [fear slugs], "controls": [control slugs], '
               '"agencies": ["government bodies the measure would give new authority, duties, or enforcement power over AI, '
-              'data centers, or the people and companies who build or use AI, '
+              'data centers, self-driving vehicles, or the people and companies who build or use AI, '
               'named with their jurisdiction, for example \\"Colorado Attorney General\\""]}') if is_measure else \
         '{"ai_related": true or false, "fears": [fear slugs]}'
     user = (f"FEARS (harms the text may cite):\n{definitions(fears)}\n{control_block}\nTEXT\n{doc}\n\n"
             f"Return JSON: {schema}\nRules: ai_related is true only if the text is substantially about artificial "
-            "intelligence, algorithms, automated decisions, synthetic media, or data centers: their building, power, "
-            "water, land, siting, rates or taxes, and the large electricity loads they bring, whether or not the text "
-            "says AI (not a data program or office that happens to be called a data center). A fear counts only if "
+            "intelligence, algorithms, automated decisions, synthetic media, data centers, or vehicles that drive "
+            "themselves. Data centers count with their building, power, water, land, siting, rates or taxes, and the "
+            "large electricity loads they bring, whether or not the text says AI (not a data program or office that "
+            "happens to be called a data center). Vehicles that drive themselves count whether or not the text says "
+            "AI: autonomous vehicles, automated driving systems, robotaxis and driverless trucks, and their testing, "
+            "permits, operation, insurance and liability. A fear counts only if "
             "the text states or clearly invokes that harm. Rules a measure sets for government bodies' own use of "
             "AI, such as inventories, assessments, purchasing rules or policies for the systems agencies, schools or "
             "police use, bind the government itself, not the people who build, sell or use AI: they are not controls, "
@@ -323,7 +326,8 @@ def run(db, state, mode):
             ai = True
         # The same for a bill, and for the same reason: most states publish no summary, and the
         # model given a bare title said "Artificial Intelligence Amendments" was not about AI. A
-        # title naming data centers settles it the same way, as the report counts them with AI.
+        # title naming data centers or self-driving vehicles settles it the same way, as the report
+        # counts them with AI.
         # Not a resolution, which can name AI in honouring a school team.
         if not ai and target not in resolutions and not target.startswith("fr-") and title_settles(title):
             ai = True

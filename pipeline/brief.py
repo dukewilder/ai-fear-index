@@ -327,7 +327,8 @@ AI_WORD = re.compile(r"\b(?:AI|A\.I\.|artificial[\s-]intelligence|chatbots?|chat
                      r"algorithm\w*|automated|machine[\s-]learning|deepfakes?|deep[\s-]fakes?|synthetic|"
                      r"generative|data[\s-]cent(?:er|re)s?|facial[\s-]recognition|biometric\w*|bots?|neural|"
                      r"LLMs?|frontier|autonomous|robot\w*|digital[\s-]replicas?|chips?|semiconductors?|"
-                     r"compute|computing|GPUs?|integrated[\s-]circuits?)\b", re.I)
+                     r"compute|computing|GPUs?|integrated[\s-]circuits?|self[\s-]driving|driverless|"
+                     r"robo[\s-]?taxis?)\b", re.I)
 UNSAID = "does not say what AI it is about; name it in the measure's words, such as the chatbot, the model or the data center"
 # The word itself. A data center bill that never says AI is counted all the same, and a sentence or
 # a headline that calls its data centers "AI data centers" would be putting words in the measure.

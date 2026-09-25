@@ -13,7 +13,8 @@ REVOKED = re.compile(r"\b(?:revoked|superseded)\s+by\b", re.I)
 # The executive branch is where the bills send the power, so the search reaches as wide as the
 # state search does. Anything whose title and abstract do not mention AI is pruned below.
 TERMS = ["artificial intelligence", "deepfake", "data center", "machine learning", "automated decision",
-         "synthetic media", "digital replica", "chatbot", "facial recognition", "large language model"]
+         "synthetic media", "digital replica", "chatbot", "facial recognition", "large language model",
+         "automated driving", "autonomous vehicle"]
 
 
 def run(db, state, mode):

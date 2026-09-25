@@ -21,7 +21,7 @@ import pathlib
 import re
 import sys
 
-from .common import (EUPHEMISM, STATES, Entities, annotate, config, connect, env, kv_set, log,
+from .common import (EUPHEMISM, STATES, SUMMARY_MAX, Entities, annotate, config, connect, env, kv_set, log,
                      can_still_pass, closed_sessions, measures_in_scope, name_key, now, status_label)
 from . import tag
 from .export import gave
@@ -195,7 +195,7 @@ def pool(db, today, days=POOL_DAYS, limit=12):
 
 def doc(row):
     return f"Jurisdiction: {row['jurisdiction_name']}\nIdentifier: {row['identifier']}\n" \
-           f"Title: {row['title'] or ''}\nSummary: {(row['summary'] or '')[:6000]}"
+           f"Title: {row['title'] or ''}\nSummary: {(row['summary'] or '')[:SUMMARY_MAX]}"
 
 
 SYSTEM = (

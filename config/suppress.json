@@ -71,6 +71,54 @@
       "why": "An affirmative defense for a disclosed deepfake, which rewards a label rather than requiring one."
     },
     {
+      "url": "https://openstates.org/ky/bills/2025RS/SB4/",
+      "kind": "control",
+      "value": "mandatory-reporting",
+      "why": "The disclosure is of the state's own use of AI. Nothing in the bill makes anyone outside government report."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/SB4/",
+      "kind": "control",
+      "value": "new-agency-powers",
+      "why": "The committee sets procedures for state agencies' own use of AI. It gains no authority over anyone outside government."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/SB4/",
+      "kind": "agency",
+      "value": "Kentucky Artificial Intelligence Governance Committee",
+      "why": "It governs state agencies' own use of AI and gains no authority over anyone outside government."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/SB4/",
+      "kind": "agency",
+      "value": "Kentucky Commonwealth Office of Technology",
+      "why": "Its new standards and regulations are for state agencies' own use of AI, not for anyone outside government."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/HB672/",
+      "kind": "control",
+      "value": "mandatory-reporting",
+      "why": "The disclosure is of the state's own use of AI. Nothing in the bill makes anyone outside government report."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/HB672/",
+      "kind": "control",
+      "value": "new-agency-powers",
+      "why": "The committee sets procedures for state agencies' own use of AI. It gains no authority over anyone outside government."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/HB672/",
+      "kind": "agency",
+      "value": "Kentucky Artificial Intelligence Governance Committee",
+      "why": "It governs state agencies' own use of AI and gains no authority over anyone outside government."
+    },
+    {
+      "url": "https://openstates.org/ky/bills/2025RS/HB672/",
+      "kind": "agency",
+      "value": "Kentucky Commonwealth Office of Technology",
+      "why": "Its new standards and regulations are for state agencies' own use of AI, not for anyone outside government."
+    },
+    {
       "url": "https://openstates.org/sc/bills/2025-2026/S902/",
       "kind": "control",
       "value": "license-to-build",

@@ -1,4 +1,4 @@
-{% from "macros.html" import org_row, benefit_row, feed_item, buying_row, quote_card %}
+{% from "macros.html" import org_row, benefit_row, feed_item, buying_row, quote_card, bill_item %}
 <section class="block first"><div class="wrap">
 <a class="back" href="{{ url('home', anchor='index') }}">{{ chevron|safe }}The Fear Index</a>
 <p class="kicker">Rank {{ f.rank }} of {{ f.of }}</p>
@@ -29,7 +29,7 @@
 <section class="block band"><div class="wrap">
 <h2 class="h">What it's buying</h2>
 <p class="sub">The government controls written into the bills that cite this fear.</p>
-<ol class="rank">{% for c in f.buying %}{{ buying_row(c) }}{% endfor %}</ol>
+<ol class="rank">{% for c in f.buying %}{{ buying_row(c, url('bills') ~ '?fear=' ~ f.slug ~ '&control=' ~ c.slug) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 
@@ -79,6 +79,7 @@
 <section class="block band"><div class="wrap">
 <h2 class="h">The bills</h2>
 <p class="sub">The ones carrying the most controls, first.</p>
-<ul class="list">{% for b in f.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="stamp">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+<ul class="list" data-all>{% for b in f.bills %}{{ bill_item(b) }}{% endfor %}</ul>
+{% if f.bills_total %}<a class="more" href="{{ url('bills') }}?fear={{ f.slug }}">All {{ f.bills_total }} bill{{ '' if f.bills_total == 1 else 's' }} citing it, with filters</a>{% endif %}
 </div></section>
 {% endif %}

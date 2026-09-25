@@ -26,7 +26,7 @@ CHEVRON = ('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
            '<path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
            'stroke-linecap="round" stroke-linejoin="round"/></svg>')
 NAV_FOR = {"home": "", "fear": "", "org": "", "feed": "feed", "method": "method", "states": "states",
-           "state": "states"}
+           "state": "states", "bills": "bills"}
 
 
 def esc(value):
@@ -196,7 +196,12 @@ def share_card(path, big, label, sub="", kicker="", foot="aifearreport.com", h=N
 
 
 def card_specs(d):
-    """Which cards to draw: one per fear and one per state. The front page has the standing one."""
+    """Which cards to draw: one per fear and one per state, and the list of every bill. The front
+    page has the standing one."""
+    if d.get("bills_meta"):
+        m = d["bills_meta"]
+        yield ("bills", f"{m['total']:,}", "AI bills, resolutions, rules and orders since January 2025",
+               f"{m['controlled']:,} would put AI under new government control. By state, fear and control.")
     for f in d["fear_pages"]:
         yield f"fear-{f['slug']}", f["score"], f["name"], \
             f"{f['score']} of 100" + (f" · {f['line']}" if f.get("line") else "")
@@ -275,7 +280,7 @@ def map_card(path, m, foot="aifearreport.com", h=None):
 
 
 def make_url(preview, base):
-    routes = {"home": "", "feed": "feed", "method": "method", "states": "states"}
+    routes = {"home": "", "feed": "feed", "method": "method", "states": "states", "bills": "bills"}
 
     def url(kind, slug=None, anchor=None):
         if kind in ("fear", "org"):
@@ -360,6 +365,12 @@ def page_specs(d):
                               ("method", "How the numbers work", "How the numbers work")):
         specs.append({"kind": kind, "route": kind, "out": f"{kind}/index.html", "template": f"{kind}.html",
                       "head": head, "crumb": crumb, "ctx": {}})
+    if d.get("bills"):
+        n = len(d["bills"])
+        specs.append({"kind": "bills", "route": "bills", "out": "bills/index.html", "template": "bills.html",
+                      "head": f"All {n:,} US AI bills since 2025, by state, fear and control", "crumb": "Every bill",
+                      "ctx": {"fear_name": {f["slug"]: f["name"] for f in d["bills_meta"]["fears"]},
+                              "control_chip": {c["slug"]: c["chip"] for c in d["bills_meta"]["controls"]}}})
     if d.get("state_pages"):
         specs.append({"kind": "states", "route": "states", "out": "states/index.html", "template": "states.html",
                       "head": "AI bills and laws by state: a map of where they would add government control",
@@ -374,7 +385,7 @@ def page_specs(d):
         s["nav"] = NAV_FOR[s["kind"]]
         s["card"] = (f"fear-{s['ctx']['f']['slug']}" if s["kind"] == "fear" else
                      f"state-{s['ctx']['p']['slug']}" if s["kind"] == "state" else
-                     "states" if s["kind"] == "states" else None)
+                     s["kind"] if s["kind"] in ("states", "bills") else None)
         s["description"] = None
         if s["kind"] == "fear":
             f = s["ctx"]["f"]
@@ -397,6 +408,11 @@ def page_specs(d):
         elif s["kind"] == "method":
             s["description"] = ("Where every number on this site comes from: the government sources, "
                                 "how measures are tagged, and what each label means.")
+        elif s["kind"] == "bills":
+            m = d["bills_meta"]
+            s["description"] = (f"Every AI bill, resolution, rule and order in the US since January 2025, {m['total']:,} "
+                                f"in all, by state, the fear it cites, the government control it would create and "
+                                f"where it stands. {m['controlled']:,} would add government control.")
         elif s["kind"] == "states":
             s["description"] = ("Every state, DC and Puerto Rico, shaded by the AI measures that would put AI, "
                                 "the people building it or the people using it under new government control, "
@@ -577,7 +593,7 @@ def build(data_path, out_dir=None, preview_path=None, base="", pages_path=None):
             body = (pathlib.Path(out_dir) / "og" / name).read_bytes()
             return f"{site_url}/og/{name}?v={hashlib.sha1(body).hexdigest()[:8]}"
 
-        tagline = (d.get("site") or {}).get("tagline") or "Every fear about AI, and what it buys."
+        tagline = (d.get("site") or {}).get("tagline") or "Fear of AI, and what it buys."
         (pathlib.Path(out_dir) / "og" / "wide").mkdir(parents=True, exist_ok=True)
         share_image(pathlib.Path(out_dir) / "og" / "share.png", tagline)
         cards["share"] = stamped("share.png")

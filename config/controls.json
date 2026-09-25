@@ -35,7 +35,7 @@
     "slug": "mandatory-reporting",
     "name": "Mandatory reporting to government",
     "chip": "Mandatory reporting",
-    "definition": "Requires developers, deployers, or operators of AI systems, or owners or operators of data centers, to report, disclose, register, or submit plans, incidents, audits, impact assessments, or other information to a government body, or to produce them on government demand.",
+    "definition": "Requires people or companies outside government that develop, deploy, or operate AI systems, or own or operate data centers, to report, disclose, register, or submit plans, incidents, audits, impact assessments, or other information to a government body, or to produce them on government demand. A government body reporting on its own use of AI does not count.",
     "pattern": "require a company to file reports with a government body, or hand them over on demand",
     "head": "reports companies must file with the government"
   },
@@ -51,7 +51,7 @@
     "slug": "new-agency-powers",
     "name": "New powers for government agencies",
     "chip": "New agency powers",
-    "definition": "Creates a new government office or agency for AI or data centers, or gives an existing agency or attorney general new authority over AI or data centers to make rules, inspect, license, or enforce.",
+    "definition": "Creates a new government office or agency for AI or data centers, or gives an existing agency or attorney general new authority over AI, data centers, or the people and companies who build or use AI, to make rules, inspect, license, or enforce. An office that only oversees the government's own use of AI does not count.",
     "pattern": "create an AI office, or hand an existing one new authority over AI or data centers",
     "head": "new authority over AI or data centers for a government body"
   },

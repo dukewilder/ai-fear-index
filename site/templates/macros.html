@@ -13,8 +13,8 @@
 {% endfor %}</tbody></table></div>
 {%- endmacro %}
 
-{% macro buying_row(c) -%}
-<li class="row"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} already passed</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
+{% macro buying_row(c, href=None) -%}
+<li>{% if href %}<a class="row" href="{{ href }}">{% else %}<div class="row">{% endif %}<span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} already passed</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span>{% if href %}</a>{% else %}</div>{% endif %}</li>
 {%- endmacro %}
 
 {% macro org_row(o, stat='fears') -%}
@@ -30,7 +30,7 @@
 {%- endmacro %}
 
 {% macro control_row(c) -%}
-<li class="row" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.not_passed }} not passed{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></li>
+<li><a class="row" href="{{ url('bills') }}?control={{ c.slug }}" title="{{ c.definition }}"><span class="rank-n">{{ c.rank }}</span><span><span class="row-name">{{ c.name }}</span><span class="meta">{{ c.passed }} passed, {{ c.not_passed }} not passed{% if c.fears %} · fears cited: {{ c.fears|join(', ') }}{% endif %}</span></span><span class="val accent">{{ c.bills }}<span class="unit">bills</span></span></a></li>
 {%- endmacro %}
 
 {# Ranked by what the report is about: the measures that would put AI under new government control.
@@ -67,11 +67,26 @@
 {%- endmacro %}
 
 {% macro quote_card(q, name_fear=true) -%}
-<li class="quote-card">{% if name_fear %}<span class="chip">{{ q.fear }}</span>{% endif %}<blockquote>“{{ q.quote }}”</blockquote><span class="q-src"><a href="{{ q.url }}" rel="noopener" target="_blank">{{ q.bill }}</a><span class="stamp">{{ q.status }}</span></span>{% if q.controls %}<span class="buys">{% for c in q.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% if q.agency %}<span class="arw" aria-hidden="true">→</span><span class="who">{{ q.agency }}</span>{% endif %}</span>{% endif %}</li>
+<li class="quote-card">{% if name_fear %}<span class="chip">{{ q.fear }}</span>{% endif %}<blockquote>“{{ q.quote }}”</blockquote><span class="q-src"><a href="{{ q.url }}" rel="noopener" target="_blank"{% if q.where %} title="Read it on {{ q.where }}"{% endif %}>{{ q.bill }}</a><span class="stamp">{{ q.status }}</span></span>{% if q.controls %}<span class="buys">{% for c in q.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% if q.agency %}<span class="arw" aria-hidden="true">→</span><span class="who">{{ q.agency }}</span>{% endif %}</span>{% endif %}</li>
 {%- endmacro %}
 
 {% macro law_row(a) -%}
-<li class="item"><span class="item-top"><a class="row-name" href="{{ a.url }}" rel="noopener" target="_blank">{{ a.name }}</a><span class="time">{{ a.date }}</span></span><span class="meta" style="margin-top:0">{{ a.title }}</span><span class="chips">{% for c in a.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% for f in a.fears %}<span class="chip">{{ f }}</span>{% endfor %}</span></li>
+<li class="item"><span class="item-top"><a class="row-name" href="{{ a.url }}" rel="noopener" target="_blank">{{ a.name }}</a><span class="time">{{ a.date }}</span></span><span class="meta" style="margin-top:0">{{ a.title }}</span><span class="chips">{% for c in a.controls %}<span class="chip o">{{ c }}</span>{% endfor %}{% for f in a.fears %}<span class="chip">{{ f }}</span>{% endfor %}</span>{{ read_on(a) }}</li>
+{%- endmacro %}
+
+{# Where a bill's link goes, said under it. The links used to open Open States, which now lands in
+   Plural's app, and a reader took its copied text for this site's reading of the bill. #}
+{% macro read_on(b) -%}
+{% if b.where %}<span class="src">Read it on {{ b.where }}<span aria-hidden="true"> ↗</span></span>{% endif %}
+{%- endmacro %}
+
+{# One measure in a list: its number and where it stands, its title, the controls it would create,
+   and where its link goes. On the page of every bill it also carries what the filters read, and
+   the fears it cites, which a fear's own page does not need to repeat. #}
+{% macro bill_item(b, fear_name=None, control_chip=None) -%}
+<li class="item"{% if fear_name is not none %} data-place="{{ b.code }}" data-fears="{{ b.fears|join(' ') }}" data-controls="{{ b.controls|join(' ') }}" data-status="{{ b.state }}"{% endif %}><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}{% if b.place %}, {{ b.place }}{% endif %}</a><span class="stamp">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>
+{%- if fear_name is not none %}{% if b.controls or b.fears %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ control_chip[c] }}</span>{% endfor %}{% for f in b.fears %}<span class="chip">{{ fear_name[f] }}</span>{% endfor %}</span>{% endif %}
+{%- elif b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}{{ read_on(b) }}</li>
 {%- endmacro %}
 
 {% macro feed_item(i) -%}

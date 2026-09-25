@@ -699,6 +699,12 @@ def check_third_reading():
     from pipeline import review
     body, items = review.build(db2, dt.date.today())
     assert "Held: 70 refusals" in body and items >= 70, "the held refusals are not on the weekly list"
+    from pipeline.common import kv_set
+    kv_set(db2, "blindspots:report", {"at": "2026-09-24T06:00:00+00:00", "uncovered_measures": 428,
+                                      "uncovered": [{"phrase": "health care", "measures": 17, "places": 8}]})
+    body, _ = review.build(db2, dt.date.today())
+    assert "Subjects none of the fears covers" in body and "| health care | 17 | 8 |" in body, \
+        "what the fears leave out does not reach the weekly list"
     db2.execute("DELETE FROM kv WHERE key LIKE 'check:released:%'")
     assert check.release_holds(db2) == 70 and not db2.execute("SELECT COUNT(*) FROM tags").fetchone()[0], \
         "released refusals did not come off"
@@ -1440,6 +1446,8 @@ def check_status_and_coverage():
             pass
 
         def json(self, url, params=None, **kw):
+            if "identifier" in params:  # finding bills' own pages, tested on its own
+                return {"results": []}
             if params.get("sort") != "first_action_asc":  # the pre-filed sweep is tested below
                 asked.append(params["q"])
             return {"results": [], "pagination": {"max_page": 1}}
@@ -1468,6 +1476,8 @@ def check_status_and_coverage():
             pass
 
         def json(self, url, params=None, **kw):
+            if "identifier" in params:  # finding bills' own pages, tested on its own
+                return {"results": []}
             got.append((params["q"], params["page"], params.get("updated_since")))
             if params["q"] == "digital replica":
                 return {"results": [{"id": "x"}], "pagination": {"max_page": 3}}
@@ -1743,6 +1753,57 @@ def check_states(dist, data):
     print(f"a map of {len(m['tiles'])} squares, {len(pages)} place pages, ranked by what they would control: ok")
 
 
+def check_fears_explained(dist, data):
+    """The site says how many fears it follows and how they were chosen, and claims no more.
+
+    A reader pointed out that the method page ranked the fears without saying how the list was
+    made or that it was a list of ten, while the tagline said "every fear about AI". The fears were
+    chosen by hand, the Fear Index ranks only them, and the controls are counted whatever a measure
+    cites. The method page says all three, with the counts, and the front page says ten.
+    """
+    method = re.sub(r"\s+", " ", (dist / "method" / "index.html").read_text())
+    home = re.sub(r"\s+", " ", (dist / "index.html").read_text())
+    word, bm = data["fear_word"], data["bills_meta"]
+    assert f'id="fears">The {word} fears' in method and "chosen by hand, not by ranking a longer list" in method, \
+        "the method page does not say how the fears were chosen"
+    assert f"{bm['controlled_no_fear']:,} of the {bm['controlled']:,} that would add government control cite none" in method
+    assert f"The {word} fears this report follows" in home and 'href="/method/#fears"' in home
+    for page in dist.rglob("*.html"):
+        assert "Every fear about AI" not in page.read_text(), f"{page} still claims every fear"
+    assert "Every fear" not in data["site"]["tagline"]
+    print(f"the {word} fears are said to be {word}, chosen by hand, with what they leave out: ok")
+
+
+def check_bills_page(dist, data):
+    """Every measure on one page, filterable, each saying where its link goes.
+
+    A reader asked for a way to read all the bills sorted by category rather than state by state, and
+    took Open States' app, where the links landed, for this site's own reading of the bill.
+    """
+    page = (dist / "bills" / "index.html").read_text()
+    items = re.findall(r'<li class="item" data-place="([^"]*)" data-fears="([^"]*)" data-controls="([^"]*)" '
+                       r'data-status="([^"]*)">(.*?)</li>', page, re.S)
+    total = data["index"]["total_measures"]
+    assert len(items) == total == data["bills_meta"]["total"], f"{len(items)} items for {total} measures"
+    assert all("Read it on " in body for *_, body in items), "an item does not say where its link goes"
+    for name in ("q", "place", "fear", "control", "status", "sort"):
+        assert f'name="{name}"' in page, f"the filters have no {name}"
+    assert "data-bills-form hidden" in page, "the filters show before the script that works them"
+    fears = {f["slug"] for f in data["bills_meta"]["fears"]}
+    assert {f for _, fs, _, _, _ in items for f in fs.split()} <= fears, "an item cites a fear the filter cannot pick"
+    assert sum(1 for _, _, cs, _, _ in items if cs) == data["bills_meta"]["controlled"] == data["index"]["controlled"]
+    assert len(re.findall(r"<h1[^>]*>", page)) == 1
+    home = (dist / "index.html").read_text()
+    assert 'href="/bills/?control=' in home, "the front page's controls do not open their bills"
+    fear = data["fear_pages"][0]
+    body = (dist / "fear" / fear["slug"] / "index.html").read_text()
+    if fear["bills_total"]:
+        assert f'href="/bills/?fear={fear["slug"]}"' in body, "a fear page does not open all the bills citing it"
+    for p in dist.rglob("index.html"):
+        assert 'data-nav="bills"' in p.read_text(), f"{p} has no Bills link"
+    print(f"every one of {total} measures on one page, filterable, saying where each link goes: ok")
+
+
 def check_search(dist, data_path, tmp):
     """What search engines are told, page by page.
 
@@ -1905,6 +1966,217 @@ def check_indexnow():
     assert calls[-1]["urlList"] == [f"{site}/states/"], calls[-1]
     assert "not set up" in indexnow.run(path, site, None, send=ok), "it ran without a key"
     print("IndexNow hears about changed pages once they settle, at most every six hours: ok")
+
+
+def check_bill_links():
+    """A bill links to its legislature's own page, not to Open States.
+
+    Open States' bill pages now redirect into Plural's app, which is a blank page without script and
+    often with it, and a reader took its copied text for this site's reading of the bill. Its records
+    carry the legislature's links as sources, alongside every data feed, search page and sponsor page
+    the scraper read. The cases are the ones its scrapers record, state by state.
+    """
+    from pipeline import collect_openstates as cos
+    from pipeline.common import read_link
+
+    def pick(ident, sources, versions=()):
+        return cos.pick_link({"identifier": ident, "sources": [{"url": u, "note": n} for u, n in sources],
+                              "versions": list(versions)})
+    cases = {
+        "New York: the API first, then the Senate's page and the Assembly's": (
+            pick("S 10701", [("https://legislation.nysenate.gov/api/3/bills/2025/S10701", ""),
+                             ("https://www.nysenate.gov/legislation/bills/2025/S10701", ""),
+                             ("https://assembly.state.ny.us/leg/?default_fld=&bn=S10701&term=2025", "")]),
+            "https://www.nysenate.gov/legislation/bills/2025/S10701"),
+        "Texas: the FTP history file, then the bill's history page": (
+            pick("HB 149", [("ftp://ftp.legis.state.tx.us/bills/89R/billhistory/house_bills/HB00100_HB00199/HB 149.xml", ""),
+                            ("https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149", "")]),
+            "https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149"),
+        "Connecticut: a CSV on FTP, then the status page": (
+            pick("SB 2", [("ftp://ftp.cga.ct.gov/pub/data/bill_info.csv", ""),
+                          ("https://www.cga.ct.gov/asp/cgabillstatus/cgabillstatus.asp?selBillType=Bill&which_year=2025&bill_num=2", "")]),
+            "https://www.cga.ct.gov/asp/cgabillstatus/cgabillstatus.asp?selBillType=Bill&which_year=2025&bill_num=2"),
+        "Nebraska: the day's listing first, then the bill": (
+            pick("LB 504", [("https://nebraskalegislature.gov/bills/search_by_date.php?SessionDay=2025-01-17&special=1", ""),
+                            ("https://nebraskalegislature.gov/bills/view_bill.php?DocumentID=58210", "")]),
+            "https://nebraskalegislature.gov/bills/view_bill.php?DocumentID=58210"),
+        "New Jersey: the bill search page for the bill, and a database index": (
+            pick("S 3611", [("https://www.njleg.state.nj.us/bill-search/2024/S3611", ""),
+                            ("https://pub.njleg.state.nj.us/leg-databases/", "")]),
+            "https://www.njleg.state.nj.us/bill-search/2024/S3611"),
+        "Georgia: two API sources marked as such, then the page": (
+            pick("SB 9", [("https://www.legis.ga.gov/api/legislation/detail/69923", "api"),
+                          ("https://www.legis.ga.gov/api/legislation/list", "api"),
+                          ("https://www.legis.ga.gov/legislation/69923", "")]),
+            "https://www.legis.ga.gov/legislation/69923"),
+        "North Dakota: the page, then the session's JSON": (
+            pick("HB 1167", [("https://ndlegis.gov/assembly/69-2025/regular/bill-overview/bo1167.html", "HTML bill detail page"),
+                             ("https://ndlegis.gov/api/assembly/69-2025/data/bills.json", "JSON page of session bills")]),
+            "https://ndlegis.gov/assembly/69-2025/regular/bill-overview/bo1167.html"),
+        "Mississippi: the bill's text, then sponsor and status files": (
+            pick("HB 1234", [("https://billstatus.ls.state.ms.us/documents/2026/html/HB/1200-1299/HB1234IN.htm", ""),
+                             ("http://billstatus.ls.state.ms.us/2026/pdf/House_authors/Smith.xml", ""),
+                             ("https://billstatus.ls.state.ms.us/2026/pdf/history/HB/HB1234.xml", "")]),
+            "https://billstatus.ls.state.ms.us/documents/2026/html/HB/1200-1299/HB1234IN.htm"),
+        "DC: the bulk data listing, then the Council's page": (
+            pick("B26-0491", [("https://lims.dccouncil.gov/api/v2/PublicData/BulkData/1/26", ""),
+                              ("https://lims.dccouncil.gov/Legislation/B26-0491", "")]),
+            "https://lims.dccouncil.gov/Legislation/B26-0491"),
+        "Arizona: one page, keyed by an internal number": (
+            pick("HB 2175", [("https://apps.azleg.gov/BillStatus/BillOverview/83456?SessionId=128", "")]),
+            "https://apps.azleg.gov/BillStatus/BillOverview/83456?SessionId=128"),
+        "Alabama: only the search form, so the bill's latest text": (
+            pick("SB 88", [("https://alison.legislature.state.al.us/bill-search", "")],
+                 [{"note": "Introduced", "date": "2026-01-10",
+                   "links": [{"url": "https://alison.legislature.state.al.us/files/pdfs/SearchableInstruments/2026RS/SB88-int.pdf",
+                              "media_type": "application/pdf"}]},
+                  {"note": "Engrossed", "date": "2026-02-10",
+                   "links": [{"url": "https://alison.legislature.state.al.us/files/pdfs/SearchableInstruments/2026RS/SB88-eng.pdf",
+                              "media_type": "application/pdf"}]}]),
+            "https://alison.legislature.state.al.us/files/pdfs/SearchableInstruments/2026RS/SB88-eng.pdf"),
+        "Rhode Island: the site's front page only, and no text either": (
+            pick("H 5100", [("https://status.rilegislature.gov/", "")]), ""),
+        "Vermont: a listing of the year's bills, then the bill": (
+            pick("H.123", [("http://legislature.vermont.gov/bill/loadBillsIntroduced/2026/", ""),
+                           ("http://legislature.vermont.gov/bill/status/2026/H.123", "")]),
+            "http://legislature.vermont.gov/bill/status/2026/H.123"),
+    }
+    for what, (got, want) in cases.items():
+        assert got == want, f"{what}: picked {got!r}, not {want!r}"
+    assert cos.pick_link({"identifier": "HB 1"}) == "", "no sources and no versions is no page"
+    # How a link is described under the bill, and the Open States fallback owned up to.
+    assert read_link({"source_url": "https://www.palegis.us/legislation/bills/2025/hb2800", "url": "https://openstates.org/x"}) == \
+        ("https://www.palegis.us/legislation/bills/2025/hb2800", "palegis.us")
+    assert read_link({"source_url": "", "url": "https://openstates.org/pa/bills/2025-2026/HB2800/"})[1] == "Open States"
+    assert read_link({"source_url": None, "url": "https://www.congress.gov/bill/119th-congress/house-bill/1"})[1] == "congress.gov"
+    assert read_link({"source_url": "https://alison.legislature.state.al.us/files/SB88-eng.pdf", "url": "u"})[1] == \
+        "alison.legislature.state.al.us, PDF"
+
+    # Stored with a search result that carries sources; an unchanged bill seen again is given its page;
+    # a record without sources leaves what is there.
+    db = connect(":memory:")
+    b = {"id": "ocd-bill/abc", "identifier": "HB 2800", "session": "2025-2026", "title": "AI risk",
+         "jurisdiction": {"id": "ocd-jurisdiction/country:us/state:pa/government", "name": "Pennsylvania"},
+         "updated_at": "2026-09-20T00:00:00", "openstates_url": "https://openstates.org/pa/bills/2025-2026/HB2800/",
+         "sources": [{"url": "https://www.palegis.us/legislation/bills/2025/hb2800"}]}
+    cos.store(db, {k: v for k, v in b.items() if k != "sources"})
+    assert db.execute("SELECT source_url FROM measures").fetchone()[0] is None
+    cos.store(db, b)  # same updated_at: not rewritten, but its page is filled in
+    assert db.execute("SELECT source_url FROM measures").fetchone()[0] == "https://www.palegis.us/legislation/bills/2025/hb2800"
+    cos.store(db, {**{k: v for k, v in b.items() if k != "sources"}, "updated_at": "2026-09-21T00:00:00"})
+    assert db.execute("SELECT source_url FROM measures").fetchone()[0] == "https://www.palegis.us/legislation/bills/2025/hb2800", \
+        "a record without its sources erased the page already found"
+
+    # The bills on the site stored without a page are asked about twenty at a time, by jurisdiction and
+    # session, labelled ones first; one the answer leaves out is marked asked and keeps its address.
+    ldb = connect(":memory:")
+    for i in range(45):
+        mid = f"os-pa{i}"
+        upsert(ldb, "measures", {"id": mid, "kind": "bill", "jurisdiction": "pa", "jurisdiction_name": "Pennsylvania",
+                                 "session": "2025-2026", "identifier": f"HB {i + 1}", "title": "Artificial intelligence",
+                                 "status": "pending", "introduced_date": "2025-03-01",
+                                 "latest_action_date": f"2025-{3 + i % 9:02d}-01",
+                                 "url": f"https://openstates.org/pa/bills/2025-2026/HB{i + 1}/", "source": "Open States"})
+        ldb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', 1, 'now')", (mid,))
+    upsert(ldb, "measures", {"id": "os-ny1", "kind": "bill", "jurisdiction": "ny", "jurisdiction_name": "New York",
+                             "session": "2025-2026", "identifier": "S 1", "title": "Artificial intelligence",
+                             "status": "pending", "introduced_date": "2025-03-01", "url": "https://openstates.org/ny/1",
+                             "source": "Open States"})
+    ldb.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES('os-ny1', 'h', 1, 'now')")
+    ldb.execute("INSERT INTO tags(target, kind, value, evidence) VALUES('os-ny1', 'control', 'mandatory-reporting', 'q')")
+    # HB 2's summary was cut at the old 6,000 characters; HB 3's is short and whole
+    ldb.execute("UPDATE measures SET summary=? WHERE id='os-pa1'", ("x" * 6000,))
+    ldb.execute("UPDATE measures SET summary='A short one.' WHERE id='os-pa2'")
+    ldb.commit()
+    whole = {"HB 2": [{"abstract": "a" * 5000}, {"abstract": "b" * 4000 + " END"}],
+             "HB 3": [{"abstract": "Something longer than the summary on file."}]}
+    asked = []
+
+    class Links:
+        def json(self, url, params=None, **kw):
+            asked.append(params)
+            assert len(params["identifier"]) <= 20 and "sources" in params["include"], params
+            assert "abstracts" in params["include"], "the backfill no longer brings the whole summary"
+            code = params["jurisdiction"].split(":")[-1].split("/")[0]
+            out = []
+            for ident in params["identifier"]:
+                if ident == "HB 7":
+                    continue  # one the answer leaves out
+                n = ident.split()[-1]
+                out.append({"id": f"ocd-bill/{code}{int(n) - 1 if code == 'pa' else n}", "identifier": ident,
+                            "jurisdiction": {"id": params["jurisdiction"]},
+                            "sources": [{"url": f"https://www.example-{code}.gov/bill/{n}"}],
+                            "abstracts": whole.get(ident, [])})
+            return {"results": out}
+    used, found, late = cos.fill_links(ldb, Links(), 2, __import__("time").time())
+    assert used == 2 and not late, (used, late)
+    assert asked[0]["jurisdiction"].endswith("state:ny/government") and asked[0]["identifier"] == ["S 1"], \
+        "the labelled bill was not asked about first"
+    assert asked[1]["session"] == "2025-2026" and len(asked[1]["identifier"]) == 20, asked[1]
+    used, found, late = cos.fill_links(ldb, Links(), 10, __import__("time").time())
+    rows = dict(ldb.execute("SELECT id, source_url FROM measures").fetchall())
+    assert all(v is not None for v in rows.values()), "a bill on the site was left unasked"
+    assert rows["os-pa6"] == "", "the one the answer left out was not marked asked"
+    assert rows["os-pa0"] == "https://www.example-pa.gov/bill/1" and rows["os-ny1"] == "https://www.example-ny.gov/bill/1"
+    assert cos.fill_links(ldb, Links(), 10, __import__("time").time())[0] == 0, "asked again about bills already asked about"
+    sums = dict(ldb.execute("SELECT id, summary FROM measures WHERE id IN ('os-pa1', 'os-pa2')").fetchall())
+    assert len(sums["os-pa1"]) == 9005 and sums["os-pa1"].endswith(" END"), "a summary the old cut left short stayed short"
+    assert sums["os-pa2"] == "A short one.", "a whole summary was rewritten"
+
+    # The tagger and the check read all of a long summary, not its first few thousand characters.
+    from pipeline import check, tag
+    from pipeline.common import SUMMARY_MAX
+    assert SUMMARY_MAX >= 50000
+    long = "Requires state agencies to inventory their AI systems. " + "More provisions. " * 1500 + "TAIL"
+    tdb = connect(":memory:")
+    upsert(tdb, "measures", {"id": "m-long", "kind": "bill", "jurisdiction": "ky", "jurisdiction_name": "Kentucky",
+                             "session": "2025RS", "identifier": "SB 4", "title": "Artificial intelligence",
+                             "summary": long, "status": "passed", "introduced_date": "2025-02-01",
+                             "url": "https://openstates.org/ky/bills/2025RS/SB4/", "source": "Open States"})
+    tdb.commit()
+    read = [t for t in tag.targets(tdb, 10)[0] if t[1] == "m-long"]
+    assert read and read[0][2].rstrip().endswith("TAIL") and read[0][4].rstrip().endswith("TAIL"), "the tagger reads a cut summary"
+    controls = {c["slug"]: c for c in config("controls")}
+    m = dict(tdb.execute("SELECT * FROM measures").fetchone())
+    assert "TAIL" in check.question(m, "control", "mandatory-reporting", "q", controls), "the check reads a cut summary"
+    print("bills link to the legislature's own page, found for the ones on file too, and summaries are read whole: ok")
+
+
+def check_government_own_use():
+    """A control binds people or organizations outside government, and an office has to gain power
+    over them.
+
+    Kentucky's SB 4 sets rules for the state's own use of AI and creates a committee to oversee it. It
+    counted as new agency powers and mandatory reporting, and the committee led the front page's
+    "goes to" line under deepfakes. Rules a government sets for itself bind the government, not the
+    people the site counts controls over. The tagger, the check and the definitions all say so, and
+    every control and office label is asked again under that wording, once.
+    """
+    from pipeline import check, tag
+    import inspect
+    assert "government bodies in their own use of AI" in check.NOT_THIS, "the check no longer rules out government's own use"
+    assert "only government bodies' own use of AI" in check.OFFICE_QUESTION
+    assert "which can include a government agency" not in check.CONTROL_NOTES["mandatory-reporting"]
+    assert "own use of AI" in check.CONTROL_NOTES["new-agency-powers"]
+    assert "bind the government itself" in inspect.getsource(tag.propose)
+    # Preemption binds the states themselves, in the laws they may pass. The rule must not reach it.
+    assert "counts only if the measure itself would impose it on people or organizations outside government" \
+        not in " ".join(inspect.getsource(tag.propose).split()), "the tagger's rule would rule out preemption"
+    assert "does not apply to it" in check.CONTROL_NOTES["preemption"]
+    defs = {c["slug"]: c["definition"] for c in config("controls")}
+    assert "outside government" in defs["mandatory-reporting"] and "own use of AI" in defs["new-agency-powers"]
+    db = connect(":memory:")
+    rows = [("m1", "control", "new-agency-powers", "yes"), ("m1", "agency", "Kentucky AI Governance Committee", "yes"),
+            ("m1", "fear", "deepfakes", "yes"), ("m2", "control", "mandatory-reporting", "no")]
+    for target, kind, value, verdict in rows:
+        db.execute("INSERT INTO checks(target, kind, value, evidence, verdict, reason, model, checked_at) "
+                   "VALUES(?,?,?,?,?,'r','m','t')", (target, kind, value, "q", verdict))
+    db.commit()
+    assert check.reask_narrowed(db) == 2
+    left = {(r[0], r[1], r[2]) for r in db.execute("SELECT target, kind, verdict FROM checks")}
+    assert left == {("m1", "fear", "yes"), ("m2", "control", "no")}, left
+    assert check.reask_narrowed(db) == 0, "asked again a second time"
+    print("rules for the government's own use of AI are not counted as controls: ok")
 
 
 def check_every_page_asks(dist, db, day):
@@ -2073,6 +2345,8 @@ def check_share_card_fits():
 
 def main():
     check_indexnow()
+    check_bill_links()
+    check_government_own_use()
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()
@@ -2246,6 +2520,8 @@ def main():
     check_every_page_asks(tmp / "dist", db, brief_day)
     check_links_open_right(tmp / "dist")
     check_states(tmp / "dist", data)
+    check_bills_page(tmp / "dist", data)
+    check_fears_explained(tmp / "dist", data)
     check_search(tmp / "dist", tmp / "site_data.json", tmp)
     check_page_dates(tmp / "site_data.json", tmp)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))

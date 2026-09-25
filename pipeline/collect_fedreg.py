@@ -1,7 +1,7 @@
 """Federal rules, proposed rules, and presidential documents about AI from the Federal Register API."""
 import re
 
-from .common import SINCE, Http, iso, kv_get, kv_set, looks_ai, upsert
+from .common import SINCE, SUMMARY_MAX, Http, iso, kv_get, kv_set, looks_ai, upsert
 
 BASE = "https://www.federalregister.gov/api/v1/documents.json"
 FIELDS = ["document_number", "title", "abstract", "html_url", "publication_date", "type", "subtype",
@@ -118,7 +118,7 @@ def store(db, d):
     return upsert(db, "measures", {
         "id": f"fr-{d.get('document_number')}", "kind": kind, "jurisdiction": "us-exec",
         "jurisdiction_name": ", ".join(agencies[:2]) or "Federal government", "session": None,
-        "identifier": ident_label, "title": d.get("title"), "summary": (d.get("abstract") or "")[:6000],
+        "identifier": ident_label, "title": d.get("title"), "summary": (d.get("abstract") or "")[:SUMMARY_MAX],
         "status": status, "latest_action": d.get("action") or ident_label,
         "latest_action_date": d.get("publication_date"), "introduced_date": d.get("publication_date"),
         "url": d.get("html_url"), "sponsors": ", ".join(agencies), "source": "Federal Register",

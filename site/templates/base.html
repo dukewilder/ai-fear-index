@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
-{% set blurb = description or 'Every fear about AI, and what it buys: ' ~ d.fear_word ~ ' fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' %}
+{% set blurb = description or 'Fear of AI, and what it buys: ' ~ d.fear_word ~ ' fears scored around the clock on how loud they are, who pays to lobby on them and the government controls they are used to justify.' %}
 <meta name="description" content="{{ blurb }}">
 {# Large previews for every page in search, which Discover needs; noindex for a page too thin to
    be a search result yet, and for the 404. #}
@@ -63,12 +63,13 @@
 <a class="brand" href="{{ url('home') }}"><span class="badge">{{ bits[0] }}</span>{{ bits[1] if bits|length > 1 else "" }}</a>
 <nav class="nav" aria-label="Main">
 <a href="{{ url('states') }}" data-nav="states"{% if nav == 'states' %} aria-current="page"{% endif %}>States</a>
+<a href="{{ url('bills') }}" data-nav="bills"{% if nav == 'bills' %} aria-current="page"{% endif %}>Bills</a>
 <a href="{{ url('feed') }}" data-nav="feed"{% if nav == 'feed' %} aria-current="page"{% endif %}>Feed</a>
 <a href="{{ url('method') }}" data-nav="method"{% if nav == 'method' %} aria-current="page"{% endif %}>Method</a>
-<button type="button" class="theme" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
+<button type="button" class="theme theme-top" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button>
 </nav>
 </div></header>
-<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Updated <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span></div></div>
+<div class="status"><div class="wrap"><span class="dot" aria-hidden="true"></span><b>Live</b><span>Updated <span data-rel="{{ d.built_at }}">recently</span></span><span class="asof">{{ d.built_at[:16]|replace("T", " ") }}Z</span>{# On a phone the switch sits here, so the masthead has room for four links. #}<button type="button" class="theme theme-bar" data-theme-switch aria-label="Switch between light and dark"><i aria-hidden="true"></i><span>Dark</span></button></div></div>
 {% for page in pages %}
 <main data-route="{{ page.route }}" data-title="{{ page.title }}"{% if preview and not loop.first %} hidden{% endif %}>
 {{ page.html|safe }}
@@ -272,21 +273,23 @@
   });
 
   // light or dark, remembered on this device
-  var root = document.documentElement, sw = document.querySelector("[data-theme-switch]");
+  var root = document.documentElement, sws = document.querySelectorAll("[data-theme-switch]");
   function themeNow() {
     var set = root.getAttribute("data-theme");
     if (set) return set;
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   function label() {
-    if (sw) sw.querySelector("span").textContent = themeNow() === "dark" ? "Light" : "Dark";
+    sws.forEach(function (sw) { sw.querySelector("span").textContent = themeNow() === "dark" ? "Light" : "Dark"; });
   }
   label();
-  if (sw) sw.addEventListener("click", function () {
-    var next = themeNow() === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("theme", next); } catch (e) {}
-    label();
+  sws.forEach(function (sw) {
+    sw.addEventListener("click", function () {
+      var next = themeNow() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+      label();
+    });
   });
 
   // copy the receipt
@@ -441,6 +444,82 @@
     }
   });
 
+  // The page of every bill. Filters read the data on each item, the address keeps them, and a
+  // hundred show at a time: two thousand at once is a long way to scroll to find the button again.
+  var bills = document.querySelector("[data-bills]"), form = document.querySelector("[data-bills-form]");
+  if (bills && form) {
+    var items = Array.prototype.slice.call(bills.children), total = items.length, limit = 100;
+    var order = items, sorted = "";
+    var countEl = document.querySelector("[data-bills-count]"), none = document.querySelector("[data-bills-none]");
+    var more = document.querySelector("[data-bills-more]"), fields = ["place", "fear", "control", "status", "q", "sort"];
+    var fmt = function (n) { return n.toLocaleString("en-US"); };
+    items.forEach(function (li, i) {
+      var name = li.querySelector(".row-name").textContent;
+      li._i = i;
+      li._n = (li.getAttribute("data-controls") || "").split(" ").filter(Boolean).length;
+      li._text = (li.textContent + " " + name.split(",")[0].replace(/[\s.]/g, "")).toLowerCase();
+      li._num = name.split(",")[0].replace(/[\s.]/g, "").toLowerCase();
+    });
+    var state = function () {
+      var v = {};
+      fields.forEach(function (f) { v[f] = (form.elements[f].value || "").trim(); });
+      return v;
+    };
+    var has = function (li, attr, want) {
+      if (!want) return true;
+      var got = (li.getAttribute(attr) || "").split(" ").filter(Boolean);
+      return want === "any" ? got.length > 0 : got.indexOf(want) >= 0;
+    };
+    var apply = function (keepLimit) {
+      var v = state(), q = v.q.toLowerCase(), compact = q.replace(/[\s.]/g, "");
+      var number = /^[a-z]+\d+$/.test(compact), words = q.split(/\s+/).filter(Boolean);
+      if (!keepLimit) limit = 100;
+      if (v.sort !== sorted) {  // reorder only when the order asked for changes
+        sorted = v.sort;
+        order = items.slice();
+        if (v.sort === "controls") order.sort(function (a, b) { return (b._n - a._n) || (a._i - b._i); });
+        order.forEach(function (li) { bills.appendChild(li); });
+      }
+      var shown = 0, matched = 0;
+      order.forEach(function (li) {
+        var ok = (!v.place || li.getAttribute("data-place") === v.place) && has(li, "data-fears", v.fear) &&
+          has(li, "data-controls", v.control) && (!v.status || li.getAttribute("data-status") === v.status) &&
+          (!q || (number ? li._num === compact : words.every(function (w) { return li._text.indexOf(w) >= 0; })));
+        if (ok) matched++;
+        li.hidden = !(ok && shown < limit);
+        if (ok && shown < limit) shown++;
+      });
+      countEl.textContent = (matched === total ? fmt(total) + " measures" : fmt(matched) + " of " + fmt(total) + " measures") +
+        (shown < matched ? ", " + fmt(shown) + " shown" : "");
+      more.hidden = shown >= matched;
+      more.textContent = "Show " + Math.min(100, matched - shown) + " more";
+      none.hidden = matched > 0;
+      var params = new URLSearchParams();
+      fields.forEach(function (f) { if (v[f]) params.set(f, v[f]); });
+      var qs = params.toString();
+      history.replaceState(null, "", location.pathname + (qs ? "?" + qs : ""));
+    };
+    var start = new URLSearchParams(location.search);
+    fields.forEach(function (f) {
+      var el = form.elements[f], want = start.get(f);
+      if (!want) return;
+      if (el.tagName === "SELECT") {
+        if (Array.prototype.some.call(el.options, function (o) { return o.value === want; })) el.value = want;
+      } else el.value = want;
+    });
+    form.hidden = false;
+    form.addEventListener("submit", function (e) { e.preventDefault(); });
+    form.addEventListener("change", function () { apply(false); });
+    var typing;
+    form.elements.q.addEventListener("input", function () { clearTimeout(typing); typing = setTimeout(function () { apply(false); }, 150); });
+    more.addEventListener("click", function () { limit += 100; apply(true); });
+    document.querySelector("[data-bills-clear]").addEventListener("click", function () {
+      fields.forEach(function (f) { form.elements[f].value = ""; });
+      apply(false);
+    });
+    apply(false);
+  }
+
   document.querySelectorAll("[data-filter-group]").forEach(function (group) {
     var list = document.getElementById(group.getAttribute("data-filter-group"));
     group.addEventListener("click", function (e) {
@@ -458,7 +537,7 @@
 {% if preview %}
 
   var pages = Array.prototype.slice.call(document.querySelectorAll("main[data-route]"));
-  var navFor = { fear: "", org: "", feed: "feed", method: "method", states: "states" };
+  var navFor = { fear: "", org: "", feed: "feed", method: "method", states: "states", bills: "bills" };
   function has(route) {
     return pages.some(function (p) { return p.getAttribute("data-route") === route; });
   }

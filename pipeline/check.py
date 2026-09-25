@@ -20,7 +20,7 @@ import time
 
 import requests
 
-from .common import annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_settles
+from .common import SUMMARY_MAX, annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_settles
 from . import known
 
 API = "https://api.anthropic.com/v1/messages"
@@ -49,6 +49,13 @@ RELEASE = 2  # 2: the 44 held on 21 September, read by hand and right
 # center owners and operators. About 40 real mandates on private parties had been refused only
 # because they fell outside the narrower wording.
 RECHECK = (1, ("labeling-mandates", "mandatory-reporting"))
+# Bump, with the kinds listed, to ask again about labels that passed under a wording since narrowed.
+# 1: a control has to bind people or organizations outside government, and an office has to gain
+#    authority over them. Kentucky's SB 4 sets rules for the state's own use of AI and creates a
+#    committee to oversee it; it counted as new agency powers and mandatory reporting, and that
+#    committee led the front page's "goes to" line under deepfakes. Rules a government sets for its
+#    own use of AI bind the government, not the people the site is counting controls over.
+NARROWED = (1, ("control", "agency"))
 
 # The heavy, rare controls first: they decide which measure leads the post, and they were the ones
 # most often wrong. Offices next, since the front page counts them.
@@ -69,6 +76,9 @@ NOT_THIS = (
     "requiring it;\n"
     "- the quote describes law already in force, not what this measure would do;\n"
     "- the measure only urges, requests, recognizes, or takes a position;\n"
+    "- it binds only government bodies in their own use of AI, such as rules for the systems their "
+    "agencies, schools, or police buy or run, inventories or assessments of those systems, or "
+    "disclosures of the government's own use, and no one outside government;\n"
     "- the quote is about something the definition does not cover.")
 
 # What each control has turned out not to be, from the labels taken off by hand.
@@ -76,11 +86,13 @@ CONTROL_NOTES = {
     "license-to-build": "Permission has to be required before an AI system or model is developed, "
                         "trained, or deployed. Licensing or registering auditors, verifiers, or "
                         "professionals is not this, and neither is a certificate for a data center.",
-    "mandatory-reporting": "The duty has to fall on those who build, deploy, operate, or use AI, or who "
-                           "own or operate data centers, which can include a government agency that "
-                           "uses AI. Telling customers, workers, or the public is not reporting to "
-                           "government. A government body reporting to a legislature, governor, or "
-                           "Congress about its own work, or about a study it was asked to do, is not this.",
+    "mandatory-reporting": "The duty has to fall on people or organizations outside government that "
+                           "build, deploy, operate, or use AI, or that own or operate data centers. "
+                           "Telling customers, workers, or the public is not reporting to government. A "
+                           "government body reporting on its own use of AI, such as an inventory or "
+                           "assessment of the systems it buys or runs, is not this, and neither is one "
+                           "reporting to a legislature, governor, or Congress about its own work or a "
+                           "study it was asked to do.",
     "labeling-mandates": "A label, watermark, provenance data, or disclosure has to be required on AI "
                          "content or AI interactions, or a company, employer, insurer, landlord, or "
                          "other private party has to tell the people it uses AI on that it is doing so. "
@@ -94,11 +106,15 @@ CONTROL_NOTES = {
                           "faster permitting are the opposite.",
     "new-agency-powers": "A government office has to be created for AI or data centers, or an existing "
                          "office handed new authority over AI or data centers to make rules, inspect, "
-                         "license, or enforce. Data centers count whether or not the measure says they "
-                         "are for AI. A study, "
-                         "a task force that only reports, or money to buy software is not this.",
+                         "license, or enforce, over people or organizations outside government. Data "
+                         "centers count whether or not the measure says they are for AI. A study, a task "
+                         "force that only reports, or money to buy software is not this, and neither is "
+                         "an office that only oversees government bodies' own use of AI: their "
+                         "purchases, inventories, policies, or the systems they run.",
     "preemption": "It has to be a federal measure that overrides, preempts, or blocks state or local "
-                  "AI laws, or conditions federal funding on states not regulating AI.",
+                  "AI laws, or conditions federal funding on states not regulating AI. It binds states and "
+                  "cities in the laws they may pass, not in their own use of AI, so the rule about government "
+                  "bodies' own use does not apply to it.",
     "id-age-checks": "Identity or age verification, or a know-your-customer check, has to be required "
                      "of the users, customers, or buyers of AI services or compute.",
     "training-caps": "A compute, cost, or capability threshold has to trigger restrictions or "
@@ -109,11 +125,13 @@ CONTROL_NOTES = {
 
 OFFICE_QUESTION = (
     "Does the measure itself create this office, or give it new authority over AI, over data centers, "
-    "or over the people who build, deploy, or use AI: to make rules, license, certify, approve, "
-    "inspect, audit, investigate, enforce, or require reports or records from them? Data centers "
-    "count whether or not the measure says they are for AI.\n"
+    "or over the people and organizations outside government who build, deploy, or use AI: to make "
+    "rules, license, certify, approve, inspect, audit, investigate, enforce, or require reports or "
+    "records from them? Data centers count whether or not the measure says they are for AI.\n"
     "Answer no when any of these is true:\n"
     "- the office is only mentioned, or is one place a person may choose to report to;\n"
+    "- its new authority reaches only government bodies' own use of AI, such as their purchases, "
+    "inventories, policies, or the systems their agencies, schools, or police run;\n"
     "- the office receives a report from another government body, or is asked to study, recommend, "
     "advise, train, or run a program, pilot, or grant;\n"
     "- the office only spends, receives, or hands out funds;\n"
@@ -218,11 +236,11 @@ def question(m, kind, value, quote, controls, fears=None):
     if m.get("post"):
         what = "STATEMENT"
         doc = (f"Organization: {m.get('org') or m['entity']}\nTitle: {m['title'] or ''}\n"
-               f"Text: {(m['summary'] or '(none)')[:5000]}")
+               f"Text: {(m['summary'] or '(none)')[:SUMMARY_MAX]}")
     else:
         what = "MEASURE"
         doc = (f"Jurisdiction: {m['jurisdiction_name']}\nIdentifier: {m['identifier']}\n"
-               f"Title: {m['title'] or ''}\nSummary: {(m['summary'] or '(none)')[:5000]}")
+               f"Title: {m['title'] or ''}\nSummary: {(m['summary'] or '(none)')[:SUMMARY_MAX]}")
     if kind == "about":
         return (f"{what}\n{doc}\n\n{ABOUT_QUESTION}\n\n"
                 'Return JSON: {"verdict": "yes" or "no", "reason": "one short sentence"}')
@@ -332,6 +350,24 @@ def recheck(db):
     return len(rows)
 
 
+def reask_narrowed(db):
+    """Ask again, once per wording, about every label of the listed kinds that passed under a wider one.
+
+    Its verdict goes, so it joins the queue; the label stays on the site until the answer comes back.
+    """
+    version, kinds = NARROWED
+    key = f"check:narrowed:{version}"
+    if kv_get(db, key):
+        return 0
+    marks = ",".join("?" * len(kinds))
+    n = db.execute(f"DELETE FROM checks WHERE kind IN ({marks}) AND verdict = 'yes'", kinds).rowcount
+    kv_set(db, key, True)
+    db.commit()
+    if n:
+        log(f"[check] {n} labels that passed under a wider wording put back to be asked again")
+    return n
+
+
 def reask_about(db):
     """Put back, once per wording, every measure the about question took out, to be asked again.
 
@@ -378,6 +414,7 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
     released = release_holds(db)
     reasked_about = reask_about(db)
     reasked = recheck(db)
+    narrowed = reask_narrowed(db)
     controls = {c["slug"]: c for c in config("controls")}
     fears = {f["slug"]: f for f in config("fears")}
     todo, refused, shown = queue(db, controls, fears)
@@ -439,6 +476,7 @@ def run(db, key, seconds=SECONDS, ask_fn=None):
             + (f"put back {reasked_about} measure{'' if reasked_about == 1 else 's'} to ask again whether "
                f"{'it is' if reasked_about == 1 else 'they are'} about AI; " if reasked_about else "")
             + (f"put back {reasked} labels to ask again; " if reasked else "")
+            + (f"asking again about {narrowed} labels under a narrower wording; " if narrowed else "")
             + f"checked {done} labels, took off {(0 if hold else refusals) + len(refused)}"
             + (f", held {refusals} refusals for review" if hold else "")
             + (f", {left} still to check" if left > 0 else "")

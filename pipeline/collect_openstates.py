@@ -6,12 +6,17 @@ would write, and Congress.gov's own record wins wherever both have one.
 """
 import collections
 import datetime as dt
+import re
 import time
+import urllib.parse
 
-from .common import (AI_TEXT, SINCE, STATES, Http, HttpError, congress_id, env, iso, kv_get, kv_set, log, retry_at,
-                     retry_clear, status_from_action, upsert)
+from .common import (AI_TEXT, OLD_SUMMARY_CUT, SINCE, STATES, SUMMARY_MAX, Http, HttpError, congress_id, env, iso,
+                     kv_get, kv_set, log, measures_in_scope, retry_at, retry_clear, status_from_action, upsert)
 
 BASE = "https://v3.openstates.org/bills"
+# Every request asks for the bill's sources and versions too. They cost no extra requests, and they
+# carry the legislature's own page for the bill, which is where a reader should land (pick_link).
+INCLUDE = ["abstracts", "sponsorships", "sources", "versions"]
 # "data center" goes last. It matches every bill that mentions one, budget bills included, and its
 # backfill had used four days of the allowance at page 203 while "automated decision",
 # "algorithmic", "synthetic media" and "digital replica" had not been searched once. California's
@@ -61,6 +66,8 @@ BLIND_ASK = "artificial intelligence"
 
 
 def ocd_id(code):
+    if code == "us":
+        return "ocd-jurisdiction/country:us/government"  # Congress, filed under the country
     kind = "district" if code == "dc" else "territory" if code == "pr" else "state"
     return f"ocd-jurisdiction/country:us/{kind}:{code}/government"
 
@@ -147,7 +154,7 @@ def sweep_blind(db, http, cap, started, today):
         began = cur.get("started") or today
         while used < cap and time.time() - started < SECONDS:
             params = {"jurisdiction": ocd_id(code), "created_since": since, "sort": "updated_desc",
-                      "per_page": 20, "page": cur["page"], "include": ["abstracts", "sponsorships"]}
+                      "per_page": 20, "page": cur["page"], "include": INCLUDE}
             if cur.get("updated_since"):
                 params["updated_since"] = cur["updated_since"]
             try:
@@ -249,7 +256,7 @@ def run(db, state, mode):
                 ran_out = True
                 break
             params = {"q": query, "sort": "updated_desc", "per_page": 20, "page": page,
-                      "include": ["abstracts", "sponsorships"], "created_since": SINCE}
+                      "include": INCLUDE, "created_since": SINCE}
             if since:
                 params["updated_since"] = since
             try:
@@ -294,6 +301,16 @@ def run(db, state, mode):
             break
         kv_set(db, "openstates_cursors", cursors)
     kv_set(db, "openstates_cursors", cursors)
+    # With the day's changes read, what is left of the run goes to the pages of bills stored before
+    # the collector asked Open States for them.
+    linked = 0
+    if not (capped or ran_out) and requests_used < budget:
+        try:
+            asked, linked, out_of_time = fill_links(db, http, min(LINK_CAP, budget - requests_used), started)
+            requests_used += asked
+            ran_out = ran_out or out_of_time
+        except Exception as exc:  # the searches above are already saved
+            log(f"[openstates] finding bills' own pages failed: {str(exc)[:200]}")
     kv_set(db, "openstates_spend", {"date": day, "n": used_today + requests_used})
     kv_set(db, "openstates_offset", stopped_at if stopped_at is not None else 0)
     # A refusal that cost nothing is their rolling window, not our budget: the run is worth
@@ -310,35 +327,170 @@ def run(db, state, mode):
     state["added"] = added
     backlog = [q for q, c in cursors.items() if c.get("backfilling")] + [q for q in QUERIES if q not in cursors]
     state["message"] = (f"{seen} bills read in {requests_used} requests"
+                        + (f"; {linked} bills' own pages found" if linked else "")
                         + ("; daily allowance reached" if capped else "")
                         + (f"; stopped at {SECONDS}s" if ran_out else "")) + (
         f"; still backfilling: {', '.join(backlog)}" if backlog else "")
 
 
+def measure_id(b):
+    """The row a bill from Open States lands on: Congress.gov's id for a federal bill, so one bill is
+    one row whoever saw it first, and otherwise Open States' own."""
+    code = jurisdiction_code(b.get("jurisdiction") or {})
+    federal = code == "us" and congress_id(b.get("session"), b.get("identifier"))
+    return federal or "os-" + (b.get("id", "").rsplit("/", 1)[-1] or f"{code}-{b.get('session')}-{b.get('identifier')}")
+
+
+# Where a reader should land for a bill: its page on the legislature's own site. Open States' own
+# pages now redirect into Plural's app, which is a blank page without script and is often blank with
+# it, and a reader who got there took its copied text for this site's reading of the bill. Open
+# States records the legislature's links as the bill's sources, but a scraper records everything it
+# read: data feeds (Texas's FTP, New York's API, Georgia's and Indiana's services), the search or
+# listing page it started from (Alabama, Rhode Island, Nebraska, Vermont) and the sponsors' pages
+# (Mississippi). So a source counts only as a web page with a number in it, a page naming the bill's
+# own number is preferred, and a search or listing page comes last. With no page at all, the bill's
+# latest text on the legislature's site will do.
+DATA_LINK = re.compile(r"^ftp:|/api/|//api\.|/odata|webservice|\.asmx\b|/bulkdata|leg-databases|"
+                       r"\.(?:xml|json|csv|zip|txt)(?:[?#]|$)", re.I)
+LISTING = re.compile(r"search|/load|by_date|listing", re.I)
+
+
+def web_page(url):
+    return url.lower().startswith(("http://", "https://")) and not DATA_LINK.search(url)
+
+
+def pick_link(b):
+    """The legislature's own page for this bill, or its latest text there; "" when there is neither."""
+    digits = re.findall(r"\d+", b.get("identifier") or "")
+    number = digits[-1].lstrip("0") or "0" if digits else ""
+    best, best_score = "", None
+    for source in b.get("sources") or []:
+        url, note = (source.get("url") or "").strip(), (source.get("note") or "").lower()
+        if not web_page(url) or "api" in re.findall(r"[a-z]+", note) or "json" in note:
+            continue
+        if not re.search(r"\d", url.split("//", 1)[-1].split("/", 1)[-1]):
+            continue  # a front page or a search form, not a page for this bill
+        score = ((4 if number and re.search(rf"(?<!\d)0*{number}(?!\d)", url) else 0)
+                 - (5 if LISTING.search(url) else 0) + (1 if url.lower().startswith("https") else 0))
+        if best_score is None or score > best_score:
+            best, best_score = url, score
+    if best:
+        return best
+    versions = sorted(b.get("versions") or [], key=lambda v: v.get("date") or "")
+    for version in reversed(versions):
+        links = [l for l in version.get("links") or [] if web_page((l.get("url") or "").strip())]
+        for kind in ("text/html", "application/pdf"):
+            for l in links:
+                if (l.get("media_type") or "").lower() == kind:
+                    return l["url"].strip()
+        if links:
+            return links[0]["url"].strip()
+    return ""
+
+
+def abstract_text(b):
+    return " ".join(a.get("abstract", "") for a in (b.get("abstracts") or []))
+
+
 def store(db, b):
     j = b.get("jurisdiction") or {}
     code = jurisdiction_code(j)
-    federal = code == "us" and congress_id(b.get("session"), b.get("identifier"))
-    ident = federal or "os-" + (b.get("id", "").rsplit("/", 1)[-1] or f"{code}-{b.get('session')}-{b.get('identifier')}")
-    row = db.execute("SELECT updated, source FROM measures WHERE id=?", (ident,)).fetchone()
+    ident = measure_id(b)
+    # Only a record that came with its sources can say where the bill's own page is; one without
+    # them (an older reply, a test) leaves whatever is stored.
+    link = pick_link(b) if "sources" in b else None
+    row = db.execute("SELECT updated, source, source_url FROM measures WHERE id=?", (ident,)).fetchone()
     if row and row["source"] == "Congress.gov":
         return 0  # the same bill, and Congress.gov carries the summary, the sponsors and the actions
     if row and row["updated"] == b.get("updated_at"):
+        if link is not None and row["source_url"] != link:
+            db.execute("UPDATE measures SET source_url=? WHERE id=?", (link, ident))
         return 0
-    abstracts = " ".join(a.get("abstract", "") for a in (b.get("abstracts") or []))
+    abstracts = abstract_text(b)
     sponsors = [s.get("name") for s in (b.get("sponsorships") or []) if s.get("primary")] or \
                [s.get("name") for s in (b.get("sponsorships") or [])][:3]
     kind = "resolution" if "resolution" in " ".join(b.get("classification") or []) else "bill"
-    return upsert(db, "measures", {
+    record = {
         "id": ident, "kind": kind, "jurisdiction": code,
         "jurisdiction_name": "Congress" if code == "us" else (j.get("name") or code.upper()),
         "session": b.get("session"), "identifier": b.get("identifier"), "title": b.get("title"),
-        "summary": abstracts[:6000], "status": status_from_action(b.get("latest_action_description")),
+        "summary": abstracts[:SUMMARY_MAX], "status": status_from_action(b.get("latest_action_description")),
         "latest_action": b.get("latest_action_description"), "latest_action_date": (b.get("latest_action_date") or "")[:10],
         "introduced_date": (b.get("first_action_date") or b.get("created_at") or "")[:10],
         "url": b.get("openstates_url"), "sponsors": ", ".join(s for s in sponsors if s),
         "source": "Open States", "updated": b.get("updated_at"), "first_seen": iso(),
-    })
+    }
+    if link is not None:
+        record["source_url"] = link
+    return upsert(db, "measures", record)
+
+
+LINK_CAP = 100  # requests per run for the pages of bills stored before the collector asked for them
+
+
+def fill_links(db, http, cap, started):
+    """Find the legislature's own page for the bills on the site that were stored without one.
+
+    Asked twenty at a time, by jurisdiction, session and bill number, the most the API takes in one
+    request: the 1,780 bills from Open States on the site at the time were 141 requests. The ones a
+    reader is likeliest to open go first: those carrying a label, then the most recently acted on. A
+    bill the answer leaves out keeps its Open States address, marked as asked, and is not asked again.
+    The same answer carries the summary, which replaces a stored one cut short by the old limit.
+    Returns (requests, links found, whether the clock stopped it).
+    """
+    if cap <= 0:
+        return 0, 0, False
+    labelled = {r[0] for r in db.execute("SELECT DISTINCT target FROM tags WHERE kind IN ('fear', 'control', 'agency')")}
+    todo = [m for m in measures_in_scope(db) if m["source"] == "Open States" and m.get("source_url") is None
+            and m["identifier"] and m["session"]]
+    todo.sort(key=lambda m: m["latest_action_date"] or "", reverse=True)
+    todo.sort(key=lambda m: m["id"] not in labelled)
+    groups = collections.OrderedDict()
+    for m in todo:
+        groups.setdefault((m["jurisdiction"], m["session"]), []).append(m)
+    used, found, lengthened, hosts = 0, 0, 0, collections.Counter()
+    try:
+        for (code, session), ms in groups.items():
+            for i in range(0, len(ms), 20):
+                if used >= cap:
+                    return used, found, False
+                if time.time() - started > SECONDS:
+                    return used, found, True
+                chunk = ms[i:i + 20]
+                try:
+                    data = http.json(BASE, params={"jurisdiction": ocd_id(code), "session": session,
+                                                   "identifier": [m["identifier"] for m in chunk],
+                                                   "include": ["sources", "versions", "abstracts"], "per_page": 20})
+                except HttpError as exc:
+                    if "exceeded limit" in str(exc) or exc.status == 429:
+                        return used, found, False
+                    if exc.status != 400:
+                        raise
+                    data = {"results": []}  # a session or number it will not take: asked, and none given
+                used += 1
+                results = data.get("results") or []
+                links = {measure_id(b): pick_link(b) for b in results}
+                whole = {measure_id(b): abstract_text(b) for b in results}
+                for m in chunk:
+                    link = links.get(m["id"], "")
+                    db.execute("UPDATE measures SET source_url=? WHERE id=?", (link, m["id"]))
+                    found += bool(link)
+                    if link:
+                        hosts[urllib.parse.urlparse(link).netloc.removeprefix("www.")] += 1
+                    # A summary stored when only 6,000 characters were kept is replaced by the whole of
+                    # it. The new text is read again, and its labels checked again, like any other.
+                    kept, text = m.get("summary") or "", whole.get(m["id"], "")
+                    if len(kept) >= OLD_SUMMARY_CUT and len(text) > len(kept):
+                        db.execute("UPDATE measures SET summary=? WHERE id=?", (text[:SUMMARY_MAX], m["id"]))
+                        lengthened += 1
+                db.commit()
+        return used, found, False
+    finally:
+        # Where the links went, in the run's log: a wrong pick shows as a host nobody expects.
+        if hosts:
+            log("[openstates] bills' own pages found on " + ", ".join(f"{h} ({n})" for h, n in hosts.most_common(12)))
+        if lengthened:
+            log(f"[openstates] {lengthened} summaries cut at {OLD_SUMMARY_CUT:,} characters replaced by the whole")
 
 
 def prefile_sweep(db, http, cap, started):
@@ -350,7 +502,7 @@ def prefile_sweep(db, http, cap, started):
         while not cur["done"] and used < cap and time.time() - started < SECONDS:
             try:
                 data = http.json(BASE, params={"q": query, "sort": "first_action_asc", "per_page": 20,
-                                               "page": cur["page"], "include": ["abstracts", "sponsorships"],
+                                               "page": cur["page"], "include": INCLUDE,
                                                "created_since": PREFILE_SINCE})
             except HttpError as exc:
                 if "exceeded limit" in str(exc) or exc.status == 429:

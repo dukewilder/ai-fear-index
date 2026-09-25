@@ -50,13 +50,14 @@
 </div></section>
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="index">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The Fear Index</h2>
-<p class="sub">Scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
+<p class="sub">The {{ d.fear_word }} fears this report follows, scored 0 to 100. <span class="key"><i class="k1"></i>bills <i class="k2"></i>lobbying <i class="k3"></i>attention</span></p>
 <ol class="rank">{% for f in d.fears %}{{ fear_row(f) }}{% endfor %}</ol>
+<a class="more" href="{{ url('method') }}#fears">How the {{ d.fear_word }} were chosen</a>
 </div></section>
 {% if d.grid %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="everywhere">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">The same fears, everywhere</h2>
-<p class="sub">Every fear, every channel, counted.</p>
+<p class="sub">All {{ d.fear_word }} fears, on every channel.</p>
 {{ grid(d.grid) }}
 </div></section>
 {% endif %}
@@ -112,6 +113,7 @@
 <h2 class="h">What the fear is buying</h2>
 <p class="sub">The government controls written into AI bills, rules and orders, by number of measures.</p>
 <ol class="rank">{% for c in d.controls if c.n %}{{ control_row(c) }}{% endfor %}</ol>
+<a class="more" href="{{ url('bills') }}">Every bill, by state, fear and control</a>
 </div></section>
 {% if d.beneficiaries %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="benefits">{% set ns.i = ns.i + 1 %}<div class="wrap">
@@ -125,6 +127,7 @@
 <h2 class="h">Already law</h2>
 <p class="sub">{{ d.law_passed }} measures have passed. {{ d.law_total }} of them carry a control.{% if d.law_total > d.already_law|length %} The {{ d.already_law|length }} carrying the most are shown.{% endif %}</p>
 <ul class="list">{% for a in d.already_law %}{{ law_row(a) }}{% endfor %}</ul>
+<a class="more" href="{{ url('bills') }}?status=passed">Everything that passed, with filters</a>
 </div></section>
 {% endif %}
 {# The daily brief and the pitch-in sit in base.html now, so every page carries them, not the

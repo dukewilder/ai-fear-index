@@ -1,0 +1,21 @@
+{% from "macros.html" import bill_item %}
+{% set m = d.bills_meta %}
+<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('home') }}">{{ chevron|safe }}The report</a>
+<h1 class="title">Every bill</h1>
+<p class="lead">All {{ "{:,}".format(m.total) }} AI bills, resolutions, rules and orders since January 2025. {{ "{:,}".format(m.controlled) }} of them would put AI, the people building it or the people using it under new government control.</p>
+<p class="sub">Filter them by place, by the fear a measure cites, by the control it would create, or by where it stands. Each links to the legislature's own page where one is on record, and says which site it opens. The address keeps the filters, so any view can be shared.</p>
+{# Inert without script, so it starts hidden and the whole list shows instead. #}
+<form class="bf" data-bills-form hidden>
+<label class="bf-q"><span>Search</span><input type="search" name="q" placeholder="Title words, or a number like SB 53" autocomplete="off" enterkeyhint="search"></label>
+<label><span>Place</span><select name="place"><option value="">All places</option>{% for p in m.places %}<option value="{{ p.code }}">{{ p.name }} ({{ p.n }})</option>{% endfor %}</select></label>
+<label><span>Fear cited</span><select name="fear"><option value="">Any, or none</option><option value="any">Any fear ({{ m.with_fear }})</option>{% for f in m.fears %}<option value="{{ f.slug }}">{{ f.name }} ({{ f.n }})</option>{% endfor %}</select></label>
+<label><span>Control</span><select name="control"><option value="">Any, or none</option><option value="any">Any control ({{ m.controlled }})</option>{% for c in m.controls %}<option value="{{ c.slug }}">{{ c.chip }} ({{ c.n }})</option>{% endfor %}</select></label>
+<label><span>Status</span><select name="status"><option value="">Any</option>{% for s in m.statuses %}<option value="{{ s.slug }}">{{ s.name }} ({{ s.n }})</option>{% endfor %}</select></label>
+<label><span>Order</span><select name="sort"><option value="">Newest action</option><option value="controls">Most controls</option></select></label>
+</form>
+<p class="bf-count" data-bills-count aria-live="polite">{{ "{:,}".format(m.total) }} measures</p>
+<ul class="list bills" data-bills data-all>{% for b in d.bills %}{{ bill_item(b, fear_name, control_chip) }}{% endfor %}</ul>
+<p class="caption" data-bills-none hidden>No measure matches all of these. <button type="button" class="linkish" data-bills-clear>Clear the filters</button></p>
+<button type="button" class="showall" data-bills-more hidden>Show 100 more</button>
+</div></section>

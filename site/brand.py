@@ -280,7 +280,7 @@ def header(path, w=1500, h=500, bg=PAPER, fg=VERMILLION):
     return path
 
 
-def share(path, tagline="Every fear about AI, and what it buys.", w=1200, h=630):
+def share(path, tagline="Fear of AI, and what it buys.", w=1200, h=630):
     """The picture that stands in for the site wherever a link to it appears.
 
     The front page's other card stamps the index on it, which is the right thing for a card about

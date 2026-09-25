@@ -123,6 +123,19 @@ def build(db, today):
                      + "\n".join(f"| {cell(name, 60)} | {n} | ${amount:,.0f} | {cell(risk, 60)} |"
                                  for _, amount, name, n, risk in candidates))
 
+    # What the fear list leaves out, from the daily count in blindspots.py: the subjects recurring in
+    # AI measures that cite none of the fears. The method page says a person sees this every week.
+    spots = kv_get(db, "blindspots:report") or {}
+    subjects = (spots.get("uncovered") or [])[:12]
+    if subjects:
+        items += len(subjects)
+        parts.append(f"## Subjects none of the fears covers\n\n"
+                     f"Recurring in the {spots.get('uncovered_measures', 'many')} AI measures whose summaries match none "
+                     f"of the fears, counted {spots.get('at', '')[:10]}. One that runs through many legislatures may be a fear "
+                     "the report should follow; adding it is an entry in config/fears.json.\n\n"
+                     "| Subject | Measures | Legislatures |\n|---|---|---|\n"
+                     + "\n".join(f"| {cell(s['phrase'], 60)} | {s['measures']} | {s['places']} |" for s in subjects))
+
     # Laws whose outcome is known from outside the record, and that the record gets wrong. This is
     # the one list here about what is missing rather than what is shown wrongly.
     from . import known

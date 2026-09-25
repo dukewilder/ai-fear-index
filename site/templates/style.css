@@ -53,9 +53,10 @@ a:hover{color:var(--accent)}
 .nav a[aria-current=page]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
 .theme{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--edge);background:transparent;color:var(--muted);font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .theme:hover{border-color:var(--ink);color:var(--ink)}
-@media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme{padding:0 6px}.theme span{display:none}.status .asof{display:none}}
+.theme-bar{display:none}
+@media (max-width:600px){.masthead .wrap{gap:8px}.brand{font-size:21px;gap:6px}.nav{gap:11px}.nav a{font-size:11px;letter-spacing:.07em}.theme-top{display:none}.theme-bar{display:inline-flex;flex-shrink:0;margin-left:auto;height:24px}.status .asof{display:none}}
 /* Three links and the switch, on the narrowest phones: 320 wide overflowed by 18px once States joined. */
-@media (max-width:374px){.masthead .wrap{gap:6px}.brand{font-size:19px;gap:5px}.nav{gap:8px}.nav a{letter-spacing:.04em}}
+@media (max-width:374px){.masthead .wrap{gap:6px}.brand{font-size:17px;gap:5px}.nav{gap:7px}.nav a{font-size:10px;letter-spacing:.02em}}
 .theme i{display:inline-block;width:8px;height:8px;border:1px solid currentColor;background:var(--ink)}
 :root[data-theme=dark] .theme i,:root:not([data-theme=light]) .theme i{background:var(--ink)}
 .status{--hair:var(--rule-band);border-bottom:1px solid var(--hair);background:var(--band);font:500 11px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
@@ -120,6 +121,7 @@ a.row:hover .row-name{text-decoration:underline;text-decoration-thickness:2px}
 .stamp{display:inline-block;padding:3px 8px 2px;border:1.5px solid var(--accent);color:var(--accent);font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;transform:rotate(-1.5deg)}
 .time{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .more{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font:600 12px var(--mono);letter-spacing:.09em;text-transform:uppercase}
+.showall+.more{display:flex;width:fit-content}
 .caption{margin:14px 0 0;font-size:13px;line-height:1.55;color:var(--muted)}
 
 .item{display:flex;flex-direction:column;gap:7px;padding:13px 0;border-bottom:1px solid var(--hair)}
@@ -362,6 +364,20 @@ a.copy.donate{text-decoration:none}
 @media (max-width:559px){.tmap-go{align-self:stretch;justify-content:center}}
 .tmap-top{margin-top:20px}
 @media (max-width:559px){.tmap-grid{gap:2px}.tile i{display:none}.tile b{font-size:9.5px;letter-spacing:0}}
+/* Under each bill, where its link goes: the legislature's own site, not this one. */
+.src{font:500 11px/1.4 var(--mono);letter-spacing:.06em;color:var(--muted);overflow-wrap:anywhere}
+/* The page of every bill: the search across the top, then the filters, two or three to a row. */
+.bf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 10px;margin:18px 0 4px}
+@media (min-width:880px){.bf{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}}
+@media (max-width:559px){.bf select{font-size:12px;letter-spacing:0}}
+.bf label{display:flex;flex-direction:column;gap:5px;min-width:0;font:500 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.bf .bf-q{grid-column:1/-1}
+.bf select,.bf input{width:100%;min-width:0;height:42px;padding:0 8px;border:1px solid var(--edge);border-radius:0;background:var(--panel);color:var(--ink);font:500 13px var(--mono);letter-spacing:.02em}
+.bf input::placeholder{color:var(--muted);opacity:1}
+.bf select:focus,.bf input:focus{outline:2px solid var(--ink);outline-offset:1px}
+.bf-count{margin:16px 0 8px;font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.bills>li{content-visibility:auto;contain-intrinsic-size:auto 130px}
+.linkish{padding:0;border:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
 .tip{position:absolute;z-index:30;padding:5px 9px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);font:500 12px var(--mono);white-space:nowrap;pointer-events:none}
 
 @media (min-width:760px){

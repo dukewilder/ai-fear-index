@@ -21,6 +21,11 @@ import requests
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 SINCE = "2025-01-01"  # current legislative sessions
+# How much of an official summary is kept, and the tagger and the check read all of what is kept. It
+# was 6,000 characters kept and 5,000 checked, which cut short seven summaries, California's SB 53 and
+# New York's budget bills among them, and left nine only partly checked.
+SUMMARY_MAX = 60000
+OLD_SUMMARY_CUT = 6000
 # Legislatures that number their sessions rather than naming them by year, and the year each of
 # these began. A session that began in 2025 is inside the report even for a bill filed before
 # January: Montana numbers its 2025 bills from draft requests made the summer before, and Texas
@@ -347,7 +352,10 @@ def congress_id(session, identifier):
 def add_columns(db):
     """Columns added to a table after a database already exists. CREATE TABLE IF NOT EXISTS
     will not add them, so they are added here once, in place."""
-    for table, column, kind in (("fec", "receipt_type", "TEXT"), ("fec", "line_number", "TEXT")):
+    # measures.source_url: the legislature's own page for a bill, where Open States gives one. NULL
+    # until the collector has asked; an empty string once it has and there was none to give.
+    for table, column, kind in (("fec", "receipt_type", "TEXT"), ("fec", "line_number", "TEXT"),
+                                ("measures", "source_url", "TEXT")):
         have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         if column not in have:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
@@ -718,6 +726,30 @@ def measures_in_scope(db):
     rows = [dict(r) for r in db.execute(
         "SELECT m.* FROM measures m JOIN tag_runs tr ON tr.target = m.id WHERE tr.ai_related = 1")]
     return one_record_per_bill([r for r in rows if in_window(r) and r["url"] not in suppressed])
+
+
+# Open States' own bill pages now redirect into Plural's app, which shows a blank page until its
+# script loads and sometimes after. A reader who clicked a bill on this site landed there and took
+# the app, with its copied text, for this site's reading of the bill.
+OPEN_STATES_HOSTS = ("openstates.org", "pluralpolicy.com", "open.pluralpolicy.com")
+
+
+def read_link(m):
+    """Where a reader goes to read a measure, and the name of the site that is, as (href, where).
+
+    The legislature's own page when Open States gave one, or failing that the bill's text on the
+    legislature's site. Congress.gov and the Federal Register records are the official pages
+    already. An Open States address is the last resort, and says so.
+    """
+    href = (m.get("source_url") or "").strip() or (m.get("url") or "")
+    host = urllib.parse.urlparse(href).netloc.lower().split(":")[0].removeprefix("www.")
+    if not host:
+        return href, ""
+    if host.endswith(OPEN_STATES_HOSTS):
+        return href, "Open States"
+    if urllib.parse.urlparse(href).path.lower().endswith(".pdf"):
+        return href, f"{host}, PDF"
+    return href, host
 
 
 def where_counted(codes):

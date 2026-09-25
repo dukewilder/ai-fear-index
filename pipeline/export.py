@@ -13,7 +13,7 @@ import re
 import urllib.parse
 
 from .common import (FEDERAL, REPO_URL, SITE_URL, STATES, Entities, config, fear_keywords, fears_mentioned, iso,
-                     kv_get, kv_set, measures_in_scope, name_key, now, own_post, sha, spell, status_label,
+                     kv_get, kv_set, measures_in_scope, name_key, now, own_post, read_link, sha, spell, status_label,
                      tidy_headline, where_counted)
 
 SMALL = {"of", "and", "for", "the", "in", "on", "to", "a", "an", "at", "by"}
@@ -198,6 +198,9 @@ def export(db, out_dir, base=""):
         m["fears"] = sorted(s for s in tg["fear"] if s in fear_by)
         m["controls"] = sorted(s for s in tg["control"] if s in control_by)
         m["agencies"] = sorted(tg["agency"])
+        # Where a reader lands to read it: the legislature's own page wherever the record has one.
+        # m["url"] stays the record's own address, which the suppression list and the quotes key on.
+        m["link"], m["where"] = read_link(m)
     suppressed = set(config("suppress").get("urls", []))
     controlled = [m for m in measures if m["controls"]]
 
@@ -498,7 +501,7 @@ def export(db, out_dir, base=""):
     passed = sorted((m for m in controlled if m["status"] == "passed"),
                     key=lambda m: (-len(m["controls"]), m["latest_action_date"] or ""))
     already_law = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 140),
-                    "url": m["url"], "date": law_date(m, today),
+                    "url": m["link"], "where": m["where"], "date": law_date(m, today),
                     "controls": [control_by[c]["chip"] for c in m["controls"]],
                     "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in passed[:40]]
     law_total = len(passed)
@@ -536,11 +539,15 @@ def export(db, out_dir, base=""):
             f"{st['filings']:,} federal lobbying filings name it." if st["filings"] else "",
             f"{st['wiki30']:,} Wikipedia views this month." if st["wiki30"] else "",
             f"{SITE_URL}/fear/{fp['slug']}/"] if x)
+        fp["bills_total"] = len(st["measures"])
     org_pages = [org_page(o, len(ranked), lob, receipts, committees, feed, measures, control_by) for o in top]
     org_pages += [org_page(o, len(industry_ranked), lob, receipts, committees, feed, measures, control_by, "industry")
                   for o in industry_top]
     org_pages += [org_page(o, len(com_ranked), lob, receipts, committees, feed, measures, control_by, "election")
                   for o in com_ranked[:30]]
+
+    # ---------------- every measure, for the page that browses them all
+    bills, bills_meta = bill_list(measures, order, fear_by, control_by, today)
 
     # ---------------- sources and status
     status = {r["source"]: dict(r) for r in db.execute("SELECT * FROM status")}
@@ -594,6 +601,7 @@ def export(db, out_dir, base=""):
         "beneficiaries": beneficiaries, "controls": control_rows, "sources": source_rows,
         "publishers": feeds,
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
+        "bills": bills, "bills_meta": bills_meta,
         "fear_word": spell(len(fears)),
     }
     (out / "site_data.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
@@ -812,7 +820,8 @@ def own_words(db, measures, fear_by, control_by, suppressed=(), per_fear=None, l
             if words < 6 or shouted:
                 continue
             out.append({"fear": fear_by[slug]["name"], "slug": slug, "quote": quote,
-                        "bill": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "url": m["url"],
+                        "bill": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "url": m["link"],
+                        "where": m["where"],
                         "status": status_label(m["status"], m["latest_action"], m["kind"]), "words": words,
                         "controls": chips, "agency": cut(who[0], 58) if who else "",
                         "when": m["introduced_date"] or ""})
@@ -858,7 +867,7 @@ def build_feed(db, ents, measures, lob, receipts, today):
             action = f" ({cut(m['latest_action'], 90)})" if m["latest_action"] and m["kind"] not in ("rule", "order") else ""
             items.append({"type": "rule" if m["kind"] in ("rule", "order") else "bill", "label": label,
                           "text": f"{m['jurisdiction_name']} {m['identifier']}: {cut(m['title'] or 'Untitled', 150)}{action}",
-                          "url": m["url"], "time_iso": when[:10] + "T12:00:00+00:00", "time": when[:10],
+                          "url": m["link"], "time_iso": when[:10] + "T12:00:00+00:00", "time": when[:10],
                           "fears": m["fears"], "org": None})
     for r in lob:
         if (r["posted"] or "") >= horizon:
@@ -1034,7 +1043,7 @@ def build_exhibit(db, order, fear_stats, today, suppressed=()):
         named = [(m, h) for m, h in named if len(h) > 24]
         bill = next((mh for mh in named if len(mh[1]) <= 70), named[0] if named else None)
         if bill:
-            line, line_url = cut(bill[1], 70), bill[0]["url"]
+            line, line_url = cut(bill[1], 70), bill[0]["link"]
             source = f"{bill[0]['identifier'] or 'Measure'}, {bill[0]['jurisdiction_name']}"
             source_label = "Newest bill"
     if not line:
@@ -1199,10 +1208,10 @@ def fear_page(f, rank, of, fear_stats, lob, feed, today, db, control_by, page_sl
                  "score": str(n), "unit": "bills"} for i, (k, n) in enumerate(agencies.most_common(5), 1)]
     bills = sorted(st["measures"], key=lambda m: (len(m["controls"]), m["introduced_date"] or ""), reverse=True)[:10]
     bill_rows = [{"name": f"{m['identifier'] or 'Measure'}, {m['jurisdiction_name']}", "title": cut(m["title"] or "", 160),
-                  "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["url"],
-                  "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in bills]
+                  "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["link"],
+                  "where": m["where"], "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in bills]
     buying = collections.Counter(c for m in st["measures"] for c in m["controls"])
-    buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n),
+    buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n), "slug": c,
                     "passed": str(sum(1 for m in st["measures"] if c in m["controls"] and m["status"] == "passed"))}
                    for i, (c, n) in enumerate(buying.most_common(), 1)]
     evidence = []
@@ -1273,6 +1282,45 @@ PLACE_KIND = {"us": "bills and resolutions", "us-exec": "rules and executive ord
 ONE_KIND = {"bills and resolutions": "bill or resolution", "rules and executive orders": "rule or executive order"}
 
 
+def bill_list(measures, order, fear_by, control_by, today):
+    """Every measure the site counts, for the page that lists them all, and what it can be filtered by.
+
+    Newest action first. A date in the future is an effective date, which says nothing about when the
+    measure moved, so it sorts by when it was filed instead. Each row carries the slugs of its fears
+    and controls; the names ride once, in the filters.
+    """
+    stamp = today.isoformat()
+    rows = []
+    for m in measures:
+        date = m["latest_action_date"] or m["introduced_date"] or ""
+        if date > stamp:
+            date = m["introduced_date"] or stamp
+        status = status_label(m["status"], m["latest_action"], m["kind"])
+        rows.append({"name": m["identifier"] or KIND_LABEL.get(m["kind"], "Measure"),
+                     "place": PLACE_NAMES.get(m["jurisdiction"], m["jurisdiction_name"]), "code": m["jurisdiction"],
+                     "title": cut(m["title"] or "", 180), "status": status, "state": slugify(status),
+                     "date": date, "url": m["link"], "where": m["where"],
+                     "fears": list(m["fears"]), "controls": list(m["controls"])})
+    rows.sort(key=lambda r: (r["date"], r["place"], r["name"]), reverse=True)
+    places = collections.Counter(r["code"] for r in rows)
+    fears = collections.Counter(f for r in rows for f in r["fears"])
+    controls = collections.Counter(c for r in rows for c in r["controls"])
+    states = collections.Counter(r["status"] for r in rows)
+    meta = {
+        "total": len(rows),
+        "controlled": sum(1 for r in rows if r["controls"]),
+        "with_fear": sum(1 for r in rows if r["fears"]),
+        "controlled_no_fear": sum(1 for r in rows if r["controls"] and not r["fears"]),
+        "places": sorted(({"code": c, "name": PLACE_NAMES.get(c, c.upper()), "n": n} for c, n in places.items()),
+                         key=lambda p: p["name"]),
+        "fears": [{"slug": f["slug"], "name": f["name"], "n": fears[f["slug"]]} for f in order if fears[f["slug"]]],
+        "controls": [{"slug": c, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "n": n}
+                     for c, n in controls.most_common()],
+        "statuses": [{"slug": slugify(label), "name": label, "n": n} for label, n in states.most_common()],
+    }
+    return rows, meta
+
+
 def place_slug(code):
     return PLACE_SLUG.get(code, code)
 
@@ -1320,7 +1368,7 @@ def place_pages(db, measures, fear_by, control_by, suppressed, today=None):
                       "controlled": str(sum(1 for m in ctl if fs in m["fears"]))}
                      for i, (fs, n) in enumerate(fear_mix.most_common(), 1)]
         buying = collections.Counter(c for m in ms for c in m["controls"])
-        buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n),
+        buying_rows = [{"rank": i, "name": control_by[c]["name"], "chip": control_by[c]["chip"], "bills": str(n), "slug": c,
                         "passed": str(sum(1 for m in ms if c in m["controls"] and m["status"] == "passed"))}
                        for i, (c, n) in enumerate(buying.most_common(), 1)]
         # the most controls first, law ahead of the rest, then the most recently moved: two stable sorts
@@ -1328,9 +1376,10 @@ def place_pages(db, measures, fear_by, control_by, suppressed, today=None):
         order.sort(key=lambda m: (-len(m["controls"]), m["status"] != "passed"))
         bill_rows = [{"name": m["identifier"] or KIND_LABEL.get(m["kind"], "Measure"),
                       "title": cut(m["title"] or "", 160),
-                      "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["url"],
-                      "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in order]
-        law_rows = [{"name": m["identifier"] or "Measure", "title": cut(m["title"] or "", 140), "url": m["url"],
+                      "status": status_label(m["status"], m["latest_action"], m["kind"]), "url": m["link"],
+                      "where": m["where"], "controls": [control_by[c]["chip"] for c in m["controls"]]} for m in order]
+        law_rows = [{"name": m["identifier"] or "Measure", "title": cut(m["title"] or "", 140), "url": m["link"],
+                     "where": m["where"],
                      "date": law_date(m, today or now().date()),
                      "controls": [control_by[c]["chip"] for c in m["controls"]],
                      "fears": [fear_by[fs]["name"] for fs in m["fears"]]} for m in law[:30]]
@@ -1495,11 +1544,15 @@ def save_snapshot(db, today, snap):
 def write_csvs(folder, measures, lob_recent, ranked, com_ranked):
     with open(folder / "measures.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["id", "kind", "jurisdiction", "identifier", "title", "status", "last_action", "introduced", "url", "fears", "controls", "agencies"])
+        # url is where to read the measure, the legislature's own page wherever the record has one;
+        # record_url is the record it was collected from, which is the same page for Congress and rules.
+        w.writerow(["id", "kind", "jurisdiction", "identifier", "title", "status", "last_action", "introduced", "url",
+                    "fears", "controls", "agencies", "record_url"])
         for m in sorted(measures, key=lambda m: m["introduced_date"] or "", reverse=True):
             w.writerow([m["id"], m["kind"], m["jurisdiction_name"], m["identifier"], m["title"],
                         status_label(m["status"], m["latest_action"], m["kind"]).lower(), m["latest_action"] or "",
-                        m["introduced_date"], m["url"], "; ".join(m["fears"]), "; ".join(m["controls"]), "; ".join(m["agencies"])])
+                        m["introduced_date"], m.get("link") or m["url"], "; ".join(m["fears"]), "; ".join(m["controls"]),
+                        "; ".join(m["agencies"]), m["url"]])
     with open(folder / "lobbying.csv", "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["client", "registrant", "year", "quarter", "amount", "bills", "fears mentioned", "url"])

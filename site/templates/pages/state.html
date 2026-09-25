@@ -1,4 +1,4 @@
-{% from "macros.html" import benefit_row, quote_card, law_row, buying_row %}
+{% from "macros.html" import benefit_row, quote_card, law_row, buying_row, bill_item %}
 {# Sections come and go with the data, so the shading alternates on the ones present rather than
    being fixed to each: a state with no offices named would otherwise stack two bands together. #}
 {% set ns = namespace(i=0) %}
@@ -50,7 +50,7 @@
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">What it's buying</h2>
 <p class="sub">The government controls written into these measures.</p>
-<ol class="rank">{% for c in p.buying %}{{ buying_row(c) }}{% endfor %}</ol>
+<ol class="rank">{% for c in p.buying %}{{ buying_row(c, url('bills') ~ '?place=' ~ p.code ~ '&control=' ~ c.slug) }}{% endfor %}</ol>
 </div></section>
 {% endif %}
 
@@ -65,7 +65,7 @@
 {% if p.bills %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">Every measure</h2>
-<p class="sub">The ones carrying the most controls first, then what has passed, then the most recent.</p>
-<ul class="list">{% for b in p.bills %}<li class="item"><span class="item-top"><a class="row-name" href="{{ b.url }}" rel="noopener" target="_blank">{{ b.name }}</a><span class="stamp">{{ b.status }}</span></span><span class="meta" style="margin-top:0">{{ b.title }}</span>{% if b.controls %}<span class="chips">{% for c in b.controls %}<span class="chip o">{{ c }}</span>{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
+<p class="sub">The ones carrying the most controls first, then what has passed, then the most recent. <a href="{{ url('bills') }}?place={{ p.code }}">Filter them by fear, control or status</a>.</p>
+<ul class="list">{% for b in p.bills %}{{ bill_item(b) }}{% endfor %}</ul>
 </div></section>
 {% endif %}

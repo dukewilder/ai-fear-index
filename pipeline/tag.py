@@ -12,8 +12,8 @@ import time
 
 import requests
 
-from .common import (AI_TEXT, config, env, in_window, iso, kv_get, kv_set, log, sha, states_a_position,
-                     title_settles)
+from .common import (AI_TEXT, SUMMARY_MAX, config, env, in_window, iso, kv_get, kv_set, log, sha,
+                     states_a_position, title_settles)
 from . import known
 
 API = "https://api.anthropic.com/v1/messages"
@@ -74,8 +74,8 @@ def propose(key, fears, controls, doc, is_measure):
               "what the text says. Reply with a single JSON object and nothing else.")
     control_block = f"\nCONTROLS (what the measure itself would impose):\n{definitions(controls)}\n" if is_measure else ""
     schema = ('{"ai_related": true or false, "fears": [fear slugs], "controls": [control slugs], '
-              '"agencies": ["government bodies the measure would give new authority, duties, or enforcement power over AI '
-              'or data centers, '
+              '"agencies": ["government bodies the measure would give new authority, duties, or enforcement power over AI, '
+              'data centers, or the people and companies who build or use AI, '
               'named with their jurisdiction, for example \\"Colorado Attorney General\\""]}') if is_measure else \
         '{"ai_related": true or false, "fears": [fear slugs]}'
     user = (f"FEARS (harms the text may cite):\n{definitions(fears)}\n{control_block}\nTEXT\n{doc}\n\n"
@@ -83,7 +83,10 @@ def propose(key, fears, controls, doc, is_measure):
             "intelligence, algorithms, automated decisions, synthetic media, or data centers: their building, power, "
             "water, land, siting, rates or taxes, and the large electricity loads they bring, whether or not the text "
             "says AI (not a data program or office that happens to be called a data center). A fear counts only if "
-            "the text states or clearly invokes that harm. A control counts only if the measure itself would impose it. "
+            "the text states or clearly invokes that harm. Rules a measure sets for government bodies' own use of "
+            "AI, such as inventories, assessments, purchasing rules or policies for the systems agencies, schools or "
+            "police use, bind the government itself, not the people who build, sell or use AI: they are not controls, "
+            "and an office that only oversees them is not an agency gaining power. "
             "Summaries often recite law already in force before saying what the measure does. Ignore every "
             "sentence that describes existing law, including ones that open with \"Existing law\" or name an "
             "act that already requires something. Only what this measure would newly impose or newly hand to a "
@@ -261,7 +264,8 @@ def targets(db, limit):
               f"Summary: {r['summary'] or '(none)'}"
         h = sha(doc)
         if r["text_hash"] != h:
-            out.append(("measure", r["id"], doc[:7000], h, body[:7000]))
+            # the whole of what is kept: the title, and the summary up to SUMMARY_MAX
+            out.append(("measure", r["id"], doc[:SUMMARY_MAX + 2000], h, body[:SUMMARY_MAX + 2000]))
     posts = db.execute(
         "SELECT p.id, p.title, p.summary, t.text_hash FROM posts p LEFT JOIN tag_runs t ON t.target = 'post:' || p.id "
         "ORDER BY p.published DESC").fetchall()

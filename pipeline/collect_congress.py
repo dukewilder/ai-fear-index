@@ -1,7 +1,8 @@
 """Federal bills from the Congress.gov API."""
 import datetime as dt
 
-from .common import Http, env, iso, kv_get, kv_set, log, looks_ai, now, status_from_action, strip_html, upsert
+from .common import (SUMMARY_MAX, Http, env, iso, kv_get, kv_set, log, looks_ai, now, status_from_action, strip_html,
+                     upsert)
 
 BASE = "https://api.congress.gov/v3"
 SUMMARY_CAP = 150  # new bills found by summary per run, at two requests each
@@ -136,7 +137,7 @@ def store_bill(db, http, key, congress, btype, number, listing=None):
     return upsert(db, "measures", {
         "id": ident, "kind": "bill", "jurisdiction": "us", "jurisdiction_name": "Congress",
         "session": str(congress), "identifier": f"{TYPE_LABEL.get(btype, btype)} {number}",
-        "title": listing.get("title") or bill.get("title"), "summary": summary[:6000], "status": status,
+        "title": listing.get("title") or bill.get("title"), "summary": summary[:SUMMARY_MAX], "status": status,
         "latest_action": latest.get("text"), "latest_action_date": latest.get("actionDate"),
         "introduced_date": bill.get("introducedDate"),
         "url": f"https://www.congress.gov/bill/{ordinal(congress)}-congress/{TYPE_SLUG.get(btype, 'bill')}/{number}",

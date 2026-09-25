@@ -19,6 +19,12 @@ from .texts import TEXT_MAX, law_texts, reading
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
+# A law read from its own text is read by the stronger model the check uses: fifteen thousand
+# characters of statute beside seventeen definitions. The smaller model found the RAISE Act's duties
+# and its Attorney General's power and, even when told that the law's "critical harm" is the
+# catastrophic risk of the loss of control fear, gave it no fear. Should a key not reach this model,
+# the reading falls back to the smaller one.
+TEXT_MODEL = "claude-sonnet-5"
 LIMITS = {"hourly": 400, "daily": 1200, "backfill": 3500, "auto": 400}
 DAY_CAP = 4000  # items per day: a first backfill clears in a day, then steady state is a trickle
 # Whatever the item limit allows, the run gets a quarter of an hour. The queue is picked up again
@@ -47,6 +53,11 @@ def call(key, system, user, max_tokens=700, model=None):
             last = f"{r.status_code} {r.text[:200]}"
             time.sleep(min(90, 5 * 2 ** attempt))
             continue
+        if r.status_code in (403, 404) or (r.status_code == 400 and "model" in r.text.lower()):
+            if model and model != MODEL:
+                log(f"[tag] {model} is not available to this key; reading with {MODEL}")
+                model = MODEL
+                continue
         if r.status_code != 200:
             raise RuntimeError(f"Claude API {r.status_code}: {r.text[:300]}")
         text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
@@ -90,7 +101,7 @@ def fear_definition(fear):
     return f"{fear['definition']} {note}" if note else fear["definition"]
 
 
-def propose(key, fears, controls, doc, is_measure):
+def propose(key, fears, controls, doc, is_measure, model=None):
     what = "a U.S. bill, resolution, or federal rule" if is_measure else "a statement or article published by an organization"
     system = (f"You classify {what} about artificial intelligence for a public database. Be literal and use only "
               "what the text says. Reply with a single JSON object and nothing else.")
@@ -116,12 +127,13 @@ def propose(key, fears, controls, doc, is_measure):
             "Summaries often recite law already in force before saying what the measure does. Ignore every "
             "sentence that describes existing law, including ones that open with \"Existing law\" or name an "
             "act that already requires something. Only what this measure would newly impose or newly hand to a "
-            "government body counts. When the text of the law is given, read it for what the law does; a section "
-            "it only reprints from law already in force is not what it imposes. Use empty lists when nothing applies.")
-    return call(key, system, user, max_tokens=500)
+            "government body counts. When the text of the law is given, read it for what the law does and the harms "
+            "it is written against, which its definitions and purpose often name; a section it only reprints from law "
+            "already in force is not what it imposes. Use empty lists when nothing applies.")
+    return call(key, system, user, max_tokens=500, model=model)
 
 
-def verify(key, fears, controls, doc, proposal):
+def verify(key, fears, controls, doc, proposal, model=None):
     fdefs = {f["slug"]: fear_definition(f) for f in fears}
     cdefs = {c["slug"]: c["definition"] for c in controls}
     labels = {
@@ -139,7 +151,7 @@ def verify(key, fears, controls, doc, proposal):
             'the Summary or the Text of the law, between 4 and 30 words, never from the Jurisdiction or Identifier '
             'line. Always return the '
             'three keys as objects, never as lists. A sentence describing law already in force does not support a label, so return null when that is the only support.')
-    return call(key, system, user, max_tokens=900)
+    return call(key, system, user, max_tokens=900, model=model)
 
 
 MIN_WORDS = {"fears": 4, "controls": 4, "agencies": 2}
@@ -371,7 +383,8 @@ def run(db, state, mode):
             raise TimedOut()
         kind, target, doc, h, body = item
         is_measure = kind == "measure"
-        proposal = propose(key, fears, controls, doc, is_measure)
+        model = TEXT_MODEL if "\nText of the law: " in doc else None
+        proposal = propose(key, fears, controls, doc, is_measure, model=model)
         ai = bool(proposal.get("ai_related"))
         # A Federal Register document is only stored when its title or abstract names AI, and a
         # presidential document has no abstract, so the model judges an executive order on its title
@@ -389,8 +402,8 @@ def run(db, state, mode):
             ai = True
         if not ai and target in known_ai:
             ai = True
-        verdict = verify(key, fears, controls, doc, proposal) if ai else {}
-        return target, h, ai, verdict, norm(body), body, proposal
+        verdict = verify(key, fears, controls, doc, proposal, model=model) if ai else {}
+        return target, h, ai, verdict, norm(body), body, proposal, model or MODEL
 
     with cf.ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(one, w): w for w in work}
@@ -404,12 +417,12 @@ def run(db, state, mode):
         for fut in cf.as_completed(futures):
             _, target, _, h, _ = futures[fut]
             try:
-                target, h, ai, verdict, doc_norm, raw, proposal = fut.result()
+                target, h, ai, verdict, doc_norm, raw, proposal, used = fut.result()
                 err = None
             except TimedOut:
                 continue
             except Exception as exc:
-                ai, verdict, doc_norm, raw, proposal, err = None, {}, "", "", {}, str(exc)[:300]
+                ai, verdict, doc_norm, raw, proposal, used, err = None, {}, "", "", {}, MODEL, str(exc)[:300]
                 errors += 1
                 if errors <= 3:
                     log(f"[tag] {target}: {err}")
@@ -439,7 +452,7 @@ def run(db, state, mode):
                                 db.execute("INSERT OR REPLACE INTO tags(target,kind,value,evidence,model,tagged_at) "
                                            "VALUES(?,?,?,?,?,?)",
                                            (target, kind[:-1] if kind != "agencies" else "agency",
-                                            label.strip(), quote, MODEL, iso()))
+                                            label.strip(), quote, used, iso()))
                         # What the last reading found stays while its quote still stands in the text
                         # and passes the same rules; this reading adds to it (prune_tags says why).
                         for o in before if ai else []:

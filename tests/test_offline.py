@@ -2763,12 +2763,19 @@ def check_confirmed_labels_stay():
                    ("os-sb1621", kind, value, quote, verdict, "r", "m", "2026-09-25T06:39:00"))
     db.commit()
     # A fresh reading that finds the fear and misses the offense keeps the offense, and not the office
-    # the check refused.
+    # the check refused. A law read from its own text is read by the stronger model.
+    db.execute("INSERT INTO texts(target, url, text, fetched, tries) VALUES(?,?,?,?,0)",
+               ("os-sb1621", "https://example.com/enrolled.htm", "BE IT ENACTED BY THE LEGISLATURE. " + images, iso()))
+    db.commit()
     real = (tagging.env, tagging.propose, tagging.verify, tagging.check_labels)
+    read_by = {}
+
+    def propose(key, fears, controls, doc, is_measure, model=None):
+        read_by[next(l for l in doc.split("\n") if l.startswith("Identifier: "))] = model
+        return {"ai_related": True, "fears": ["deepfakes"], "controls": [], "agencies": []}
     tagging.env = lambda name: "k"
-    tagging.propose = lambda key, fears, controls, doc, is_measure: {
-        "ai_related": True, "fears": ["deepfakes"], "controls": [], "agencies": []}
-    tagging.verify = lambda key, fears, controls, doc, proposal: {
+    tagging.propose = propose
+    tagging.verify = lambda key, fears, controls, doc, proposal, model=None: {
         "fears": {"deepfakes": images}, "controls": {}, "agencies": {}}
     tagging.check_labels = lambda db, key: "checked 0 labels"
     try:
@@ -2776,6 +2783,7 @@ def check_confirmed_labels_stay():
         tagging.run(db, state, "hourly")
     finally:
         tagging.env, tagging.propose, tagging.verify, tagging.check_labels = real
+    assert read_by == {"Identifier: SB 1621": tagging.TEXT_MODEL, "Identifier: SB 9": None}, read_by
     have = {(r["kind"], r["value"]) for r in db.execute("SELECT kind, value FROM tags WHERE target='os-sb1621'")}
     assert ("control", "use-restrictions") in have, "a confirmed control was lost to a fresh reading that missed it"
     assert ("fear", "deepfakes") in have and ("agency", "Texas Attorney General") not in have, have
@@ -2823,6 +2831,27 @@ def check_frontier_reread():
     finally:
         tagging.call = real
     assert len(said) == 2 and all("critical harm" in u for u in said), "the tagger was not told what the fear includes"
+    # A key that cannot use the stronger model reads the law with the smaller one rather than not at all.
+    class Reply:
+        def __init__(self, code, text):
+            self.status_code, self.text = code, text
+
+        def json(self):
+            return {"content": [{"type": "text", "text": self.text}]}
+    models = []
+
+    def post(url, **kw):
+        models.append(kw["json"]["model"])
+        if kw["json"]["model"] == tagging.TEXT_MODEL:
+            return Reply(404, '{"type":"error","error":{"type":"not_found_error","message":"model"}}')
+        return Reply(200, '{"ai_related": false}')
+    real_post = tagging.requests.post
+    tagging.requests.post = post
+    try:
+        assert tagging.call("k", "s", "u", model=tagging.TEXT_MODEL) == {"ai_related": False}
+    finally:
+        tagging.requests.post = real_post
+    assert models == [tagging.TEXT_MODEL, tagging.MODEL], models
     # An answer that adds a note, or a second object, after its JSON is read for the first object.
     assert tagging.parse_json('{"ai_related": true, "fears": ["x"]}\n\nNote: {"also": 1}') == \
         {"ai_related": True, "fears": ["x"]}, "an answer with a note after its JSON went unread"
@@ -2846,6 +2875,15 @@ def check_frontier_reread():
     assert retag_frontier(db) == 1 and retag_frontier(db) == 0, "queued more than once, or not at all"
     hashes = {r["target"]: r["text_hash"] for r in db.execute("SELECT target, text_hash FROM tag_runs")}
     assert hashes == {"os-raise": None, "os-other": "h"}, hashes
+    # And every law read from its own text is read once more, by the stronger model.
+    from pipeline.common import retag_law_texts
+    db.execute("UPDATE tag_runs SET text_hash = 'h'")
+    db.execute("INSERT INTO texts(target, url, text, fetched, tries) VALUES('os-other', 'u', 'text', ?, 0)", (iso(),))
+    db.execute("DELETE FROM kv WHERE key LIKE 'retag:law-texts:%'")
+    db.commit()
+    assert retag_law_texts(db) == 1 and retag_law_texts(db) == 0
+    hashes = {r["target"]: r["text_hash"] for r in db.execute("SELECT target, text_hash FROM tag_runs")}
+    assert hashes == {"os-raise": "h", "os-other": None}, hashes
 
 
 def main():

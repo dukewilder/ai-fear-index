@@ -617,6 +617,7 @@ def connect(path):
     retag_data_centers(db)
     retag_self_driving(db)
     retag_frontier(db)
+    retag_law_texts(db)
     recheck_data_center_labels(db)
     restatus(db)
     return db
@@ -1117,6 +1118,26 @@ def retag_frontier(db):
     if ids:
         log(f"[repair] {len(ids)} measures naming frontier models queued to be read again")
     return len(ids)
+
+
+# Bump to send the tagger again every law read from its own text (pipeline.texts). 1: those are now
+# read by the stronger model, and the first 27 were read by the smaller one.
+RETAG_LAW_TEXTS = 1
+
+
+def retag_law_texts(db):
+    """Queue once every measure with its law's text on file. A reading adds to the labels on file, so
+    this can only find what the smaller model missed."""
+    key = f"retag:law-texts:{RETAG_LAW_TEXTS}"
+    if kv_get(db, key):
+        return 0
+    n = db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target IN "
+                   "(SELECT target FROM texts WHERE text IS NOT NULL)").rowcount
+    kv_set(db, key, True)
+    db.commit()
+    if n:
+        log(f"[repair] {n} laws read from their text queued to be read again")
+    return n
 
 
 # Bump to read again the bills whose title names AI that the tagger judged not about AI.

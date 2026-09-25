@@ -2856,11 +2856,26 @@ def check_frontier_reread():
     assert tagging.parse_json('{"ai_related": true, "fears": ["x"]}\n\nNote: {"also": 1}') == \
         {"ai_related": True, "fears": ["x"]}, "an answer with a note after its JSON went unread"
     assert tagging.parse_json('Here it is:\n```json\n{"a": {"b": "c"}}\n```') == {"a": {"b": "c"}}
+    for reply in ("no object here", '{"ai_related": true, "fears": ["x"'):
+        try:
+            tagging.parse_json(reply)
+            raise AssertionError("an answer with no JSON was taken for one")
+        except ValueError:
+            pass  # a ValueError, which the check and the tagger ask again on, and nothing else
+    # The stronger model is given room, and asked once more with a reminder when it answers in prose.
+    asked = []
+
+    def prose_first(key, system, user, max_tokens=700, model=None):
+        asked.append((user[-60:], max_tokens, model))
+        if len(asked) == 1:
+            raise ValueError("no JSON in reply")
+        return {"ai_related": True}
+    tagging.call = prose_first
     try:
-        tagging.parse_json("no object here")
-        raise AssertionError("an answer with no JSON was taken for one")
-    except ValueError:
-        pass
+        assert tagging.ask_json("k", "s", "u", 500, tagging.TEXT_MODEL) == {"ai_related": True}
+    finally:
+        tagging.call = real
+    assert asked[0][1] >= 1500 and asked[1][1] >= 2500 and asked[1][0].endswith("starting with {."), asked
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "t.db")
     for mid, title in (("os-raise", "Relates to the training and use of artificial intelligence frontier models"),

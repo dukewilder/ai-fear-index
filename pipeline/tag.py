@@ -79,7 +79,22 @@ def parse_json(text):
     except ValueError:
         pass
     m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        raise ValueError("no JSON in reply")  # an object begun and cut off: asked again, not an error
     return json.loads(m.group(0))
+
+
+def ask_json(key, system, user, max_tokens, model=None):
+    """call(), and once more with room and a reminder when the answer holds no JSON object, as the
+    check does. The stronger model can spend its tokens explaining first: ten of the 27 laws it first
+    read on 25 September came back with no object at all."""
+    if model and model != MODEL:
+        max_tokens = max(max_tokens, 1500)
+    try:
+        return call(key, system, user, max_tokens=max_tokens, model=model)
+    except ValueError:
+        return call(key, system, user + "\n\nAnswer with the JSON object only, starting with {.",
+                    max_tokens=max(max_tokens, 2500), model=model)
 
 
 def norm(text):
@@ -130,7 +145,7 @@ def propose(key, fears, controls, doc, is_measure, model=None):
             "government body counts. When the text of the law is given, read it for what the law does and the harms "
             "it is written against, which its definitions and purpose often name; a section it only reprints from law "
             "already in force is not what it imposes. Use empty lists when nothing applies.")
-    return call(key, system, user, max_tokens=500, model=model)
+    return ask_json(key, system, user, 500, model)
 
 
 def verify(key, fears, controls, doc, proposal, model=None):
@@ -151,7 +166,7 @@ def verify(key, fears, controls, doc, proposal, model=None):
             'the Summary or the Text of the law, between 4 and 30 words, never from the Jurisdiction or Identifier '
             'line. Always return the '
             'three keys as objects, never as lists. A sentence describing law already in force does not support a label, so return null when that is the only support.')
-    return call(key, system, user, max_tokens=900, model=model)
+    return ask_json(key, system, user, 900, model)
 
 
 MIN_WORDS = {"fears": 4, "controls": 4, "agencies": 2}

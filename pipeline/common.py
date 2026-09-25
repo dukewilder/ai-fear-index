@@ -502,7 +502,9 @@ def redo_briefs(db):
 #    General "the power to impose duties on frontier developers". The measure imposes duties on those
 #    two offices and sets the developers' standards itself. A duty on an office is now its job, not a
 #    power over anyone, in the rules and in the gate.
-REDO_EDITION = ("2026-09-25", 2)
+#    3: the second rewrite gave the Emergency Management Agency "the power to demand reports", which the
+#    title does not say. A power now has to be one the text states.
+REDO_EDITION = ("2026-09-25", 3)
 
 
 def redo_today(db):

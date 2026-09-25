@@ -591,6 +591,24 @@ POWER_TO_IMPOSE = re.compile(r"\bpower to (?:impose|set|place|put) (?:\w+ ){0,2}
                              re.I)
 
 
+# The power in the sentence has to be one the text states, by its verb or by what it acts on. Written a
+# third time, the 25 September edition gave Pennsylvania's Emergency Management Agency "the power to demand
+# reports" from a measure whose only text, its title, mentions no report and no demand.
+POWER_TO = re.compile(r"\bpower to ([a-z][\w-]*)(?: (?:the|any|all|every|its|their|a|an))? ([a-z][\w-]*)", re.I)
+
+
+def ungrounded_power(text, raw):
+    m = POWER_TO.search(text)
+    if not m or not raw:
+        return ""
+    low = raw.lower()
+    verb, obj = m.group(1).lower(), m.group(2).lower()
+    if verb[:5] in low or obj[:5] in low:
+        return ""
+    return (f"gives the office the power to {verb} {obj}, which the measure's text does not say; "
+            f"give it only a power the text states, in its words")
+
+
 def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdiction="", raw="", offices=None):
     """The reason a sentence was rejected, or an empty string if it holds up.
 
@@ -642,6 +660,9 @@ def why_not(text, quote, body_norm, passed=False, office="", starts="", jurisdic
     hired = hired_fault(text)
     if hired:
         return hired
+    invented = ungrounded_power(text, raw)
+    if invented:
+        return invented
     if raw and DUTIES_ON_OFFICE.search(raw) and POWER_TO_IMPOSE.search(text):
         return ("turns the duties the measure puts on an office into a power to impose duties; those duties "
                 "are the office's own job, so say what the measure does to the people it covers, in its words")

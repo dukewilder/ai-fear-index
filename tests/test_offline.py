@@ -91,6 +91,15 @@ def check_brief_prompt():
     assert "duties" in brief.why_not(pa_bad, "imposing duties on the Pennsylvania Emergency Management Agency",
                                      pa_body, False, "", "", "Pennsylvania", raw=pa_raw), "the duties gate is not wired in"
     assert "Duties a measure puts on an office" in brief.RULES
+    # A power the text does not state is refused; one it states, by verb or by object, is kept.
+    pa_v2 = ("Pennsylvania would give the Pennsylvania Emergency Management Agency the power to demand reports of "
+             "critical incidents and catastrophic risks from frontier developers.")
+    assert "does not say" in brief.ungrounded_power(pa_v2, pa_raw)
+    nj = "New Jersey gives the BPU the power to demand semi-annual water and energy usage reports from data centers."
+    assert brief.ungrounded_power(nj, "requires semi-annual reports on water and energy usage by data centers") == ""
+    ca = ("California gives the Attorney General the power to, for cause, request and obtain a copy of an audit "
+          "report from the operator of a companion chatbot.")
+    assert brief.ungrounded_power(ca, "the Attorney General may request an audit report for cause") == ""
     assert brief.starts_later("commencing January 1, 2029, the agency", "2026-09-20") == "2029"
     assert brief.starts_later("effective January 1, 2025, the agency", "2026-09-20") == ""
     later = ("California puts AI auditors under registration with the Government Operations Agency, "

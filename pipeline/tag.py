@@ -87,14 +87,21 @@ def parse_json(text):
 def ask_json(key, system, user, max_tokens, model=None):
     """call(), and once more with room and a reminder when the answer holds no JSON object, as the
     check does. The stronger model can spend its tokens explaining first: ten of the 27 laws it first
-    read on 25 September came back with no object at all."""
-    if model and model != MODEL:
-        max_tokens = max(max_tokens, 1500)
+    read on 25 September came back with no object at all, and Texas's HB 149 twice more with the room
+    and the reminder. After that the smaller model reads it, rather than the law going unread and
+    being sent to the stronger one again on every pass."""
+    budget = max(max_tokens, 1500) if model and model != MODEL else max_tokens
     try:
-        return call(key, system, user, max_tokens=max_tokens, model=model)
+        return call(key, system, user, max_tokens=budget, model=model)
     except ValueError:
-        return call(key, system, user + "\n\nAnswer with the JSON object only, starting with {.",
-                    max_tokens=max(max_tokens, 2500), model=model)
+        try:
+            return call(key, system, user + "\n\nAnswer with the JSON object only, starting with {.",
+                        max_tokens=max(budget, 2500), model=model)
+        except ValueError:
+            if not model or model == MODEL:
+                raise
+            log(f"[tag] {model} answered twice without JSON; reading with {MODEL}")
+            return call(key, system, user, max_tokens=max_tokens, model=MODEL)
 
 
 def norm(text):
@@ -446,8 +453,8 @@ def run(db, state, mode):
                     try:
                         before = db.execute("SELECT kind, value, evidence, model, tagged_at FROM tags WHERE target=?",
                                             (target,)).fetchall()
-                        refused = {(r["kind"], r["value"], r["evidence"]) for r in db.execute(
-                            "SELECT kind, value, evidence FROM checks WHERE target=? AND verdict='no'", (target,))}
+                        verdicts = {(r["kind"], r["value"], r["evidence"]): r["verdict"] for r in db.execute(
+                            "SELECT kind, value, evidence, verdict FROM checks WHERE target=?", (target,))}
                         db.execute("DELETE FROM tags WHERE target=?", (target,))
                         code, url = about.get(target, ("", ""))
                         for kind in ("fears", "controls", "agencies"):
@@ -470,17 +477,20 @@ def run(db, state, mode):
                                             label.strip(), quote, used, iso()))
                         # What the last reading found stays while its quote still stands in the text
                         # and passes the same rules; this reading adds to it (prune_tags says why).
+                        # Where both found a label, a quote the check confirmed wins over a new one it
+                        # has not read: Texas's SB 1964 lost its confirmed reporting duty to a new
+                        # quote, from the law's optional sandbox, that the check then refused.
                         for o in before if ai else []:
                             kind = KINDS.get(o["kind"])
+                            said = verdicts.get((o["kind"], o["value"], o["evidence"]))
                             if not kind or (kind in ("controls", "agencies") and target in positions) \
-                                    or (url, o["kind"], o["value"]) in pulled \
-                                    or (o["kind"], o["value"], o["evidence"]) in refused:
+                                    or (url, o["kind"], o["value"]) in pulled or said == "no":
                                 continue
                             if agreed({kind: {o["value"]: o["evidence"]}}, doc_norm, kind,
                                       jurisdictions.get(target, ""), raw=raw, code=code):
-                                db.execute("INSERT OR IGNORE INTO tags(target,kind,value,evidence,model,tagged_at) "
-                                           "VALUES(?,?,?,?,?,?)", (target, o["kind"], o["value"], o["evidence"],
-                                                                   o["model"], o["tagged_at"]))
+                                db.execute(f"INSERT OR {'REPLACE' if said == 'yes' else 'IGNORE'} INTO "
+                                           "tags(target,kind,value,evidence,model,tagged_at) VALUES(?,?,?,?,?,?)",
+                                           (target, o["kind"], o["value"], o["evidence"], o["model"], o["tagged_at"]))
                         db.execute("INSERT OR REPLACE INTO tag_runs(target,text_hash,ai_related,tagged_at,error) "
                                    "VALUES(?,?,?,?,NULL)", (target, h, 1 if ai else 0, iso()))
                         done += 1

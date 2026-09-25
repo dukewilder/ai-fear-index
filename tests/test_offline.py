@@ -2787,6 +2787,21 @@ def check_confirmed_labels_stay():
     have = {(r["kind"], r["value"]) for r in db.execute("SELECT kind, value FROM tags WHERE target='os-sb1621'")}
     assert ("control", "use-restrictions") in have, "a confirmed control was lost to a fresh reading that missed it"
     assert ("fear", "deepfakes") in have and ("agency", "Texas Attorney General") not in have, have
+    # A reading that finds the same control on another quote keeps the quote the check confirmed: the
+    # new one could be refused, and the label would go with it.
+    db.execute("UPDATE tag_runs SET text_hash = 'older still' WHERE target = 'os-sb1621'")
+    db.commit()
+    tagging.env, tagging.check_labels = (lambda name: "k"), (lambda db, key: "checked 0 labels")
+    tagging.propose = lambda key, fears, controls, doc, is_measure, model=None: {
+        "ai_related": True, "fears": [], "controls": ["use-restrictions"], "agencies": []}
+    tagging.verify = lambda key, fears, controls, doc, proposal, model=None: {
+        "fears": {}, "controls": {"use-restrictions": images}, "agencies": {}}
+    try:
+        tagging.run(db, {}, "hourly")
+    finally:
+        tagging.env, tagging.propose, tagging.verify, tagging.check_labels = real
+    row = db.execute("SELECT evidence FROM tags WHERE target='os-sb1621' AND kind='control'").fetchone()
+    assert row and row["evidence"] == offense, f"a confirmed quote gave way to one nobody had checked: {row and row['evidence']}"
     # One lost before this rule existed comes back on the quote the check confirmed, dated when it did.
     db.execute("DELETE FROM tags WHERE target='os-sb1621' AND kind='control'")
     db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-gone", "control", "use-restrictions", "creating a criminal offense",
@@ -2876,6 +2891,20 @@ def check_frontier_reread():
     finally:
         tagging.call = real
     assert asked[0][1] >= 1500 and asked[1][1] >= 2500 and asked[1][0].endswith("starting with {."), asked
+    # Twice without JSON from the stronger model, and the smaller one reads it rather than nobody.
+    asked.clear()
+
+    def prose_always(key, system, user, max_tokens=700, model=None):
+        asked.append(model)
+        if model == tagging.TEXT_MODEL:
+            raise ValueError("no JSON in reply")
+        return {"ai_related": True}
+    tagging.call = prose_always
+    try:
+        assert tagging.ask_json("k", "s", "u", 500, tagging.TEXT_MODEL) == {"ai_related": True}
+    finally:
+        tagging.call = real
+    assert asked == [tagging.TEXT_MODEL, tagging.TEXT_MODEL, tagging.MODEL], asked
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "t.db")
     for mid, title in (("os-raise", "Relates to the training and use of artificial intelligence frontier models"),

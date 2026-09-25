@@ -611,6 +611,10 @@ def export(db, out_dir, base=""):
     spots = kv_get(db, "blindspots:report")
     if spots:
         (out / "blindspots.json").write_text(json.dumps(spots, indent=1, default=str))
+    # So does the measurement of the fears the report does not follow, for the same reader.
+    cands = kv_get(db, "candidates:report")
+    if cands:
+        (out / "candidates.json").write_text(json.dumps(cands, indent=1, default=str))
     # The weekly review rides the data branch too, beside the issue it was posted as.
     review = kv_get(db, "review:latest")
     if review and review.get("body"):

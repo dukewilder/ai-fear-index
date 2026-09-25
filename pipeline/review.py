@@ -136,6 +136,23 @@ def build(db, today):
                      "| Subject | Measures | Legislatures |\n|---|---|---|\n"
                      + "\n".join(f"| {cell(s['phrase'], 60)} | {s['measures']} | {s['places']} |" for s in subjects))
 
+    # A fear the report does not follow that now outscores one it does, measured the same way for
+    # both in candidates.py. The list is fixed on purpose; this is how a person learns it is stale.
+    cands = kv_get(db, "candidates:report") or {}
+    lowest = cands.get("lowest_followed")
+    rising = [r for r in cands.get("rows") or [] if r.get("kind") == "candidate" and lowest is not None
+              and r["score"] > lowest]
+    if rising:
+        items += len(rising)
+        parts.append(f"## Fears the report does not follow that outscore one it does: {len(rising)}\n\n"
+                     f"Scored with the index's formula, every fear counted the same way; the lowest fear the "
+                     f"site follows scores {lowest}. Moving one onto the list is a change to config/fears.json "
+                     "and a day of relabelling.\n\n"
+                     "| Fear | Score | Bills | Lobbying filings | News, 30 days | Wikipedia, 30 days |\n"
+                     "|---|---|---|---|---|---|\n"
+                     + "\n".join(f"| {cell(r['name'], 50)} | {r['score']} | {r['bills']} | {r['filings']} | "
+                                 f"{r['news30']} | {r['wiki30']} |" for r in rising[:LIMIT]))
+
     # Laws whose outcome is known from outside the record, and that the record gets wrong. This is
     # the one list here about what is missing rather than what is shown wrongly.
     from . import known

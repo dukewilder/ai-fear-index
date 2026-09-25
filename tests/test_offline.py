@@ -177,6 +177,10 @@ def check_fears_config():
     from pipeline.common import config
     import re as _re
     fears = config("fears")
+    candidates = config("fear_candidates")
+    assert not {f["slug"] for f in fears} & {c["slug"] for c in candidates}, "a fear is both followed and a candidate"
+    fears_only = fears
+    fears = fears + candidates  # a candidate is written the same way, so it can move onto the list whole
     keys = set(fears[0])
     assert keys >= {"slug", "name", "sentence", "short", "definition", "keywords", "gdelt",
                     "match", "wikipedia", "because"}, f"the first fear is missing fields: {keys}"
@@ -206,7 +210,7 @@ def check_fears_config():
         assert not why.lower().startswith("that "), f"{f['slug']}: because repeats the 'that'"
         assert why[0] == why[0].lower() or why.split()[0] in ("AI", "China", "OpenAI", "Congress"), \
             f"{f['slug']}: because starts mid-sentence, so only a proper noun is capitalised"
-    print(f"{len(fears)} fears, all well formed: ok")
+    print(f"{len(fears_only)} fears and {len(candidates)} candidates, all well formed: ok")
 
 
 def check_no_euphemism():
@@ -2142,6 +2146,58 @@ def check_bill_links():
     print("bills link to the legislature's own page, found for the ones on file too, and summaries are read whole: ok")
 
 
+def check_candidates():
+    """Fears the report does not follow are measured beside the ones it does, the same way.
+
+    The list of fears is fixed so its labels mean something, and a fixed list can fall behind: a
+    fear that grows after it was settled is invisible however many bills cite it. candidates.py
+    counts every candidate and every followed fear on the index's four channels by the same rules
+    and scores them with the index's formula, and the weekly list names a candidate that has come
+    to outscore a fear the site follows.
+    """
+    import datetime as _dt
+    from pipeline import candidates, review
+    from pipeline.common import kv_set
+    from pipeline.export import recent_quarters
+    db = connect(":memory:")
+    bills = [("m1", "Artificial intelligence; prior authorization; health insurers"),
+             ("m2", "Artificial intelligence in utilization review by health plans"),
+             ("m3", "Deepfakes in elections"),
+             ("m4", "Tractor safety")]
+    for mid, title in bills:
+        upsert(db, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx" if mid != "m2" else "ca",
+                                "jurisdiction_name": "X", "session": "2025", "identifier": f"SB {mid[1]}",
+                                "title": title, "summary": "", "status": "pending", "introduced_date": "2025-03-01",
+                                "url": f"https://example.com/{mid}", "source": "test", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs(target, text_hash, ai_related, tagged_at) VALUES(?, 'h', ?, 'now')",
+                   (mid, 0 if mid == "m4" else 1))
+    y, q = sorted(recent_quarters(4, _dt.date.today()))[-1]
+    for i, issues in enumerate(["AI in prior authorization", "AI and health care claims", "deepfake robocalls"]):
+        upsert(db, "lobbying", {"id": f"l{i}", "client": f"C{i}", "client_key": f"c{i}", "registrant": "R",
+                                "year": y, "quarter": f"Q{q}", "amount": 10000, "issues": issues, "posted": "2026-01-01"})
+    today = _dt.date.today()
+    for d in range(30):
+        day = (today - _dt.timedelta(days=d + 1)).isoformat()
+        db.execute("INSERT INTO series VALUES(?,?,?)", ("news:deepfakes", day, 5))
+        db.execute("INSERT INTO series VALUES(?,?,?)", ("cand-news:ai-care-decisions", day, 20))
+    db.commit()
+    followed = [{"slug": "deepfakes", "name": "Deepfakes", "match": ["deep ?fake"], "keywords": ["deepfake*"],
+                 "wikipedia": []}]
+    cands = [{"slug": "ai-care-decisions", "name": "AI deciding care", "match": ["artificial intelligence",
+              "prior authori[sz]ation|utilization review"], "keywords": ["prior authorization", "health care"],
+              "wikipedia": []}]
+    rows = {r["slug"]: r for r in candidates.measure(db, followed, cands)}
+    care, fakes = rows["ai-care-decisions"], rows["deepfakes"]
+    assert (care["bills"], care["states"], care["filings"], care["news30"]) == (2, 2, 2, 600), care
+    assert (fakes["bills"], fakes["filings"], fakes["news30"]) == (1, 1, 150), fakes
+    assert care["score"] > fakes["score"] and care["kind"] == "candidate", rows
+    kv_set(db, "candidates:report", {"rows": list(rows.values()), "lowest_followed": fakes["score"]})
+    body, _ = review.build(db, today)
+    assert "Fears the report does not follow that outscore one it does: 1" in body and "AI deciding care" in body, \
+        "a candidate that outscores a followed fear is not on the weekly list"
+    print("fears the report does not follow are measured beside the ones it does: ok")
+
+
 def check_government_own_use():
     """A control binds people or organizations outside government, and an office has to gain power
     over them.
@@ -2347,6 +2403,7 @@ def main():
     check_indexnow()
     check_bill_links()
     check_government_own_use()
+    check_candidates()
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()

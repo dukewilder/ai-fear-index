@@ -1,0 +1,362 @@
+[
+ {
+  "slug": "ai-care-decisions",
+  "name": "AI deciding care",
+  "sentence": "AI deciding care",
+  "short": "Care decisions",
+  "definition": "AI deciding or denying medical care: insurers using algorithms to approve or deny claims and prior authorizations, or AI diagnosing or treating patients in place of a clinician. Mental health care given by an AI is AI therapists.",
+  "keywords": [
+   "prior authorization*",
+   "utilization review",
+   "utilization management",
+   "medical necessity",
+   "claim denial*",
+   "coverage determination*",
+   "clinical decision*",
+   "health care",
+   "healthcare",
+   "health insurance",
+   "patient*"
+  ],
+  "gdelt": "\"artificial intelligence\" (\"prior authorization\" OR \"claim denials\" OR \"denied claims\" OR \"insurance denials\" OR \"medical decisions\" OR misdiagnosis)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "prior authori[sz]ation|utilization (review|management)|medical necessity|coverage (determination|decision)|claims? (denial|review|determination)|health (insurance|insurer|plan|benefit plan|care (provider|service|professional|facilit))|clinical decision|patient care|diagnos|physician|hospital"
+  ],
+  "wikipedia": [
+   "Artificial_intelligence_in_healthcare"
+  ],
+  "because": "an algorithm decides whether you get treated"
+ },
+ {
+  "slug": "privacy",
+  "name": "Privacy and personal data",
+  "sentence": "privacy and personal data",
+  "short": "Privacy",
+  "definition": "AI collecting, inferring, selling or exposing people's personal data, or being trained on it, without their knowledge or consent.",
+  "keywords": [
+   "privacy",
+   "personal data",
+   "personal information",
+   "consumer data",
+   "data broker*",
+   "data protection",
+   "sensitive data",
+   "data minimization"
+  ],
+  "gdelt": "\"artificial intelligence\" (privacy OR \"personal data\" OR \"personal information\")",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "privacy|personal (data|information)|consumer data|data broker|sensitive data|data protection|data minimi[sz]ation"
+  ],
+  "wikipedia": [
+   "Information_privacy"
+  ],
+  "because": "AI is taking people's personal data"
+ },
+ {
+  "slug": "copyright",
+  "name": "AI taking creators' work",
+  "sentence": "AI taking creators' work",
+  "short": "Copyright",
+  "definition": "AI trained on, copying or imitating books, art, music, journalism or other creative work without the owner's permission or payment.",
+  "keywords": [
+   "copyright*",
+   "intellectual property",
+   "training data",
+   "fair use",
+   "creators",
+   "artists",
+   "musicians"
+  ],
+  "gdelt": "\"artificial intelligence\" (copyright OR \"intellectual property\" OR \"fair use\")",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "copyright|intellectual property|training data|fair use|\\bartists?\\b|musicians?|creative works?|publishers?|journalis"
+  ],
+  "wikipedia": [
+   "Artificial_intelligence_and_copyright"
+  ],
+  "because": "AI is built on work nobody paid for"
+ },
+ {
+  "slug": "surveillance",
+  "name": "AI surveillance",
+  "sentence": "AI surveillance",
+  "short": "Surveillance",
+  "definition": "AI watching, identifying or tracking people: facial recognition, biometric identification, license plate readers, predictive policing, or monitoring of workers or the public.",
+  "keywords": [
+   "facial recognition",
+   "face recognition",
+   "surveillance",
+   "biometric*",
+   "predictive policing",
+   "license plate reader*",
+   "employee monitoring",
+   "workplace surveillance"
+  ],
+  "gdelt": "(\"facial recognition\" OR \"AI surveillance\" OR \"AI-powered surveillance\" OR \"predictive policing\" OR \"biometric surveillance\" OR \"employee monitoring\")",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative|facial recognition|face recognition|biometric|license plate",
+   "facial recognition|face recognition|surveillance|biometric|predictive policing|license plate reader|electronic monitoring|employee monitoring"
+  ],
+  "wikipedia": [
+   "Facial_recognition_system"
+  ],
+  "because": "AI is watching and identifying people"
+ },
+ {
+  "slug": "misinformation",
+  "name": "AI misinformation",
+  "sentence": "AI misinformation",
+  "short": "Misinformation",
+  "definition": "AI producing or spreading false or misleading information: chatbots giving wrong answers, AI-written propaganda or fake news, or AI used to mislead voters. Faked images, video or voices of real people are deepfakes.",
+  "keywords": [
+   "misinformation",
+   "disinformation",
+   "false information",
+   "hallucination*",
+   "election interference",
+   "foreign influence"
+  ],
+  "gdelt": "\"artificial intelligence\" (misinformation OR disinformation OR hallucinations OR \"false information\" OR propaganda)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "misinformation|disinformation|false information|hallucinat|propaganda|election interference"
+  ],
+  "wikipedia": [
+   "Hallucination_(artificial_intelligence)"
+  ],
+  "because": "AI makes it easy to spread what is not true"
+ },
+ {
+  "slug": "algorithmic-pricing",
+  "name": "Algorithmic pricing",
+  "sentence": "algorithmic pricing",
+  "short": "Pricing",
+  "definition": "Algorithms or AI setting what people pay: landlords' rent-setting software, prices tailored to a person's data, or competitors coordinating prices through a shared algorithm.",
+  "keywords": [
+   "algorithmic pricing",
+   "pricing algorithm*",
+   "surveillance pricing",
+   "rent-setting",
+   "rent setting",
+   "rental pric*",
+   "price fixing",
+   "price-fixing",
+   "dynamic pricing",
+   "personalized pricing",
+   "individualized pricing",
+   "realpage"
+  ],
+  "gdelt": "(\"algorithmic pricing\" OR \"surveillance pricing\" OR \"pricing algorithm\" OR \"rent-setting software\" OR RealPage)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative|software|algorithmic device|pricing tool",
+   "rent(al)? pric|rental rate|amount of rent|set(ting)? rents?|rent.setting|pricing algorithm|algorithmic pricing|price.fixing|surveillance pricing|dynamic pricing|personali[sz]ed pric|individuali[sz]ed pric|coordinated pric|algorithmic device"
+  ],
+  "wikipedia": [],
+  "because": "an algorithm decides what people pay"
+ },
+ {
+  "slug": "ai-in-schools",
+  "name": "AI in schools",
+  "sentence": "AI in schools",
+  "short": "Schools",
+  "definition": "AI in classrooms harming students: students using it to cheat or skip the work of learning, AI replacing teachers, or school AI tools collecting students' data.",
+  "keywords": [
+   "academic integrity",
+   "cheating",
+   "plagiarism",
+   "student data",
+   "student privacy"
+  ],
+  "gdelt": "\"artificial intelligence\" (cheating OR plagiarism) (students OR schools OR college)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "cheat|plagiar|academic (integrity|dishonesty)|replac\\w* teachers|student (data|privacy|information)|harm\\w* (to )?students"
+  ],
+  "wikipedia": [
+   "Artificial_intelligence_in_education"
+  ],
+  "because": "students are letting AI do the learning"
+ },
+ {
+  "slug": "ai-scams",
+  "name": "AI scams",
+  "sentence": "AI scams",
+  "short": "Scams",
+  "definition": "AI used to defraud people: scam calls, phishing, fake identities or chatbots that trick people out of money. A faked likeness of a real person is a deepfake.",
+  "keywords": [
+   "scam*",
+   "phishing",
+   "robocall*",
+   "ai-enabled fraud",
+   "ai fraud",
+   "impersonation scam*"
+  ],
+  "gdelt": "\"artificial intelligence\" (scam OR scams OR scammers OR phishing)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "\\bscams?\\b|scammer|phishing|robocall|swindl|defraud"
+  ],
+  "wikipedia": [],
+  "because": "AI makes scams easier to run"
+ },
+ {
+  "slug": "self-driving",
+  "name": "Self-driving vehicles",
+  "sentence": "self-driving vehicles",
+  "short": "Self-driving",
+  "definition": "Vehicles driven by AI, such as robotaxis and self-driving trucks, endangering people on the road.",
+  "keywords": [
+   "autonomous vehicle*",
+   "self-driving",
+   "driverless",
+   "automated driving",
+   "automated vehicle*",
+   "robotaxi*",
+   "autonomous truck*"
+  ],
+  "gdelt": "(\"self-driving\" OR driverless OR robotaxi OR robotaxis OR \"autonomous vehicles\")",
+  "match": [
+   "autonomous (motor )?vehicle|self.driving|driverless|automated driving|automated (motor )?vehicle|robotaxi|autonomous truck"
+  ],
+  "wikipedia": [
+   "Self-driving_car"
+  ],
+  "because": "AI is driving the car"
+ },
+ {
+  "slug": "ai-weapons",
+  "name": "AI weapons",
+  "sentence": "AI weapons",
+  "short": "AI weapons",
+  "definition": "AI used to kill or wage war: autonomous weapons that pick targets without a person deciding, or AI running military or nuclear systems.",
+  "keywords": [
+   "autonomous weapon*",
+   "lethal autonomous",
+   "weapon system*",
+   "weapons system*",
+   "warfare",
+   "battlefield",
+   "killer robot*"
+  ],
+  "gdelt": "(\"autonomous weapons\" OR \"killer robots\" OR \"lethal autonomous weapons\" OR \"AI warfare\" OR \"AI weapons\")",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "autonomous weapon|lethal autonomous|weapons? system|warfare|battlefield|nuclear (command|weapon|launch)"
+  ],
+  "wikipedia": [
+   "Lethal_autonomous_weapon"
+  ],
+  "because": "a machine could decide who is killed"
+ },
+ {
+  "slug": "ai-companions",
+  "name": "AI companions",
+  "sentence": "AI companions",
+  "short": "Companions",
+  "definition": "Chatbots built to be friends or partners drawing people, adults included, into emotional dependence, isolation, delusion or self-harm. Chatbots and children are kids and chatbots.",
+  "keywords": [
+   "ai companion*",
+   "companion chatbot*",
+   "emotional dependence",
+   "loneliness",
+   "companionship"
+  ],
+  "gdelt": "(\"AI companion\" OR \"AI companions\" OR \"AI girlfriend\" OR \"AI boyfriend\" OR \"AI psychosis\" OR \"chatbot psychosis\")",
+  "match": [
+   "companion|chat ?bot|conversational (AI|artificial)",
+   "loneli|isolat|emotional (dependen|attachment|relationship)|companionship|romantic|delusion|psychosis|suicid|self.harm"
+  ],
+  "wikipedia": [
+   "AI-induced_psychosis"
+  ],
+  "because": "people are replacing each other with chatbots"
+ },
+ {
+  "slug": "addictive-feeds",
+  "name": "Addictive algorithms",
+  "sentence": "addictive algorithms",
+  "short": "Addictive feeds",
+  "definition": "Algorithms built to keep people scrolling: recommendation feeds that hook children or adults, push harmful content, or exploit attention.",
+  "keywords": [
+   "addictive feed*",
+   "algorithmic feed*",
+   "recommendation algorithm*",
+   "social media addiction",
+   "addictive design"
+  ],
+  "gdelt": "(algorithm OR algorithms OR \"addictive feeds\") \"social media\" (addictive OR addiction) (children OR teens OR kids)",
+  "match": [
+   "algorithm|recommendation (system|engine)|personali[sz]ed (feed|recommendation)|addictive feed",
+   "addict|compulsive|social media|\\bfeeds?\\b"
+  ],
+  "wikipedia": [
+   "Problematic_social_media_use"
+  ],
+  "because": "the feed is built to hook people"
+ },
+ {
+  "slug": "ai-monopolies",
+  "name": "AI monopolies",
+  "sentence": "AI monopolies",
+  "short": "Monopolies",
+  "definition": "A handful of companies controlling AI, its chips, data or models, and using that control to shut out competitors or dictate terms.",
+  "keywords": [
+   "antitrust",
+   "monopol*",
+   "anticompetitive",
+   "market concentration",
+   "market power"
+  ],
+  "gdelt": "\"artificial intelligence\" (antitrust OR monopoly OR monopolies OR anticompetitive)",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "antitrust|monopol|anticompetitive|market (power|concentration)"
+  ],
+  "wikipedia": [],
+  "because": "a few companies will own AI"
+ },
+ {
+  "slug": "ai-bubble",
+  "name": "AI bubble",
+  "sentence": "the AI bubble",
+  "short": "AI bubble",
+  "definition": "Spending on AI running far ahead of what it earns, so that its collapse takes down markets, banks, or the economy.",
+  "keywords": [
+   "ai bubble",
+   "financial stability",
+   "systemic risk"
+  ],
+  "gdelt": "(\"AI bubble\" OR \"AI crash\")",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "\\bbubble|financial stability|systemic risk"
+  ],
+  "wikipedia": [
+   "AI_bubble"
+  ],
+  "because": "the AI boom could crash the economy"
+ },
+ {
+  "slug": "ai-slop",
+  "name": "AI slop",
+  "sentence": "AI slop",
+  "short": "AI slop",
+  "definition": "Machine-made content flooding feeds, search results and stores, crowding out work made by people.",
+  "keywords": [
+   "ai slop",
+   "ai-generated content"
+  ],
+  "gdelt": "\"AI slop\"",
+  "match": [
+   "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+   "\\bslop\\b|ai.generated content|machine.generated content"
+  ],
+  "wikipedia": [
+   "AI_slop"
+  ],
+  "because": "machine-made junk is crowding out people"
+ }
+]

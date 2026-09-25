@@ -69,6 +69,17 @@ def definitions(items):
     return "\n".join(f"- {i['slug']}: {i['definition']}" for i in items)
 
 
+def fear_definition(fear):
+    """A fear's definition, with what the third reading has been told it includes (pipeline.check
+    FEAR_NOTES), so the first reading and the third read a fear alike. New York's RAISE Act, read
+    from its text, was confirmed on its reporting duty and its Attorney General's power and given no
+    fear: the law guards against "critical harm", mass casualties or a billion dollars of damage, and
+    the tagger was never told that is the catastrophic risk the loss of control fear names."""
+    from .check import FEAR_NOTES
+    note = FEAR_NOTES.get(fear["slug"])
+    return f"{fear['definition']} {note}" if note else fear["definition"]
+
+
 def propose(key, fears, controls, doc, is_measure):
     what = "a U.S. bill, resolution, or federal rule" if is_measure else "a statement or article published by an organization"
     system = (f"You classify {what} about artificial intelligence for a public database. Be literal and use only "
@@ -79,7 +90,8 @@ def propose(key, fears, controls, doc, is_measure):
               'data centers, self-driving vehicles, or the people and companies who build or use AI, '
               'named with their jurisdiction, for example \\"Colorado Attorney General\\""]}') if is_measure else \
         '{"ai_related": true or false, "fears": [fear slugs]}'
-    user = (f"FEARS (harms the text may cite):\n{definitions(fears)}\n{control_block}\nTEXT\n{doc}\n\n"
+    fear_block = "\n".join(f"- {f['slug']}: {fear_definition(f)}" for f in fears)
+    user = (f"FEARS (harms the text may cite):\n{fear_block}\n{control_block}\nTEXT\n{doc}\n\n"
             f"Return JSON: {schema}\nRules: ai_related is true only if the text is substantially about artificial "
             "intelligence, algorithms, automated decisions, synthetic media, data centers, or vehicles that drive "
             "themselves. Data centers count with their building, power, water, land, siting, rates or taxes, and the "
@@ -100,7 +112,7 @@ def propose(key, fears, controls, doc, is_measure):
 
 
 def verify(key, fears, controls, doc, proposal):
-    fdefs = {f["slug"]: f["definition"] for f in fears}
+    fdefs = {f["slug"]: fear_definition(f) for f in fears}
     cdefs = {c["slug"]: c["definition"] for c in controls}
     labels = {
         "fears": {s: fdefs[s] for s in proposal.get("fears", []) if s in fdefs},

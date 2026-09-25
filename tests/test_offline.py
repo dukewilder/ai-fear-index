@@ -2806,7 +2806,41 @@ def check_confirmed_labels_stay():
                           "AND c.value = t.value WHERE c.verdict = 'no'").fetchone(), "a refused label came back"
 
 
+def check_frontier_reread():
+    """The first reading is told what the third already was: a harm defined by mass casualties or a
+    billion dollars of damage, New York's "critical harm", is the catastrophic risk of loss of control.
+    And the measures naming frontier models are read once more, which can now only add labels."""
+    from pipeline import tag as tagging
+    from pipeline.common import retag_frontier
+    said = []
+    real = tagging.call
+    tagging.call = lambda key, system, user, max_tokens=700, model=None: said.append(user) or {
+        "ai_related": True, "fears": ["loss-of-control"], "controls": [], "agencies": []}
+    try:
+        fears, controls = config("fears"), config("controls")
+        proposal = tagging.propose("k", fears, controls, "Title: RAISE act", True)
+        tagging.verify("k", fears, controls, "Title: RAISE act", proposal)
+    finally:
+        tagging.call = real
+    assert len(said) == 2 and all("critical harm" in u for u in said), "the tagger was not told what the fear includes"
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    db = connect(tmp / "t.db")
+    for mid, title in (("os-raise", "Relates to the training and use of artificial intelligence frontier models"),
+                       ("os-other", "Relates to deepfakes of candidates")):
+        upsert(db, "measures", {"id": mid, "kind": "bill", "jurisdiction": "ny", "jurisdiction_name": "New York",
+                                "session": "2025-2026", "identifier": mid, "title": title, "summary": "",
+                                "status": "passed", "introduced_date": "2025-03-27", "url": f"https://example.com/{mid}",
+                                "source": "Open States", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "h", 1, iso()))
+    db.execute("DELETE FROM kv WHERE key LIKE 'retag:frontier:%'")
+    db.commit()
+    assert retag_frontier(db) == 1 and retag_frontier(db) == 0, "queued more than once, or not at all"
+    hashes = {r["target"]: r["text_hash"] for r in db.execute("SELECT target, text_hash FROM tag_runs")}
+    assert hashes == {"os-raise": None, "os-other": "h"}, hashes
+
+
 def main():
+    check_frontier_reread()
     check_confirmed_labels_stay()
     check_office_names()
     check_law_text()

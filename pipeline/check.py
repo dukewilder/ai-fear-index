@@ -92,7 +92,9 @@ NOT_THIS = (
 FEAR_NOTES = {
     "loss-of-control": ("A measure that has developers of frontier or other advanced AI models assess, report, "
                         "prevent or manage catastrophic risk from them acts on this harm, even where it defines "
-                        "the term: catastrophic risk is part of this definition."),
+                        "the term: catastrophic risk is part of this definition. So is a harm the measure defines "
+                        "by mass casualties or a billion dollars or more in damage, whatever it calls it, such as "
+                        "the \"critical harm\" of New York's RAISE Act."),
 }
 
 # What each control has turned out not to be, from the labels taken off by hand.

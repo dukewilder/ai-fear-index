@@ -616,6 +616,7 @@ def connect(path):
     retag_ai_bills(db)
     retag_data_centers(db)
     retag_self_driving(db)
+    retag_frontier(db)
     recheck_data_center_labels(db)
     restatus(db)
     return db
@@ -1085,6 +1086,36 @@ def retag_self_driving(db):
     db.commit()
     if ids:
         log(f"[repair] {len(ids)} measures naming self-driving vehicles queued to be read again")
+    return len(ids)
+
+
+# Bump to send the tagger again every measure that names frontier models or the catastrophic harms
+# they are regulated for. 1: the tagger is now told what the check already was, that such a harm is
+# the catastrophic risk the loss of control fear names, and New York's RAISE Act had no fear.
+RETAG_FRONTIER = 1
+FRONTIER_TEXT = re.compile(r"(?i)frontier (?:ai |artificial intelligence )?(?:models?|developers?)|critical harm|"
+                           r"catastrophic risk")
+
+
+def retag_frontier(db):
+    """Queue once every measure naming frontier models, catastrophic risk or critical harm.
+
+    A reading now adds to the labels on file instead of replacing them (pipeline.tag), so reading a
+    measure again can only find what the last reading missed.
+    """
+    key = f"retag:frontier:{RETAG_FRONTIER}"
+    if kv_get(db, key):
+        return 0
+    ids = [r["id"] for r in db.execute(
+        "SELECT m.id, m.kind, m.jurisdiction, m.session, m.introduced_date, m.title, m.summary "
+        "FROM measures m JOIN tag_runs t ON t.target = m.id WHERE t.ai_related = 1")
+        if in_window(r) and FRONTIER_TEXT.search(f"{r['title'] or ''}\n{r['summary'] or ''}")]
+    for mid in ids:
+        db.execute("UPDATE tag_runs SET text_hash = NULL WHERE target = ?", (mid,))
+    kv_set(db, key, True)
+    db.commit()
+    if ids:
+        log(f"[repair] {len(ids)} measures naming frontier models queued to be read again")
     return len(ids)
 
 

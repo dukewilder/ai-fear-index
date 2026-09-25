@@ -842,7 +842,7 @@ def fear_line(st):
     if st["filings"]:
         parts.append(count(st["filings"], "lobbying filing"))
     if st["wiki30"] and len(parts) < 3:
-        parts.append(f"{compact(st['wiki30'])} Wikipedia views in 30 days")
+        parts.append(f"{compact(st['wiki30'])} Wikipedia views in the last 30 days")
     if st["news30"] and len(parts) < 3:
         parts.append(count(st["news30"], "news article") + " " + st.get("news_span", "in the last 30 days"))
     return " · ".join(parts[:3])

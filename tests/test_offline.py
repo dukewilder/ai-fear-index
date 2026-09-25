@@ -2578,7 +2578,105 @@ def check_share_card_fits():
     print("a share card gives way rather than running through its rules: ok")
 
 
+def check_office_names():
+    """One office, one name. Spelled two ways it was counted twice on the front page on 25 September:
+    the Pennsylvania Attorney General, and California's medical board as the California Medical
+    Board and the California Medical Board of California. An office the tagger could only describe
+    was listed as "Minnesota (state agency overseeing AI independent verification organizations)"."""
+    from pipeline.common import office_label, name_key
+    assert name_key(office_label("California Medical Board of California", "ca")) == \
+        name_key(office_label("California Medical Board", "ca")), "one board counted as two"
+    for raw, where, want in (
+            ("Pennsylvania Office of Attorney General", "pa", "Pennsylvania Attorney General"),
+            ("Virginia Office of the Attorney General", "va", "Virginia Attorney General"),
+            ("Hawaii Department of the Attorney General", "hi", "Hawaii Attorney General"),
+            ("Minnesota (state agency overseeing AI independent verification organizations)", "mn", ""),
+            ("Texas Attorney General (Consumer Protection Division)", "tx", "Texas Attorney General"),
+            ("Department of Commerce", "us", "U.S. Department of Commerce"),
+            ("Department of Artificial Intelligence", "us", "U.S. Department of Artificial Intelligence"),
+            ("U.S. Department of Labor", "us", "U.S. Department of Labor"),
+            ("Federal Trade Commission", "us", "Federal Trade Commission"),
+            ("Colorado civil rights division", "co", "Colorado Civil Rights Division"),
+            ("California health care professional licensing boards", "ca",
+             "California health care professional licensing boards"),
+            ("Oregon State Department of Energy", "or", "Oregon Department of Energy"),
+            ("West Virginia Department of Commerce", "wv", "West Virginia Department of Commerce"),
+            ("California district attorneys, county counsels and city attorneys", "ca", "California local prosecutors")):
+        got = office_label(raw, where)
+        assert got == want, f"{raw!r} is shown as {got!r}, not {want!r}"
+
+
+def check_law_text():
+    """A law whose official summary is a line is read from its enacted text, and a label quoting
+    that text stays on. On 25 September New York's RAISE Act, whose whole summary is "Relates to the
+    training and use of artificial intelligence frontier models; defines terms; establishes remedies
+    for violations.", was on the site as a law that imposes nothing."""
+    from pipeline import texts as T
+    from pipeline import tag as tagging
+    from pipeline import check as checking
+    page = ("<html><head><title>x</title><script>var leak = 1</script></head><body>"
+            "<p>BE IT ENACTED BY THE LEGISLATURE OF THE STATE:</p>"
+            "<p>SECTION 1. A large developer shall <s>not</s> report each safety incident to the attorney "
+            "general within seventy-two hours of learning of it.</p><p>SECTION 2. This act takes effect.</p>"
+            + "<p>" + "Filler words for length. " * 80 + "</p></body></html>")
+    text = T.usable(T.tidy(T.from_html(page)))
+    flat = " ".join(text.split())
+    assert "leak" not in flat and "shall not report" not in flat, "a script or struck-out words were read as law"
+    assert "shall report each safety incident to the attorney general" in flat, flat[:300]
+    shell = T.tidy(T.from_html("<html><body>" + "<p>Legislators Sessions Calendars Journals Bills Code</p>" * 30
+                               + "</body></html>"))
+    try:
+        T.usable(shell)
+        raise AssertionError("a legislature's page with no law on it was taken for the law")
+    except ValueError:
+        pass
+    assert T.tidy("regu-\nlation of") == "regulation of"
+    bill = {"versions": [
+        {"date": "2025-01-10", "note": "Introduced", "links": [{"url": "https://x.gov/intro.pdf", "media_type": "application/pdf"}]},
+        {"date": "2025-05-20", "note": "Enrolled", "links": [{"url": "https://x.gov/enr.pdf", "media_type": "application/pdf"},
+                                                             {"url": "https://x.gov/enr.htm", "media_type": "text/html"}]},
+        {"date": "2025-04-01", "note": "Engrossed", "links": [{"url": "https://x.gov/eng.htm", "media_type": "text/html"}]}]}
+    assert T.text_links(bill) == ["https://x.gov/enr.htm", "https://x.gov/enr.pdf"], T.text_links(bill)
+    line = ("Relates to the training and use of artificial intelligence frontier models; defines terms; "
+            "establishes remedies for violations.")
+    law = {"id": "os-raise", "status": "passed", "summary": line}
+    assert T.thin(line) and T.reading(law, {"os-raise": text}) == text
+    assert T.reading({**law, "status": "pending"}, {"os-raise": text}) == "", "a bill still moving was read from a text"
+    assert T.reading({**law, "summary": line * 3}, {"os-raise": text}) == "", "a law with a summary was read from text"
+    method = (ROOT / "site" / "templates" / "pages" / "method.html").read_text()
+    assert f"under {T.THIN} words" in method, "the method page and the code disagree on when a law's text is read"
+
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    db = connect(tmp / "t.db")
+    upsert(db, "measures", {"id": "os-raise", "kind": "bill", "jurisdiction": "ny", "jurisdiction_name": "New York",
+                            "session": "2025-2026", "identifier": "S 6953",
+                            "title": "Relates to the training and use of artificial intelligence frontier models",
+                            "summary": line, "status": "passed", "latest_action": "SIGNED CHAP.699",
+                            "latest_action_date": "2025-12-19", "introduced_date": "2025-03-27",
+                            "url": "https://example.com/raise", "sponsors": "Sample", "source": "Open States",
+                            "updated": "2025-12-19", "first_seen": iso()})
+    db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", ("os-raise", "old", 1, iso()))
+    db.execute("INSERT INTO texts(target, url, text, fetched, tries) VALUES(?,?,?,?,0)",
+               ("os-raise", "https://x.gov/enr.htm", text, iso()))
+    db.commit()
+    work, _ = tagging.targets(db, 10)
+    doc = next(w[2] for w in work if w[1] == "os-raise")
+    assert "Text of the law:" in doc and "seventy-two hours" in doc, "the tagger was not given the law's text"
+    quote = "shall report each safety incident to the attorney general within seventy-two hours"
+    db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-raise", "control", "mandatory-reporting", quote, "test", iso()))
+    db.commit()
+    tagging.prune_tags(db)
+    assert db.execute("SELECT COUNT(*) FROM tags WHERE target='os-raise'").fetchone()[0] == 1, \
+        "a label quoting the law's text was pruned as unsupported"
+    controls = {c["slug"]: c for c in config("controls")}
+    todo, _, shown = checking.queue(db, controls, {f["slug"]: f for f in config("fears")})
+    asked = checking.question(shown["os-raise"], "control", "mandatory-reporting", quote, controls)
+    assert "Text of the law" in asked and "seventy-two hours" in asked, "the check was not shown the law's words"
+
+
 def main():
+    check_office_names()
+    check_law_text()
     check_indexnow()
     check_bill_links()
     check_government_own_use()

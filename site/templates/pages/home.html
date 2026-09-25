@@ -70,7 +70,7 @@
 {% if d.quotes %}
 <section class="block{{ ' band' if ns.i % 2 == 0 else '' }}" id="words">{% set ns.i = ns.i + 1 %}<div class="wrap">
 <h2 class="h">In their own words</h2>
-<p class="sub">The fear as each bill's official summary states it, and the controls the same bill would create.</p>
+<p class="sub">The fear as each bill's official summary or text states it, and the controls the same bill would create.</p>
 <ul class="quotes">{% for q in d.quotes %}{{ quote_card(q) }}{% endfor %}</ul>
 </div></section>
 {% endif %}

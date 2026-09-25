@@ -12,6 +12,7 @@ import urllib.parse
 
 from .common import (AI_TEXT, OLD_SUMMARY_CUT, SINCE, STATES, SUMMARY_MAX, Http, HttpError, congress_id, env, iso,
                      kv_get, kv_set, log, measures_in_scope, retry_at, retry_clear, status_from_action, upsert)
+from . import texts
 
 BASE = "https://v3.openstates.org/bills"
 # Every request asks for the bill's sources and versions too. They cost no extra requests, and they
@@ -208,7 +209,12 @@ def run(db, state, mode):
     day = iso()[:10]
     spent = kv_get(db, "openstates_spend", {})
     used_today = spent.get("n", 0) if spent.get("date") == day else 0
-    budget = max(0, min(MAX_REQUESTS, DAY_BUDGET - used_today))
+    # Laws still waiting for their text (pipeline.texts) have their requests kept back. The backfill
+    # would otherwise take the whole day's allowance on the first pass, every day it runs.
+    mine = kv_get(db, "texts_spend", {})
+    reserve = max(0, texts.OPEN_STATES_CAP - (mine.get("n", 0) if mine.get("date") == day else 0)) \
+        if kv_get(db, "texts_waiting") else 0
+    budget = max(0, min(MAX_REQUESTS, DAY_BUDGET - used_today - reserve))
     if not budget:
         state["message"] = f"daily budget of {DAY_BUDGET} requests used; resumes tomorrow"
         return

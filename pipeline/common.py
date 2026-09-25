@@ -332,6 +332,8 @@ CREATE TABLE IF NOT EXISTS checks(
   target TEXT, kind TEXT, value TEXT, evidence TEXT, verdict TEXT, reason TEXT, model TEXT, checked_at TEXT,
   PRIMARY KEY(target, kind, value));
 CREATE TABLE IF NOT EXISTS history(date TEXT PRIMARY KEY, snapshot TEXT);
+CREATE TABLE IF NOT EXISTS texts(
+  target TEXT PRIMARY KEY, url TEXT, text TEXT, fetched TEXT, error TEXT, tries INTEGER DEFAULT 0, asked TEXT);
 CREATE INDEX IF NOT EXISTS idx_articles_seen ON articles(seen);
 CREATE INDEX IF NOT EXISTS idx_measures_intro ON measures(introduced_date);
 CREATE INDEX IF NOT EXISTS idx_lobbying_year ON lobbying(year, quarter);
@@ -696,13 +698,54 @@ LOCAL_PROSECUTORS = re.compile(r"\b(district|city|county|public|local) (attorney
                                r"\bprosecuting attorneys\b", re.I)
 
 
-def office_label(name):
-    """The name an office is counted and shown under."""
-    name = (name or "").strip()
+STATE_NAMES = ("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
+               "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky",
+               "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
+               "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York",
+               "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island",
+               "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+               "West Virginia", "Wisconsin", "Wyoming", "District of Columbia", "Puerto Rico")
+# The attorney general's office is the attorney general. Pennsylvania's was counted twice, once as
+# "Pennsylvania Attorney General" and once as "Pennsylvania Office of Attorney General", and Hawaii's
+# as its Attorney General and its "Department of the Attorney General".
+AG_OFFICE = re.compile(r"\b(?:Office|Department) of (?:the )?Attorney General\b|\bAttorney General's Office\b")
+# A proper name the tagger left in lower case ("Colorado civil rights division"). A plural is a
+# class of offices ("California health care professional licensing boards") and keeps its case.
+LOWER_OFFICE = re.compile(r"[a-z][a-z ]* (?:division|department|commission|board|office|bureau|agency|authority|"
+                          r"council|cabinet)")
+SMALL_WORDS = {"of", "and", "the", "for", "on", "in"}
+
+
+def office_label(name, where=None):
+    """The name an office is counted and shown under, or "" when the measure does not name one.
+
+    The tagger names each office with its jurisdiction, which is what makes offices countable, but
+    it spells one office several ways: "California Medical Board" and "California Medical Board of
+    California" are one board. An office it could only describe, "Minnesota (state agency overseeing
+    AI independent verification organizations)", is not a named office and is not counted as one.
+    where is the measure's jurisdiction code: a federal office named without its country ("Department
+    of Commerce" in a bill before Congress) is given it, as the Department of Labor already has it.
+    """
+    name = " ".join((name or "").split())
     m = LOCAL_PROSECUTORS.search(name)
     if m:
         prefix = name[:m.start()].strip()
         return f"{prefix} local prosecutors" if prefix else "Local prosecutors"
+    bare = re.sub(r"\s*\([^)]*\)", "", name).strip()
+    if bare != name and (not bare or bare in STATE_NAMES or bare.lower() in ("state", "federal", "the state")):
+        return ""
+    name = AG_OFFICE.sub("Attorney General", bare)
+    for state in STATE_NAMES:
+        if name.startswith(state + " "):
+            rest = name[len(state) + 1:]
+            rest = re.sub(rf"\s+of (?:the State of )?{state}$", "", rest)
+            rest = re.sub(r"^State (?=Department\b)", "", rest)
+            if LOWER_OFFICE.fullmatch(rest):
+                rest = " ".join(w if w in SMALL_WORDS else w.capitalize() for w in rest.split())
+            name = f"{state} {rest}"
+            break
+    if where in ("us", "us-exec") and re.match(r"(?:Department|Office|Bureau|Agency) of\b", name):
+        name = "U.S. " + name
     return name
 
 

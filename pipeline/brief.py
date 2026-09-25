@@ -882,13 +882,15 @@ def patterns(db, today, recent):
     # carry a control count, as on the page: an office gains nothing from one that imposes nothing.
     controlled = set().union(*[ids for (kind, slug), ids in tally.items() if kind == "control" and slug in names])
     named, by_office = {}, collections.defaultdict(set)
+    where = {r["id"]: r["jurisdiction"] for r in db.execute("SELECT id, jurisdiction FROM measures")}
     for t in db.execute("SELECT target, value FROM tags WHERE kind='agency'"):
         if t["target"] not in controlled:
             continue
-        k = name_key(office_label(t["value"]))
+        label = office_label(t["value"], where.get(t["target"]))
+        k = name_key(label)
         if not k:
             continue
-        named.setdefault(k, office_label(t["value"]))
+        named.setdefault(k, label)
         by_office[k].add(t["target"])
     if named:
         k = max(by_office, key=lambda x: len(by_office[x]))
@@ -1112,13 +1114,14 @@ def totals(db):
     keep = in_scope(db)
     known = {c["slug"] for c in config("controls")}
     controlled, named = set(), collections.defaultdict(set)
+    where = {r["id"]: r["jurisdiction"] for r in db.execute("SELECT id, jurisdiction FROM measures")}
     for t in db.execute("SELECT target, kind, value FROM tags WHERE kind IN ('control','agency')"):
         if t["target"] not in keep:
             continue
         if t["kind"] == "control" and t["value"] in known:
             controlled.add(t["target"])
-        elif t["kind"] == "agency" and name_key(office_label(t["value"])):
-            named[name_key(office_label(t["value"]))].add(t["target"])
+        elif t["kind"] == "agency" and name_key(office_label(t["value"], where.get(t["target"]))):
+            named[name_key(office_label(t["value"], where.get(t["target"])))].add(t["target"])
     # An office counts when a measure that carries a control names it, which is the page's rule.
     offices = {k for k, ids in named.items() if ids & controlled}
     return {"measures": len(keep), "controlled": len(controlled), "offices": len(offices)}

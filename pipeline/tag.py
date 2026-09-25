@@ -15,6 +15,7 @@ import requests
 from .common import (AI_TEXT, SUMMARY_MAX, config, env, in_window, iso, kv_get, kv_set, log, sha,
                      states_a_position, title_settles)
 from . import known
+from .texts import TEXT_MAX, law_texts, reading
 
 API = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-haiku-4-5-20251001"
@@ -93,7 +94,8 @@ def propose(key, fears, controls, doc, is_measure):
             "Summaries often recite law already in force before saying what the measure does. Ignore every "
             "sentence that describes existing law, including ones that open with \"Existing law\" or name an "
             "act that already requires something. Only what this measure would newly impose or newly hand to a "
-            "government body counts. Use empty lists when nothing applies.")
+            "government body counts. When the text of the law is given, read it for what the law does; a section "
+            "it only reprints from law already in force is not what it imposes. Use empty lists when nothing applies.")
     return call(key, system, user, max_tokens=500)
 
 
@@ -111,8 +113,9 @@ def verify(key, fears, controls, doc, proposal):
               "text that supports it, or null if the text does not support it. Reply with one JSON object only.")
     user = (f"TEXT\n{doc}\n\nLABELS TO CHECK\n{json.dumps(labels, indent=1)}\n\n"
             'Return JSON: {"fears": {"slug": "quote or null"}, "controls": {"slug": "quote or null"}, '
-            '"agencies": {"name": "quote or null"}}\nEach value must be a quote copied word for word from the Title '
-            'or Summary, between 4 and 30 words, never from the Jurisdiction or Identifier line. Always return the '
+            '"agencies": {"name": "quote or null"}}\nEach value must be a quote copied word for word from the Title, '
+            'the Summary or the Text of the law, between 4 and 30 words, never from the Jurisdiction or Identifier '
+            'line. Always return the '
             'three keys as objects, never as lists. A sentence describing law already in force does not support a label, so return null when that is the only support.')
     return call(key, system, user, max_tokens=900)
 
@@ -205,8 +208,10 @@ def prune_tags(db):
     later rule would reject keeps appearing on the site forever.
     """
     bodies, posts, gone = {}, {}, []
-    for r in db.execute("SELECT id, jurisdiction, jurisdiction_name, title, summary, url FROM measures"):
-        raw = f"{r['title'] or ''}\n{r['summary'] or ''}"
+    texts = law_texts(db)
+    for r in db.execute("SELECT id, jurisdiction, jurisdiction_name, title, summary, status, url FROM measures"):
+        law = reading(dict(r), texts)
+        raw = f"{r['title'] or ''}\n{r['summary'] or ''}" + (f"\n{law}" if law else "")
         bodies[r["id"]] = (norm(raw), r["jurisdiction_name"] or "", raw, r["jurisdiction"] or "",
                            states_a_position(r["title"]), r["url"])
     for r in db.execute("SELECT id, title, summary FROM posts"):
@@ -258,17 +263,21 @@ def targets(db, limit):
     # session that began then. Sixty-three of Montana's 2025 bills were never read at all.
     rows = [r for r in db.execute(
         "SELECT m.id, m.kind, m.jurisdiction, m.session, m.introduced_date, m.jurisdiction_name, m.identifier, "
-        "m.title, m.summary, t.text_hash FROM measures m LEFT JOIN tag_runs t ON t.target = m.id "
+        "m.title, m.summary, m.status, t.text_hash FROM measures m LEFT JOIN tag_runs t ON t.target = m.id "
         "ORDER BY m.introduced_date DESC").fetchall() if in_window(r)]
+    texts = law_texts(db)
     out = []
     for r in rows:
-        body = f"{r['title'] or ''}\n{r['summary'] or ''}"
+        # A law whose summary is missing or a line is read with its enacted text (pipeline.texts).
+        law = reading(dict(r), texts)
+        body = f"{r['title'] or ''}\n{r['summary'] or ''}" + (f"\n{law}" if law else "")
         doc = f"Jurisdiction: {r['jurisdiction_name']}\nIdentifier: {r['identifier']}\nTitle: {r['title']}\n" \
-              f"Summary: {r['summary'] or '(none)'}"
+              f"Summary: {r['summary'] or '(none)'}" + (f"\nText of the law: {law}" if law else "")
         h = sha(doc)
         if r["text_hash"] != h:
-            # the whole of what is kept: the title, and the summary up to SUMMARY_MAX
-            out.append(("measure", r["id"], doc[:SUMMARY_MAX + 2000], h, body[:SUMMARY_MAX + 2000]))
+            # the whole of what is kept: the title, the summary up to SUMMARY_MAX, the law's text
+            out.append(("measure", r["id"], doc[:SUMMARY_MAX + 2000 + TEXT_MAX], h,
+                        body[:SUMMARY_MAX + 2000 + TEXT_MAX]))
     posts = db.execute(
         "SELECT p.id, p.title, p.summary, t.text_hash FROM posts p LEFT JOIN tag_runs t ON t.target = 'post:' || p.id "
         "ORDER BY p.published DESC").fetchall()

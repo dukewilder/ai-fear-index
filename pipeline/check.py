@@ -22,6 +22,7 @@ import requests
 
 from .common import SUMMARY_MAX, annotate, config, iso, kv_get, kv_set, log, measures_in_scope, sha, title_settles
 from . import known
+from .texts import excerpt, law_texts, reading
 
 API = "https://api.anthropic.com/v1/messages"
 # Stronger first. A key that cannot use the first model gets the next one down rather than no
@@ -266,6 +267,9 @@ def question(m, kind, value, quote, controls, fears=None):
         what = "MEASURE"
         doc = (f"Jurisdiction: {m['jurisdiction_name']}\nIdentifier: {m['identifier']}\n"
                f"Title: {m['title'] or ''}\nSummary: {(m['summary'] or '(none)')[:SUMMARY_MAX]}")
+        # A law read from its text (pipeline.texts): the part of it around the quote, and its opening.
+        if m.get("law_text") and kind != "about":
+            doc += f"\nText of the law (the part the quote is from): {excerpt(m['law_text'], quote)}"
     if kind == "about":
         return (f"{what}\n{doc}\n\n{ABOUT_QUESTION}\n\n"
                 'Return JSON: {"verdict": "yes" or "no", "reason": "one short sentence"}')
@@ -294,6 +298,9 @@ def queue(db, controls, fears=None):
     """Labels without a verdict on the quote they rest on now, and labels already refused on it."""
     fears = fears or {}
     shown = {m["id"]: m for m in measures_in_scope(db)}
+    texts = law_texts(db)
+    for m in shown.values():
+        m["law_text"] = reading(m, texts)
     # Statements the site shows: an organization's own post, judged about AI. Only their fears.
     names = {e["slug"]: e["name"] for e in config("entities")}
     for p in db.execute("SELECT p.* FROM posts p JOIN tag_runs tr ON tr.target = 'post:' || p.id "

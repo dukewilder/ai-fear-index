@@ -99,7 +99,7 @@ def main():
         kv_set(db, "wiki_catchup", f"{today}:{','.join(waiting)}")
         db.commit()
     if args.only:
-        sources = [s for s in args.only.split(",") if s in MODULES and s != "tag"]
+        sources = [s for s in args.only.split(",") if s in MODULES and s not in ("tag", "texts")]
     log(f"mode={mode} sources={sources} first run for: {[s for s in sources if s not in done] or 'none'}")
     started = time.time()
     asked = {s: kv_get(db, f"retry:{s}") for s in sources}
@@ -117,6 +117,12 @@ def main():
             known.fetch_missing(db)
         except Exception as exc:  # never the reason a run fails
             log(f"[known] {str(exc)[:200]}")
+    # A law whose official summary is missing or a line gets its enacted text read, before tagging,
+    # so the tagger reads it the same run (pipeline.texts).
+    if not args.only or "texts" in args.only.split(","):
+        from . import texts
+        with source_run(db, "texts") as state:
+            texts.run(db, state, mode)
     if not args.only or "tag" in args.only.split(","):
         from . import tag
         with source_run(db, "tag") as state:

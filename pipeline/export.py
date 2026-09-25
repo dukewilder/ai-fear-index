@@ -238,7 +238,7 @@ def export(db, out_dir, base=""):
         tg = tags.get(m["id"], {"fear": set(), "control": set(), "agency": set()})
         m["fears"] = sorted(s for s in tg["fear"] if s in fear_by)
         m["controls"] = sorted(s for s in tg["control"] if s in control_by)
-        m["agencies"] = sorted({office_label(a) for a in tg["agency"]})
+        m["agencies"] = sorted({office_label(a, m["jurisdiction"]) for a in tg["agency"]} - {""})
         # Where a reader lands to read it: the legislature's own page wherever the record has one.
         # m["url"] stays the record's own address, which the suppression list and the quotes key on.
         m["link"], m["where"] = read_link(m)
@@ -690,6 +690,8 @@ SOURCES = [
     ("news", "Headlines", "NEWS_FEEDS"),   # filled in from config/news.json, so the page cannot drift from it
     ("wikipedia", "Wikipedia readership", "Wikimedia pageviews"),
     ("rss", "Organization statements", "Newsroom feeds of tracked organizations"),
+    ("texts", "Text of laws with no usable summary", "The legislature's own copy, found through Open States, and "
+     "the Federal Register's"),
     ("tag", "Fear and control labels", "Claude reads each measure. Every label rests on a quote copied word for word from it and is checked against its text"),
 ]
 SCHEDULE = [
@@ -849,11 +851,15 @@ def fear_line(st):
 
 
 def law_date(m, today):
-    """'Passed' with its date, or 'Effective' when the date on file is still ahead of us."""
+    """'Passed' with its date, or 'Takes effect' when the date on file is still ahead of us.
+
+    Georgia files a law's effective date as its last action, and "Effective · 2027-07-01" on a law
+    that has not taken effect read as though it had.
+    """
     d = (m["latest_action_date"] or m["introduced_date"] or "")[:10]
     if not d:
         return "Passed"
-    return f"Effective · {d}" if d > today.isoformat() else f"Passed · {d}"
+    return f"Takes effect · {d}" if d > today.isoformat() else f"Passed · {d}"
 
 
 def own_words(db, measures, fear_by, control_by, suppressed=(), per_fear=None, limit=40):

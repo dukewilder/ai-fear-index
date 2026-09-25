@@ -26,14 +26,14 @@
 
 <nav class="jumpbar" aria-label="On this page"><div class="wrap"><div class="jump">
 <a href="{{ url('home', anchor='index') }}" data-jump="index">The index</a>
-<a href="{{ url('home', anchor='everywhere') }}" data-jump="everywhere">Everywhere</a>
-<a href="{{ url('home', anchor='numbers') }}" data-jump="numbers">The totals</a>
-<a href="{{ url('home', anchor='words') }}" data-jump="words">Their words</a>
-<a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>
-<a href="{{ url('home', anchor='funding') }}" data-jump="funding">The money</a>
+{% if d.grid %}<a href="{{ url('home', anchor='everywhere') }}" data-jump="everywhere">Everywhere</a>{% endif %}
+{% if d.numbers %}<a href="{{ url('home', anchor='numbers') }}" data-jump="numbers">The totals</a>{% endif %}
+{% if d.quotes %}<a href="{{ url('home', anchor='words') }}" data-jump="words">Their words</a>{% endif %}
+{% if d.states %}<a href="{{ url('home', anchor='states') }}" data-jump="states">The states</a>{% endif %}
+{% if d.funders %}<a href="{{ url('home', anchor='funding') }}" data-jump="funding">The money</a>{% endif %}
 <a href="{{ url('home', anchor='buying') }}" data-jump="buying">What it buys</a>
-<a href="{{ url('home', anchor='benefits') }}" data-jump="benefits">Who benefits</a>
-<a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>
+{% if d.beneficiaries %}<a href="{{ url('home', anchor='benefits') }}" data-jump="benefits">Who benefits</a>{% endif %}
+{% if d.already_law %}<a href="{{ url('home', anchor='law') }}" data-jump="law">Already law</a>{% endif %}
 </div></div></nav>
 
 {% if d.polls %}

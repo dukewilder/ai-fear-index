@@ -543,7 +543,9 @@ def drop_position_controls(db):
 # Bump when a change to config/fears.json needs the whole record read again. Adding a fear does
 # not change a single measure's text, and the tagger only re-reads a measure whose text has
 # changed, so without this a new fear would only ever be applied to bills filed after it.
-RETAG_FEARS = 1
+# 2: the list grew from ten fears to the highest-scoring of every fear measured on 25 September 2026,
+#    and bans and limits on uses of AI became a control, so every measure is read against both.
+RETAG_FEARS = 2
 
 
 def retag_for_fears(db):

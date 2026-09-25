@@ -657,6 +657,19 @@ def build(data_path, out_dir=None, preview_path=None, base="", pages_path=None):
                                    nav="", home=False, og_image=cards.get("share"), icons=icons,
                                    robots="noindex", ld=None, canonical=None, description=gone["description"]))
     written.append(str(target))
+    # A fear taken off the list keeps its address, saying so, out of the sitemap like the 404.
+    for r in d.get("retired_fears") or []:
+        page = {"kind": "method", "route": f"fear/{r['slug']}", "out": f"fear/{r['slug']}/index.html",
+                "title": f"{r['name']}: no longer on the list | {name}", "head": r["name"], "ctx": {},
+                "nav": "", "card": None,
+                "description": f"{r['name']} is no longer one of the fears the AI Fear Report follows."}
+        page["html"] = env.get_template("pages/retired.html").render(r=r)
+        target = pathlib.Path(out_dir) / page["out"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(shell.render(pages=[page], preview=False, title=page["title"], og_title=page["head"],
+                                       nav="", home=False, og_image=cards.get("share"), icons=icons,
+                                       robots="noindex", ld=None, canonical=None, description=page["description"]))
+        written.append(str(target))
     if site_url:
         record = {}
         if pages_path and pathlib.Path(pages_path).exists():

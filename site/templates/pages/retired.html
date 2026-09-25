@@ -1,0 +1,11 @@
+{% set fl = d.fear_list or {} %}<section class="block first"><div class="wrap">
+<a class="back" href="{{ url('home', anchor='index') }}">{{ chevron|safe }}The Fear Index</a>
+<p class="kicker">No longer on the list</p>
+<h1 class="title">{{ r.name }}</h1>
+<p class="hero-text sm">{{ r.name }} was one of the fears this report followed until {{ fl.chosen or "the list was last set" }}. That day every candidate was measured the same way, in bills, lobbying filings, news and Wikipedia readership, and the report kept the {{ d.fear_word }} that scored highest. {{ r.name }} was not among them. It is still measured every day with the other candidates, and a person sees each week whether it has come to outscore a fear on the list.</p>
+<p class="jump" style="margin-top:22px">
+<a href="{{ url('method', anchor='fears') }}">How the fears were chosen</a>
+<a href="{{ url('home', anchor='index') }}">The {{ d.fear_word }} fears</a>
+<a href="{{ url('bills') }}">Every bill</a>
+</p>
+</div></section>

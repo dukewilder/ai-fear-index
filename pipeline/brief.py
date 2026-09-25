@@ -102,7 +102,7 @@ ENFORCER = re.compile(r"\b(attorney general|commission|department|board|bureau|a
 # a licence, an identity check, or a new office with a power over you is.
 WEIGHT = {"license-to-build": 5, "training-caps": 5, "id-age-checks": 5, "open-model-limits": 4,
           "new-agency-powers": 4, "preemption": 4, "export-controls": 3, "data-center-limits": 3,
-          "mandatory-reporting": 1, "labeling-mandates": 1}
+          "use-restrictions": 3, "mandatory-reporting": 1, "labeling-mandates": 1}
 
 
 OTHER_TONGUE = re.compile(r"\b(para|que|los|las|del|por|una|con|sobre|ley|articulo|art[ií]culo|"

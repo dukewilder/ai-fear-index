@@ -6,5 +6,11 @@
   "donate_text": "",
   "donate_btc": "1AhncrENQLEKQtoa7Tqqfbp4aiguynYmNe",
   "x_handle": "aiFearReport",
-  "indexnow_key": "fc03bcabfd56dc2848421bee47afd590"
+  "indexnow_key": "fc03bcabfd56dc2848421bee47afd590",
+  "fears_chosen": "25 September 2026",
+  "retired_fears": [
+    "ai-cyberattacks",
+    "bioweapons"
+  ],
+  "fears_chosen_note": "GDELT had not returned news counts for some candidates that day; the same 17 come out on top at any value those counts could take."
 }

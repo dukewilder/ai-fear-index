@@ -130,10 +130,9 @@ def main():
         from . import review
         with source_run(db, "review") as state:
             review.run(db, state, mode)
-    # Fears the report does not follow, measured beside the ones it does (candidates.py): daily, and
-    # on any run while a candidate still has no news count, so a first reading does not wait a day.
-    report = kv_get(db, "candidates:report")
-    if not args.only and (mode in ("daily", "backfill") or not report or report.get("news_waiting")):
+    # Fears the report does not follow, measured beside the ones it does (candidates.py). Once a day:
+    # GDELT limits the runner's address, and the fears on the site come first for its news.
+    if not args.only and (mode in ("daily", "backfill") or not kv_get(db, "candidates:report")):
         from . import candidates
         with source_run(db, "candidates") as state:
             candidates.run(db, state, mode)

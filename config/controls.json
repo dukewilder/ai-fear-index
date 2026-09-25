@@ -48,6 +48,14 @@
     "head": "labels and notices of AI use"
   },
   {
+    "slug": "use-restrictions",
+    "name": "Bans and limits on uses of AI",
+    "chip": "Use limits",
+    "definition": "Bans or restricts a use of AI by people or organizations outside government: forbids it outright or for a purpose or setting, such as setting rents, giving therapy or denying insurance claims; requires that a person rather than an AI make or review a decision; requires an AI system to be built so it cannot be used a certain way; or makes creating or spreading AI-made content a crime or a civil violation. Rules for the government's own use of AI do not count.",
+    "head": "bans and limits on uses of AI",
+    "pattern": "ban or restrict a use of AI, or make one a crime"
+  },
+  {
     "slug": "new-agency-powers",
     "name": "New powers for government agencies",
     "chip": "New agency powers",

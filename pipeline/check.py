@@ -60,8 +60,8 @@ NARROWED = (1, ("control", "agency"))
 # The heavy, rare controls first: they decide which measure leads the post, and they were the ones
 # most often wrong. Offices next, since the front page counts them.
 ORDER = ["about", "license-to-build", "training-caps", "open-model-limits", "id-age-checks", "export-controls",
-         "preemption", "new-agency-powers", "data-center-limits", "agency", "mandatory-reporting",
-         "labeling-mandates", "fear"]
+         "preemption", "new-agency-powers", "data-center-limits", "use-restrictions", "agency",
+         "mandatory-reporting", "labeling-mandates", "fear"]
 
 SYSTEM = ("You check one label a public database has given a U.S. bill or rule, or an organization's "
           "statement. Read the text and decide whether it itself does or says what the label claims. Be "
@@ -99,6 +99,14 @@ CONTROL_NOTES = {
                          "A government body disclosing its own use of AI is not this. A defense or safe "
                          "harbor for content that carries a disclosure rewards a label; it does not "
                          "require one.",
+    "use-restrictions": "A use of AI has to be banned or restricted for someone outside government, a person has to "
+                        "be required to make or review a decision in place of an AI, or creating or spreading "
+                        "AI-made content has to become a crime or a civil violation. Extending an existing offense, "
+                        "such as defamation, fraud or child sexual abuse material, to AI-made content counts, because "
+                        "the use becomes newly unlawful. A label or disclosure requirement is labels and notices, and "
+                        "a report to government is mandatory reporting, not this. A measure that only says existing "
+                        "law already covers AI, only studies or urges, or only limits what government bodies may "
+                        "do with AI is not this.",
     "export-controls": "Exports or foreign access have to be restricted. A measure that loosens "
                        "restrictions, adds license exceptions, or promotes exports is the opposite.",
     "data-center-limits": "Building or operating data centers has to be paused, banned, or put under "
@@ -147,6 +155,7 @@ FEAR_QUESTION = (
     "- the text is about AI in general and the harm is inferred rather than stated;\n"
     "- a word from the definition appears but not the harm itself, such as China named in a trade or "
     "supply matter with no AI competition in it, or workers trained in AI with no jobs lost to it;\n"
+    "- the definition itself says this case belongs to a different fear;\n"
     "- the quote describes law already in force, not what this measure would do.")
 
 # Whether a measure is about AI at all, asked of every counted measure whose title does not say so.

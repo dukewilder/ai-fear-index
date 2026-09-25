@@ -1085,7 +1085,15 @@ def check_lobbying_keywords():
     Cybersecurity; Encryption policy" came to name a fear of AI attacks.
     """
     from pipeline.common import fear_keywords, fears_mentioned
+    from pipeline.candidates import keyword_patterns
     kw = fear_keywords()
+    # A fear taken off the list is a candidate now, still measured with the same words, so the
+    # lessons in its words are checked there.
+    for c in config("fear_candidates"):
+        kw.setdefault(c["slug"], keyword_patterns(c["keywords"]))
+
+    def names(text, fear):
+        return any(p.search(text) for p in kw[fear])
     for text, fear, want in (
             ("medical imaging and managing engagement", "loss-of-control", False),
             ("laboratory collaboration agreements", "job-loss", False),
@@ -1097,15 +1105,20 @@ def check_lobbying_keywords():
             ("discriminatory automated decisions", "bias", True),
             ("ransomware and hacking of AI systems", "ai-cyberattacks", True),
             ("reskilling for the future of work", "job-loss", True),
-            ("companion chatbots and child safety", "kids-chatbots", True)):
-        got = fear in fears_mentioned(text, kw)
+            ("companion chatbots and child safety", "kids-chatbots", True),
+            ("rent-setting software used by landlords", "algorithmic-pricing", True),
+            ("patient access to medicines; artificial intelligence", "ai-care-decisions", False),
+            ("AI in prior authorization and claim denials", "ai-care-decisions", True),
+            ("intellectual property theft by China; AI", "copyright", False),
+            ("foreign influence operations; AI", "misinformation", False)):
+        got = names(text, fear)
         assert got == want, \
             f"{text!r} {'should' if want else 'should not'} name {fear}"
     # the words the evidence refused, kept out by name so they are not quietly restored
     refused = {"cyber", "labor", "jobs", "worker", "workforce", "national security", "dominance",
                "pandemic", "algorithmic", "high-risk", "civil rights", "child", "children",
                "youth", "minor", "critical infrastructure"}
-    for f in config("fears"):
+    for f in config("fears") + config("fear_candidates"):
         bare = {k.lower().rstrip("*") for k in f["keywords"]}
         clash = bare & refused
         assert not clash, f"{f['slug']} took back a word the filings showed to be generic: {clash}"
@@ -1757,25 +1770,58 @@ def check_states(dist, data):
     print(f"a map of {len(m['tiles'])} squares, {len(pages)} place pages, ranked by what they would control: ok")
 
 
+def check_links(dist):
+    """Every link inside the site reaches a page that exists, and every anchor a section that exists.
+
+    Funders' pages linked back to /#funders for months while the section was called funding.
+    """
+    import html as _html, urllib.parse as _up
+    pages = {p: p.read_text(errors="replace") for p in dist.rglob("*.html")}
+    ids = {p: set(re.findall(r'\bid="([^"]+)"', s)) for p, s in pages.items()}
+    bad, n = [], 0
+    for p, s in pages.items():
+        for href in re.findall(r'\bhref="([^"]*)"', s):
+            u = _up.urlparse(_html.unescape(href))
+            if u.scheme or href.startswith(("mailto:", "bitcoin:")) or not (u.path or u.fragment):
+                continue
+            n += 1
+            target = p
+            if u.path:
+                path = u.path if u.path.startswith("/") else "/" + str(p.parent.relative_to(dist) / u.path)
+                t = dist / path.lstrip("/")
+                target = t / "index.html" if (t.is_dir() or path.endswith("/")) else t
+                if not target.exists():
+                    bad.append((str(p.relative_to(dist)), href, "no such page"))
+                    continue
+            if u.fragment and target.suffix == ".html" and u.fragment not in ids.get(target, set()):
+                bad.append((str(p.relative_to(dist)), href, "no such section"))
+    assert not bad, f"{len(bad)} links inside the site go nowhere: {bad[:6]}"
+    print(f"all {n} links inside the site reach a page and a section that exist: ok")
+
+
 def check_fears_explained(dist, data):
     """The site says how many fears it follows and how they were chosen, and claims no more.
 
     A reader pointed out that the method page ranked the fears without saying how the list was
-    made or that it was a list of ten, while the tagline said "every fear about AI". The fears were
-    chosen by hand, the Fear Index ranks only them, and the controls are counted whatever a measure
-    cites. The method page says all three, with the counts, and the front page says ten.
+    made or that it was a list of ten, while the tagline said "every fear about AI". The list is now
+    the highest-scoring of every fear measured on the day it was set, the ones left off are still
+    measured, and the controls are counted whatever a measure cites. The method page says all of it,
+    with the counts, and the front page says how many.
     """
     method = re.sub(r"\s+", " ", (dist / "method" / "index.html").read_text())
     home = re.sub(r"\s+", " ", (dist / "index.html").read_text())
     word, bm = data["fear_word"], data["bills_meta"]
-    assert f'id="fears">The {word} fears' in method and "chosen by hand, not by ranking a longer list" in method, \
+    fl = data["fear_list"]
+    assert f'id="fears">The {word} fears' in method and fl["chosen"] and \
+        f"scored highest on the Fear Index out of {fl['measured']} fears measured on {fl['chosen']}" in method, \
         "the method page does not say how the fears were chosen"
+    assert f"Every day the {fl['candidates']} candidates are scored" in method, "the fears left off are not said to be measured"
     assert f"{bm['controlled_no_fear']:,} of the {bm['controlled']:,} that would add government control cite none" in method
     assert f"The {word} fears this report follows" in home and 'href="/method/#fears"' in home
     for page in dist.rglob("*.html"):
         assert "Every fear about AI" not in page.read_text(), f"{page} still claims every fear"
     assert "Every fear" not in data["site"]["tagline"]
-    print(f"the {word} fears are said to be {word}, chosen by hand, with what they leave out: ok")
+    print(f"the {word} fears are said to be the top {word} of {fl['measured']} measured, with what they leave out: ok")
 
 
 def check_bills_page(dist, data):
@@ -1836,8 +1882,16 @@ def check_search(dist, data_path, tmp):
     assert sitemap.count("<lastmod>") == len(listed), "a sitemap entry has no date"
     titles = {}
     thin = {p["slug"] for p in data["state_pages"] if p["n"] < 3}
+    # A fear taken off the list keeps its address with a note, out of search like the 404.
+    retired = {f"fear/{r['slug']}/index.html" for r in data.get("retired_fears") or []}
+    for rel in retired:
+        body = (dist / rel).read_text()
+        assert 'content="noindex"' in body and "No longer on the list" in body, f"{rel} is not marked retired"
+        assert "https://aifearreport.com/" + rel[:-len("index.html")] not in listed, f"{rel} is offered to search"
     for page in dist.rglob("index.html"):
         body, rel = page.read_text(), page.relative_to(dist).as_posix()
+        if rel in retired:
+            continue
         title = re.search(r"<title>(.*?)</title>", body).group(1)
         assert title not in titles, f"{rel} and {titles.get(title)} share the title {title!r}"
         titles[title] = rel
@@ -2146,6 +2200,24 @@ def check_bill_links():
     print("bills link to the legislature's own page, found for the ones on file too, and summaries are read whole: ok")
 
 
+def check_use_restrictions():
+    """A ban on a use of AI is a control, and the tagger and the check are told what one is.
+
+    The ten controls counted licences, caps, reports, labels and new powers, and no ban: a bill
+    that forbade landlords to set rents by algorithm, or made an AI-made sexual image a crime, put
+    the people using AI under a new rule and counted as adding no control at all.
+    """
+    from pipeline import brief, check
+    cs = {c["slug"]: c for c in config("controls")}
+    c = cs["use-restrictions"]
+    assert {"slug", "name", "chip", "definition", "head", "pattern"} <= set(c), c
+    assert "government's own use" in c["definition"], "the definition lets the government's own use in"
+    assert "use-restrictions" in check.ORDER and "use-restrictions" in check.CONTROL_NOTES
+    assert "labels and notices" in check.CONTROL_NOTES["use-restrictions"], "the note does not keep labels out"
+    assert brief.WEIGHT.get("use-restrictions"), "the brief does not know what a ban is worth"
+    print("a ban or limit on a use of AI counts as a control: ok")
+
+
 def check_candidates():
     """Fears the report does not follow are measured beside the ones it does, the same way.
 
@@ -2404,6 +2476,7 @@ def main():
     check_bill_links()
     check_government_own_use()
     check_candidates()
+    check_use_restrictions()
     check_brief_prompt()
     check_plate_fits()
     check_mark_geometry()
@@ -2493,6 +2566,11 @@ def main():
         db.execute("INSERT OR REPLACE INTO series VALUES(?,?,?)", ("wiki:loss-of-control", day, 1000 + i))
         if i < 60:
             db.execute("INSERT OR REPLACE INTO series VALUES(?,?,?)", ("news:deepfakes", day, 300 - i))
+            # GDELT asked about every other fear too and found nothing: a count of nought, which the
+            # index scores, unlike a fear it has not been asked about yet.
+            for f in config("fears"):
+                if f["slug"] != "deepfakes":
+                    db.execute("INSERT OR REPLACE INTO series VALUES(?,?,?)", (f"news:{f['slug']}", day, 0))
     for i in range(12):
         upsert(db, "articles", {"id": f"a{i}", "fear": "deepfakes", "title": f"Deepfake scam wave hits voters in state {i}",
                                 "url": "https://example.com", "domain": "example.com",
@@ -2579,6 +2657,7 @@ def main():
     check_states(tmp / "dist", data)
     check_bills_page(tmp / "dist", data)
     check_fears_explained(tmp / "dist", data)
+    check_links(tmp / "dist")
     check_search(tmp / "dist", tmp / "site_data.json", tmp)
     check_page_dates(tmp / "site_data.json", tmp)
     pages = sorted(str(p.relative_to(tmp / "dist")) for p in (tmp / "dist").rglob("index.html"))

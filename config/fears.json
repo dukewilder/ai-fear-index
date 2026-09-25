@@ -200,53 +200,6 @@
     "because": "anyone can now fake anyone"
   },
   {
-    "slug": "ai-cyberattacks",
-    "name": "AI cyberattacks",
-    "sentence": "AI cyberattacks",
-    "short": "Cyberattacks",
-    "definition": "AI-enabled hacking or cyberattacks, including attacks on critical infrastructure.",
-    "keywords": [
-      "cyberattack*",
-      "cyber attack*",
-      "cyber-attack*",
-      "cyber threat*",
-      "malicious cyber",
-      "cyber incident*",
-      "hacking",
-      "hacker*",
-      "ransomware"
-    ],
-    "gdelt": "\"artificial intelligence\" (cyberattack OR cyberattacks OR hackers OR ransomware)",
-    "match": [
-      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
-      "cyberattack|cyber attack|hacker|hacking|ransomware|malware|breach"
-    ],
-    "wikipedia": [],
-    "because": "AI makes an attack on the grid easier"
-  },
-  {
-    "slug": "bioweapons",
-    "name": "Bioweapons",
-    "sentence": "bioweapons",
-    "short": "Bioweapons",
-    "definition": "AI helping create biological, chemical, radiological, or nuclear weapons, or engineered pandemics.",
-    "keywords": [
-      "bioweapon*",
-      "biological weapon*",
-      "biosecurity",
-      "chemical weapon*",
-      "cbrn",
-      "pathogen*"
-    ],
-    "gdelt": "\"artificial intelligence\" (bioweapon OR bioweapons OR \"biological weapons\" OR biosecurity)",
-    "match": [
-      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model",
-      "bioweapon|biological weapon|biosecurity|pathogen|bioterror"
-    ],
-    "wikipedia": [],
-    "because": "AI could help somebody build a weapon"
-  },
-  {
     "slug": "bias",
     "name": "Algorithmic bias",
     "sentence": "algorithmic bias",
@@ -273,5 +226,230 @@
       "Algorithmic_bias"
     ],
     "because": "an algorithm decides who gets hired, housed, or lent to"
+  },
+  {
+    "slug": "ai-care-decisions",
+    "name": "AI deciding care",
+    "sentence": "AI deciding care",
+    "short": "Care decisions",
+    "definition": "AI deciding or denying medical care: insurers or health plans using algorithms to deny claims, prior authorizations or coverage, or AI diagnosing or treating patients in place of a doctor or nurse. Mental health care given by an AI is AI therapists, and discrimination in who gets care is algorithmic bias.",
+    "keywords": [
+      "prior authorization*",
+      "utilization review",
+      "utilization management",
+      "medical necessity",
+      "claim denial*",
+      "coverage determination*",
+      "clinical decision*",
+      "health care",
+      "healthcare",
+      "health insurance"
+    ],
+    "gdelt": "\"artificial intelligence\" (\"prior authorization\" OR \"claim denials\" OR \"denied claims\" OR \"insurance denials\" OR \"medical decisions\" OR misdiagnosis)",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+      "prior authori[sz]ation|utilization (review|management)|medical necessity|coverage (determination|decision)|claims? (denial|review|determination)|den(y|ied|ial)s? (of )?(care|coverage|claims?)|health (insurance|insurer|plan|benefit plan)|clinical decision|patient care|misdiagnos|physician"
+    ],
+    "wikipedia": [
+      "Artificial_intelligence_in_healthcare"
+    ],
+    "because": "an algorithm decides whether you get treated"
+  },
+  {
+    "slug": "privacy",
+    "name": "Privacy and personal data",
+    "sentence": "privacy and personal data",
+    "short": "Privacy",
+    "definition": "AI collecting, inferring, selling or exposing people's personal information, or being trained on it, without their knowledge or consent. Watching and identifying people is AI surveillance.",
+    "keywords": [
+      "privacy",
+      "personal data",
+      "personal information",
+      "consumer data",
+      "data broker*",
+      "data protection",
+      "sensitive data",
+      "data minimization"
+    ],
+    "gdelt": "\"artificial intelligence\" (privacy OR \"personal data\" OR \"personal information\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+      "privacy|personal (data|information)|consumer data|data broker|sensitive data|data protection|data minimi[sz]ation"
+    ],
+    "wikipedia": [
+      "Information_privacy"
+    ],
+    "because": "AI is taking people's personal data"
+  },
+  {
+    "slug": "copyright",
+    "name": "AI taking creators' work",
+    "sentence": "AI taking creators' work",
+    "short": "Copyright",
+    "definition": "AI trained on, copying or imitating books, art, music, journalism or other creative work without the owner's permission or payment. A fake of a real person's face or voice is a deepfake.",
+    "keywords": [
+      "copyright*",
+      "training data",
+      "fair use",
+      "creators",
+      "artists",
+      "musicians",
+      "songwriters"
+    ],
+    "gdelt": "\"artificial intelligence\" (copyright OR \"intellectual property\" OR \"fair use\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+      "copyright|intellectual property|training data|fair use|\\bartists?\\b|musicians?|creative works?"
+    ],
+    "wikipedia": [
+      "Artificial_intelligence_and_copyright"
+    ],
+    "because": "AI is built on work nobody paid for"
+  },
+  {
+    "slug": "surveillance",
+    "name": "AI surveillance",
+    "sentence": "AI surveillance",
+    "short": "Surveillance",
+    "definition": "AI watching, identifying or tracking people: facial recognition, biometric identification, license plate readers, predictive policing, or automated monitoring of workers or the public. Prices set from a person's data are algorithmic pricing.",
+    "keywords": [
+      "facial recognition",
+      "face recognition",
+      "surveillance",
+      "biometric*",
+      "predictive policing",
+      "license plate reader*",
+      "employee monitoring",
+      "workplace surveillance"
+    ],
+    "gdelt": "(\"facial recognition\" OR \"AI surveillance\" OR \"AI-powered surveillance\" OR \"predictive policing\" OR \"biometric surveillance\" OR \"employee monitoring\")",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative|facial recognition|face recognition|biometric|license plate",
+      "facial recognition|face recognition|surveillance|biometric|predictive policing|license plate reader|electronic monitoring|employee monitoring"
+    ],
+    "wikipedia": [
+      "Facial_recognition_system"
+    ],
+    "because": "AI is watching and identifying people"
+  },
+  {
+    "slug": "algorithmic-pricing",
+    "name": "Algorithmic pricing",
+    "sentence": "algorithmic pricing",
+    "short": "Pricing",
+    "definition": "Algorithms or AI setting what people pay: landlords' rent-setting software, prices tailored to a person's data, or competitors coordinating prices through a shared algorithm.",
+    "keywords": [
+      "algorithmic pricing",
+      "pricing algorithm*",
+      "surveillance pricing",
+      "rent-setting",
+      "rent setting",
+      "rental pric*",
+      "price fixing",
+      "price-fixing",
+      "dynamic pricing",
+      "personalized pricing",
+      "individualized pricing",
+      "realpage"
+    ],
+    "gdelt": "(\"algorithmic pricing\" OR \"surveillance pricing\" OR \"pricing algorithm\" OR \"rent-setting software\" OR RealPage)",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative|software|algorithmic device|pricing tool",
+      "rent(al)? pric|rental rate|amount of rent|set(ting)? rents?|rent.setting|pricing algorithm|algorithmic pricing|price.fixing|surveillance pricing|dynamic pricing|personali[sz]ed pric|individuali[sz]ed pric|coordinated pric|algorithmic device"
+    ],
+    "wikipedia": [],
+    "because": "an algorithm decides what people pay"
+  },
+  {
+    "slug": "ai-companions",
+    "name": "AI companions",
+    "sentence": "AI companions",
+    "short": "Companions",
+    "definition": "Chatbots built to be friends or partners drawing people, adults included, into emotional dependence, isolation, delusion or self-harm. Chatbots and children are kids and chatbots.",
+    "keywords": [
+      "ai companion*",
+      "companion chatbot*",
+      "emotional dependence",
+      "loneliness",
+      "companionship"
+    ],
+    "gdelt": "(\"AI companion\" OR \"AI companions\" OR \"AI girlfriend\" OR \"AI boyfriend\" OR \"AI psychosis\" OR \"chatbot psychosis\")",
+    "match": [
+      "companion (chat ?bot|app|AI|platform)|AI companion|chat ?bot|conversational (AI|artificial)",
+      "loneli|isolat|emotional (dependen|attachment|relationship)|companionship|romantic|delusion|psychosis|suicid|self.harm"
+    ],
+    "wikipedia": [
+      "AI-induced_psychosis"
+    ],
+    "because": "chatbots are standing in for friends and partners"
+  },
+  {
+    "slug": "ai-scams",
+    "name": "AI scams",
+    "sentence": "AI scams",
+    "short": "Scams",
+    "definition": "AI used to defraud people: scam calls and messages, phishing, fake identities, or chatbots that trick people out of money. A fake of a real person's face or voice is a deepfake.",
+    "keywords": [
+      "scam*",
+      "phishing",
+      "robocall*",
+      "ai-enabled fraud",
+      "ai fraud",
+      "impersonation scam*"
+    ],
+    "gdelt": "\"artificial intelligence\" (scam OR scams OR scammers OR phishing)",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+      "\\bscams?\\b|scammer|phishing|robocall|swindl|defraud"
+    ],
+    "wikipedia": [],
+    "because": "AI makes scams easier to run"
+  },
+  {
+    "slug": "misinformation",
+    "name": "AI misinformation",
+    "sentence": "AI misinformation",
+    "short": "Misinformation",
+    "definition": "AI producing or spreading false or misleading information: chatbots giving wrong answers, AI-written propaganda or fake news, or AI used to mislead voters. A fake of a real person's face or voice is a deepfake.",
+    "keywords": [
+      "misinformation",
+      "disinformation",
+      "false information",
+      "hallucination*",
+      "election interference"
+    ],
+    "gdelt": "\"artificial intelligence\" (misinformation OR disinformation OR hallucinations OR \"false information\" OR propaganda)",
+    "match": [
+      "artificial intelligence|\\bA\\.?I\\.?\\b|\\bAI-|OpenAI|Anthropic|DeepMind|ChatGPT|frontier model|language model|machine learning|algorithm|automated decision|chat ?bot|generative",
+      "misinformation|disinformation|false information|hallucinat|propaganda|election interference"
+    ],
+    "wikipedia": [
+      "Hallucination_(artificial_intelligence)"
+    ],
+    "because": "AI makes it easy to spread what is not true"
+  },
+  {
+    "slug": "self-driving",
+    "name": "Self-driving vehicles",
+    "sentence": "self-driving vehicles",
+    "short": "Self-driving",
+    "definition": "Vehicles driven by AI, such as robotaxis and self-driving trucks, endangering people on the road.",
+    "keywords": [
+      "autonomous vehicle*",
+      "self-driving",
+      "driverless",
+      "automated driving",
+      "automated vehicle*",
+      "robotaxi*",
+      "autonomous truck*"
+    ],
+    "gdelt": "(\"self-driving\" OR driverless OR robotaxi OR robotaxis OR \"autonomous vehicles\")",
+    "match": [
+      "autonomous (motor )?vehicle|self.driving|driverless|automated driving|automated (motor )?vehicle|robotaxi|autonomous truck"
+    ],
+    "wikipedia": [
+      "Self-driving_car"
+    ],
+    "because": "cars are driving themselves"
   }
 ]

@@ -403,6 +403,8 @@ def export(db, out_dir, base=""):
             # both a Wikipedia article and nothing collected from it until the next daily pass, and
             # a zero there would be a claim nobody has checked rather than a count.
             "has_wiki": bool(f.get("wikipedia")) and slug in wiki30,
+            # The same for news: a fear GDELT has not been asked about yet has no count, not a zero.
+            "has_news": slug in news30,
             "wiki_article": bool(f.get("wikipedia")),
             "news_span": news_span,
         }
@@ -603,6 +605,16 @@ def export(db, out_dir, base=""):
         "schedule": SCHEDULE, "fear_pages": fear_pages, "org_pages": org_pages,
         "bills": bills, "bills_meta": bills_meta,
         "fear_word": spell(len(fears)),
+        # How the list was set: the highest-scoring of every fear measured on the day it was chosen.
+        # The ones left off are candidates, still measured (candidates.py).
+        "fear_list": {"candidates": len(config("fear_candidates")),
+                      "measured": spell(len(fears) + len(config("fear_candidates"))),
+                      "chosen": (config("site").get("fears_chosen") or ""),
+                      "note": (config("site").get("fears_chosen_note") or "")},
+        # Fears that were on the list and are not now. Their pages stay, saying so, rather than
+        # turning into a 404 for anyone who followed a link to one.
+        "retired_fears": [{"slug": c["slug"], "name": c["name"]} for c in config("fear_candidates")
+                          if c["slug"] in (config("site").get("retired_fears") or [])],
     }
     (out / "site_data.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
     (out / "status.json").write_text(json.dumps(status, indent=1, default=str))
@@ -703,7 +715,7 @@ def index_scores(fears, stats):
         st = stats[f["slug"]]
         parts, weight = {}, 0.0
         for key, w in INDEX_WEIGHTS.items():
-            if key == "wiki30" and not st["has_wiki"]:
+            if (key == "wiki30" and not st["has_wiki"]) or (key == "news30" and not st.get("has_news", True)):
                 continue
             if not tops[key]:
                 continue
@@ -740,6 +752,9 @@ def build_grid(order, stats, ends=None, today=None):
         st = stats[f["slug"]]
         cells = []
         for key, _ in GRID_CHANNELS:
+            if key == "news30" and not st.get("has_news", True):
+                cells.append({"n": "\u2013", "level": 0, "note": "News not counted yet"})
+                continue
             if key == "wiki30" and not st["has_wiki"]:
                 # Nothing to count, which is not the same as nobody reading. Either there is no
                 # article on this fear, or there is one and its readership has not been read yet.

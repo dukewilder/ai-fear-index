@@ -2601,9 +2601,24 @@ def check_office_names():
              "California health care professional licensing boards"),
             ("Oregon State Department of Energy", "or", "Oregon Department of Energy"),
             ("West Virginia Department of Commerce", "wv", "West Virginia Department of Commerce"),
-            ("California district attorneys, county counsels and city attorneys", "ca", "California local prosecutors")):
+            ("California district attorneys, county counsels and city attorneys", "ca", "California local prosecutors"),
+            ("Iowa state government (enforcement authority for civil penalties)", "ia", ""),
+            ("Ohio state agencies", "oh", ""),
+            ("State government", "ca", ""),
+            ("Medical Board of California", "ca", "California Medical Board"),
+            ("California District Attorney", "ca", "California local prosecutors"),
+            ("California County Counsel", "ca", "California local prosecutors"),
+            ("Governor of Pennsylvania", "pa", "Pennsylvania Governor"),
+            ("New Jersey Office of Secretary of Higher Education", "nj", "New Jersey Secretary of Higher Education"),
+            ("University of California", "ca", "University of California"),
+            ("Office of the Comptroller of the Currency", "us", "U.S. Office of the Comptroller of the Currency")):
         got = office_label(raw, where)
         assert got == want, f"{raw!r} is shown as {got!r}, not {want!r}"
+    # "New this week" is the week the chart beside it steps through: the seven days through today.
+    from pipeline.export import new_this_week
+    today = dt.date(2026, 9, 25)
+    for day, want in (("2026-09-18", False), ("2026-09-19", True), ("2026-09-25", True), ("2026-09-26", False), ("", False)):
+        assert new_this_week({"introduced_date": day}, today) == want, f"{day} counted as new this week: {not want}"
 
 
 def check_law_text():
@@ -2631,6 +2646,50 @@ def check_law_text():
     except ValueError:
         pass
     assert T.tidy("regu-\nlation of") == "regulation of"
+    # New York's HTML numbers every line down the margin, as most PDFs do. With the numbers in, no
+    # quote that ran across a line could be found, and the RAISE Act came out of its reading bare.
+    lines = ["The People of the State of New York, represented in Senate and Assem-",
+             "bly, do enact as follows:",
+             "Section 1. A large developer shall disclose each safety incident af-",
+             "fecting the frontier model to the division of homeland security and",
+             "emergency services within seventy-two hours of learning of it."] + \
+            [f"Section {i}. The attorney general may bring a civil action for a violation of this article." for i in range(2, 40)]
+    numbered = "<pre>" + "\n".join(f"{i:>2} {l}" for i, l in enumerate(lines, 1)) + "</pre>"
+    flat = " ".join(T.usable(T.clean(T.from_html(numbered))).split())
+    assert "incident affecting the frontier model to the division of homeland security and emergency services" in flat, \
+        "a margin line number was left inside the law's words"
+    assert "Senate and Assembly, do enact" in flat, flat[:200]
+    # A short bill on a legislature's page, whose menus outnumber the bill's lines.
+    menus = "<p>" + "</p><p>".join(["Assembly Members", "Legislative Info", "Public Hearings", "Bill Search Home"] * 12) + "</p>"
+    short_bill = menus + "<pre>" + "\n".join(f"{i:>2} {l}" for i, l in enumerate(lines[:8], 1)) + "</pre>" + menus
+    assert "incident affecting the frontier model" in " ".join(T.clean(T.from_html(short_bill)).split()), \
+        "the menus around a short bill outvoted its line numbers"
+    # Words a bill strikes are printed in brackets, and they are not the law it makes.
+    assert " ".join(T.clean("Title 13, Chapter 72, is repealed [May] July 1, [2025]\n2027.").split()) == \
+        "Title 13, Chapter 72, is repealed July 1, 2027."
+    # The Federal Register's text of one order opens with the cover of its part of the issue, which
+    # lists other orders, and carries NULs and page markers that are not the order's words.
+    register = ("[Federal Register Volume 90, Number 20 (Friday, January 31, 2025)]\n[Presidential Documents]\n"
+                "[Pages 8741-8742]\n\n[[Page 8739]]\n\nExecutive Order 14181--Emergency Measures To Provide Water "
+                "Resources in California\n\x00\x00Presidential Documents\x00\n\n[[Page 8741]]\n\nExecutive Order 14179 "
+                "of January 23, 2025\n\nBy the authority vested in me as President, it is hereby ordered:\n"
+                "Section 1. Purpose. The agencies shall\n\n[[Page 8742]]\n\nrevise their guidance.")
+    order = T.clean(register)
+    assert order.startswith("Executive Order 14179") and "Water" not in order and "\x00" not in order, order[:200]
+    assert "The agencies shall\n\nrevise their guidance" in order, order
+    # Run over every text on file each pass, so it has to leave its own result as it is: a text that
+    # changed each time would be read again each time.
+    for text in (T.from_html(numbered), register, "is repealed [May] July 1, [2025]\n2027.", T.from_html(page)):
+        once = T.clean(text)
+        assert T.clean(once) == once, f"cleaning twice changed the text: {once[:120]!r}"
+    # A short law is still a law. Utah's SB 332 runs 255 words; a page with no enacting clause is not one.
+    short = "Be it enacted by the Legislature of the state of Utah: Section 1. " + "The act is repealed July 1, 2027. " * 20
+    assert T.usable(short) == short
+    try:
+        T.usable(short.replace("Be it enacted by the Legislature of the state of Utah:", "Bill status and history:"))
+        raise AssertionError("a short page with no enacting clause was taken for a law")
+    except ValueError:
+        pass
     bill = {"versions": [
         {"date": "2025-01-10", "note": "Introduced", "links": [{"url": "https://x.gov/intro.pdf", "media_type": "application/pdf"}]},
         {"date": "2025-05-20", "note": "Enrolled", "links": [{"url": "https://x.gov/enr.pdf", "media_type": "application/pdf"},
@@ -2674,7 +2733,81 @@ def check_law_text():
     assert "Text of the law" in asked and "seventy-two hours" in asked, "the check was not shown the law's words"
 
 
+def check_confirmed_labels_stay():
+    """A label all three readings agreed on stays while its quote does.
+
+    A measure is read afresh when its text changes, and a fresh reading does not always propose every
+    label the last one found. On 25 September 179 confirmed labels were off the site for that alone,
+    Texas's criminal offenses for AI-made sexual images of children among them."""
+    from pipeline import tag as tagging
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    db = connect(tmp / "t.db")
+    title = ("Relating to prosecution and punishment of certain criminal offenses prohibiting sexually explicit "
+             "visual material involving depictions of computer-generated children; creating criminal offenses; "
+             "increasing criminal penalties.")
+    for mid, name in (("os-sb1621", title), ("os-gone", "Relating to deepfakes of candidates; creating a criminal offense.")):
+        upsert(db, "measures", {"id": mid, "kind": "bill", "jurisdiction": "tx", "jurisdiction_name": "Texas",
+                                "session": "89R", "identifier": "SB 1621" if mid == "os-sb1621" else "SB 9",
+                                "title": name, "summary": "", "status": "passed", "latest_action": "Effective",
+                                "latest_action_date": "2025-09-01", "introduced_date": "2025-03-01",
+                                "url": f"https://example.com/{mid}", "sponsors": "Sample", "source": "Open States",
+                                "updated": "2025-09-01", "first_seen": iso()})
+        db.execute("INSERT INTO tag_runs VALUES(?,?,?,?,NULL)", (mid, "an older text", 1, iso()))
+    offense = "creating criminal offenses; increasing criminal penalties"
+    images = "sexually explicit visual material involving depictions of computer-generated children"
+    rows = (("control", "use-restrictions", offense, "yes"), ("fear", "deepfakes", images, "yes"),
+            ("agency", "Texas Attorney General", "creating criminal offenses", "no"))
+    for kind, value, quote, verdict in rows:
+        db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-sb1621", kind, value, quote, "test", "2026-09-25T06:31:37"))
+        db.execute("INSERT INTO checks VALUES(?,?,?,?,?,?,?,?)",
+                   ("os-sb1621", kind, value, quote, verdict, "r", "m", "2026-09-25T06:39:00"))
+    db.commit()
+    # A fresh reading that finds the fear and misses the offense keeps the offense, and not the office
+    # the check refused.
+    real = (tagging.env, tagging.propose, tagging.verify, tagging.check_labels)
+    tagging.env = lambda name: "k"
+    tagging.propose = lambda key, fears, controls, doc, is_measure: {
+        "ai_related": True, "fears": ["deepfakes"], "controls": [], "agencies": []}
+    tagging.verify = lambda key, fears, controls, doc, proposal: {
+        "fears": {"deepfakes": images}, "controls": {}, "agencies": {}}
+    tagging.check_labels = lambda db, key: "checked 0 labels"
+    try:
+        state = {}
+        tagging.run(db, state, "hourly")
+    finally:
+        tagging.env, tagging.propose, tagging.verify, tagging.check_labels = real
+    have = {(r["kind"], r["value"]) for r in db.execute("SELECT kind, value FROM tags WHERE target='os-sb1621'")}
+    assert ("control", "use-restrictions") in have, "a confirmed control was lost to a fresh reading that missed it"
+    assert ("fear", "deepfakes") in have and ("agency", "Texas Attorney General") not in have, have
+    # One lost before this rule existed comes back on the quote the check confirmed, dated when it did.
+    db.execute("DELETE FROM tags WHERE target='os-sb1621' AND kind='control'")
+    db.execute("INSERT INTO tags VALUES(?,?,?,?,?,?)", ("os-gone", "control", "use-restrictions", "creating a criminal offense",
+                                                         "test", iso()))
+    for target, quote in (("os-gone", "creating a criminal offense"), ("os-gone", "a quote no longer in the measure")):
+        db.execute("INSERT OR REPLACE INTO checks VALUES(?,?,?,?,?,?,?,?)",
+                   (target, "fear", "deepfakes", quote, "yes", "r", "m", "2026-09-25T06:39:00"))
+    db.execute("UPDATE tag_runs SET ai_related = 0 WHERE target = 'os-gone'")
+    db.execute("INSERT OR REPLACE INTO checks VALUES(?,?,?,?,?,?,?,?)",
+               ("os-gone", "control", "use-restrictions", "creating a criminal offense", "yes", "r", "m", "2026-09-25T06:39:00"))
+    db.execute("DELETE FROM tags WHERE target='os-gone'")
+    db.commit()
+    dropped, back = tagging.prune_tags(db)
+    row = db.execute("SELECT evidence, tagged_at FROM tags WHERE target='os-sb1621' AND kind='control'").fetchone()
+    assert row and row["evidence"] == offense and row["tagged_at"] == "2026-09-25T06:39:00", "a confirmed label stayed off"
+    assert not db.execute("SELECT 1 FROM tags WHERE target='os-gone'").fetchone(), \
+        "a label came back on a measure no longer read as about AI"
+    assert back == 1, f"put back {back}"
+    # Nor on a quote the measure no longer has, or one the check refused.
+    db.execute("UPDATE tag_runs SET ai_related = 1 WHERE target = 'os-gone'")
+    db.execute("UPDATE checks SET evidence = 'a quote no longer in the measure' WHERE target = 'os-gone'")
+    db.commit()
+    assert tagging.prune_tags(db) == (0, 0), "a label came back on words the measure does not have"
+    assert not db.execute("SELECT 1 FROM tags t JOIN checks c ON c.target = t.target AND c.kind = t.kind "
+                          "AND c.value = t.value WHERE c.verdict = 'no'").fetchone(), "a refused label came back"
+
+
 def main():
+    check_confirmed_labels_stay()
     check_office_names()
     check_law_text()
     check_indexnow()

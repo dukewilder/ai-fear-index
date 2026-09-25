@@ -38,7 +38,19 @@ FR_DOC = "https://www.federalregister.gov/api/v1/documents/{}.json"
 # What the text of a law says of itself, somewhere near the top.
 LAWLIKE = re.compile(r"(?i)be it enacted|\ban act\b|\bdo enact\b|it is hereby ordered|by the authority vested|"
                      r"\bthis (?:act|chapter|rule) (?:shall|may) be cited\b")
+# The clause that makes words law. A page about a bill does not carry it; the bill itself does.
+ENACTING = re.compile(r"(?i)be it enacted|\bdo enact\b|it is hereby ordered|by the authority vested")
 READABLE = ("text/html", "application/pdf", "text/plain")
+# Characters a copy of a law carries that are not its words. The Federal Register's plain text has
+# a NUL where its printed page had a rule or a box.
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# A bill prints the words it strikes from the law in brackets, as Utah's does: "is repealed [May]
+# July 1, [2025] 2027". Struck-out words are not the law it makes.
+BRACKETED = re.compile(r"\[[^\[\]]{0,3000}\]")
+# A line number in the margin, before a line's words or on a line of its own, and a line holding
+# nothing but a number.
+MARGIN = re.compile(r"[ \t]*\d{1,3}(?:[ \t]+(?=\S)|[ \t]*$)")
+LONE_LINES = re.compile(r"(?m)^[ \t]*\d{1,3}[ \t]*$\n?")
 
 
 def thin(summary):
@@ -148,14 +160,7 @@ def from_html(page):
 def from_pdf(data):
     from pypdf import PdfReader
     reader = PdfReader(io.BytesIO(data))
-    text = "\n".join((page.extract_text() or "") for page in reader.pages[:150])
-    lines = [l for l in text.split("\n") if l.strip()]
-    # Most bills print a line number down the margin, and the numbers land inside every quote.
-    numbered = sum(1 for l in lines if re.match(r"\s*\d{1,3}\s+\S", l))
-    if lines and numbered > len(lines) / 2:
-        text = re.sub(r"(?m)^[ \t]*\d{1,3}[ \t]+(?=\S)", "", text)
-    # A line holding nothing but a number is a line or page number, not the law's words.
-    return re.sub(r"(?m)^[ \t]*\d{1,3}[ \t]*$\n?", "", text)
+    return "\n".join((page.extract_text() or "") for page in reader.pages[:150])
 
 
 def tidy(text):
@@ -164,6 +169,57 @@ def tidy(text):
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" *\n *", "\n", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def unnumber(text):
+    """A bill's words without the line numbers printed down its margin.
+
+    Most bills number every line, in a PDF and in New York's HTML alike, and the numbers land inside
+    any quote that runs from one line to the next. New York's RAISE Act, read with them in on 25
+    September, came out of its reading with no label, because no quote could be found in its text.
+    The numbers are taken off when most lines from the first numbered one to the last are numbered,
+    so the menus of a legislature's page around a short bill do not outvote the bill.
+    """
+    lines = text.split("\n")
+    hits = [i for i, l in enumerate(lines) if MARGIN.match(l)]
+    if len(hits) >= 5 and len(hits) > sum(1 for l in lines[hits[0]:hits[-1] + 1] if l.strip()) / 2:
+        for i in hits:
+            lines[i] = MARGIN.sub("", lines[i], count=1)
+    # A line holding nothing but a number is a line or page number, not the law's words.
+    return LONE_LINES.sub("", "\n".join(lines))
+
+
+def from_register(text):
+    """One Federal Register document, without the cover of the part of the issue it was printed in.
+
+    The plain text of Executive Order 14179 opens with its part's cover, which lists three other
+    orders beside it, one on water for California. The document starts at its own first page, and
+    the page markers inside it are not its words.
+    """
+    first = re.search(r"\[Pages? (\d+)", text[:1000])
+    start = text.find(f"[[Page {first.group(1)}]]") if first else -1
+    if start > 0:
+        text = text[start:]
+    return re.sub(r"\[\[Page \d+\]\]", " ", text)
+
+
+def clean(text):
+    """The words of a law and nothing else, however its copy was made.
+
+    It is also run over every text on file, each pass, so a rule added here reaches a text read before
+    it. So it has to give back the same text when run on its own result: otherwise each pass would
+    find the law's text changed and have it read again.
+    """
+    text = CONTROL.sub("", text.replace("\r\n", "\n").replace("\r", "\n"))
+    if text.lstrip().startswith("[Federal Register Volume"):
+        text = from_register(text)
+    text = unnumber(text)
+    while True:  # brackets inside brackets come off from the inside out
+        shorter = BRACKETED.sub(" ", text)
+        if shorter == text:
+            break
+        text = shorter
+    return tidy(text)
 
 
 def read(http, url):
@@ -177,7 +233,7 @@ def read(http, url):
         text = from_html(resp.text)
     else:
         text = resp.text
-    return usable(tidy(text))
+    return usable(clean(text))
 
 
 def usable(text):
@@ -185,9 +241,12 @@ def usable(text):
 
     New York's bill page without its text still names the sections the bill adds ("Add Art 44-B
     \u00a7\u00a71420 - 1425"), so a page is taken for a law only when it is long enough to be one and
-    reads like one: an enacting clause, or section after section.
+    reads like one: an enacting clause, or section after section. A law can be short, though. Utah's
+    SB 332, which kept its AI Policy Act in force two more years, runs 255 words, so a text carrying
+    the enacting clause itself needs only 100.
     """
-    if len(re.findall(r"[A-Za-z]+", text)) < 300:
+    words = len(re.findall(r"[A-Za-z]+", text))
+    if words < 300 and not (words >= 100 and ENACTING.search(text)):
         raise ValueError("too short to be the text of a law")
     if not LAWLIKE.search(text) and len(re.findall(r"(?i)\b(?:section|sec\.)\s*\d|\u00a7", text)) < 5:
         raise ValueError("not the text of a law: a page around it, or a page that loads it with a script")
@@ -299,6 +358,13 @@ def fetch_texts(db, started):
 def run(db, state, mode):
     started = time.time()
     laws = wanted(db)
+    # Every text on file is kept the way clean() reads it now, so a rule added there reaches a text
+    # read before the rule was.
+    for r in db.execute("SELECT target, text FROM texts WHERE text IS NOT NULL").fetchall():
+        now = clean(r["text"])
+        if now != r["text"]:
+            db.execute("UPDATE texts SET text = ? WHERE target = ?", (now, r["target"]))
+    db.commit()
 
     def on_file():
         return {r["target"]: dict(r) for r in db.execute("SELECT target, url, text, tries, asked FROM texts")}

@@ -201,11 +201,21 @@ def pulled_labels():
     return {(x["url"], x["kind"], x["value"]) for x in config("suppress").get("labels", [])}
 
 
+KINDS = {"fear": "fears", "control": "controls", "agency": "agencies"}
+
+
 def prune_tags(db):
-    """Re-apply the current evidence rules to labels already stored, and drop the ones that fail.
+    """Re-apply the current evidence rules to labels already stored: take off the ones that fail,
+    and put back the confirmed ones that pass. Returns (taken off, put back).
 
     Measures are only re-read when their text changes, so without this a label that a
     later rule would reject keeps appearing on the site forever.
+
+    The other way round: a label the third reading confirmed (pipeline.check) stays while its quote
+    still stands in the measure and passes these rules. A measure is read afresh whenever its text
+    changes, and a fresh reading does not always propose every label the last one found. On 25
+    September, 179 labels all three readings had agreed on were off the site for that reason alone,
+    among them the criminal offenses Texas created for AI-made sexual images of children.
     """
     bodies, posts, gone = {}, {}, []
     texts = law_texts(db)
@@ -218,23 +228,22 @@ def prune_tags(db):
         raw = f"{r['title'] or ''}\n{r['summary'] or ''}"
         posts["post:" + r["id"]] = (norm(raw), raw)
     pulled = pulled_labels()
-    for r in db.execute("SELECT rowid, target, kind, value, evidence FROM tags"):
-        kind = {"fear": "fears", "control": "controls", "agency": "agencies"}.get(r["kind"], r["kind"])
-        label = {kind: {r["value"]: r["evidence"]}}
-        if r["target"].startswith("post:"):
+
+    def holds(target, kind, value, evidence):
+        label = {KINDS.get(kind, kind): {value: evidence}}
+        if target.startswith("post:"):
             # A statement names fears and nothing else, and it has to still exist. Labels on posts
             # were never checked here, so ones on deleted posts stayed in the counts.
-            p = posts.get(r["target"])
-            if p is None or r["kind"] != "fear" or not agreed(label, p[0], kind, raw=p[1]):
-                gone.append(r["rowid"])
-            continue
-        b = bodies.get(r["target"])
+            p = posts.get(target)
+            return p is not None and kind == "fear" and bool(agreed(label, p[0], "fears", raw=p[1]))
+        b = bodies.get(target)
         if b is None:
-            gone.append(r["rowid"])  # the measure it was on is gone
-            continue
+            return False  # the measure it was on is gone
         body, jur, raw, code, position, url = b
-        if (position and r["kind"] in ("control", "agency")) or (url, r["kind"], r["value"]) in pulled \
-                or not agreed(label, body, kind, jur, raw=raw, code=code):
+        return not ((position and kind in ("control", "agency")) or (url, kind, value) in pulled) \
+            and bool(agreed(label, body, KINDS.get(kind, kind), jur, raw=raw, code=code))
+    for r in db.execute("SELECT rowid, target, kind, value, evidence FROM tags"):
+        if not holds(r["target"], r["kind"], r["value"], r["evidence"]):
             gone.append(r["rowid"])
     # A label the third reading refused on this very quote stays off, even on a run where the
     # reading itself cannot happen (no key, the day's cap reached, the model unreachable).
@@ -244,8 +253,23 @@ def prune_tags(db):
     gone = sorted(set(gone))
     for chunk in (gone[i:i + 400] for i in range(0, len(gone), 400)):
         db.execute(f"DELETE FROM tags WHERE rowid IN ({','.join('?' for _ in chunk)})", chunk)
+    # Confirmed, still quoted, and missing: put back on the quote the check confirmed, dated when it
+    # did. Only for a measure still read as about AI, and only under a fear or control still defined.
+    known_slugs = {"fear": {f["slug"] for f in config("fears")}, "control": {c["slug"] for c in config("controls")}}
+    back = 0
+    for r in db.execute(
+            "SELECT c.target, c.kind, c.value, c.evidence, c.checked_at FROM checks c "
+            "JOIN tag_runs tr ON tr.target = c.target AND tr.ai_related = 1 "
+            "LEFT JOIN tags t ON t.target = c.target AND t.kind = c.kind AND t.value = c.value "
+            "WHERE c.verdict = 'yes' AND c.kind IN ('fear', 'control', 'agency') AND t.target IS NULL").fetchall():
+        if r["kind"] in known_slugs and r["value"] not in known_slugs[r["kind"]]:
+            continue
+        if holds(r["target"], r["kind"], r["value"], r["evidence"]):
+            db.execute("INSERT OR IGNORE INTO tags(target, kind, value, evidence, model, tagged_at) VALUES(?,?,?,?,?,?)",
+                       (r["target"], r["kind"], r["value"], r["evidence"], "confirmed", r["checked_at"]))
+            back += 1
     db.commit()
-    return len(gone)
+    return len(gone), back
 
 
 def check_labels(db, key):
@@ -294,7 +318,7 @@ def targets(db, limit):
 def run(db, state, mode):
     # The re-check first. It needs no model, so neither a missing key nor the daily cap should
     # leave a label the current rules reject on the site until tomorrow.
-    dropped = prune_tags(db)
+    dropped, restored = prune_tags(db)
     key = env("ANTHROPIC_API_KEY")
     fears, controls = config("fears"), config("controls")
     day = iso()[:10]
@@ -304,6 +328,7 @@ def run(db, state, mode):
     if not limit:
         state["message"] = (f"daily cap of {DAY_CAP} items reached; resumes tomorrow"
                             + (f"; dropped {dropped} unsupported labels" if dropped else "")
+                            + (f"; put back {restored} confirmed labels" if restored else "")
                             + f"; {check_labels(db, key)}")
         return
     # The laws a person has confirmed are about AI are read as about AI whatever their text shows.
@@ -369,6 +394,10 @@ def run(db, state, mode):
             with _lock:
                 if err is None:
                     try:
+                        before = db.execute("SELECT kind, value, evidence, model, tagged_at FROM tags WHERE target=?",
+                                            (target,)).fetchall()
+                        refused = {(r["kind"], r["value"], r["evidence"]) for r in db.execute(
+                            "SELECT kind, value, evidence FROM checks WHERE target=? AND verdict='no'", (target,))}
                         db.execute("DELETE FROM tags WHERE target=?", (target,))
                         code, url = about.get(target, ("", ""))
                         for kind in ("fears", "controls", "agencies"):
@@ -389,6 +418,19 @@ def run(db, state, mode):
                                            "VALUES(?,?,?,?,?,?)",
                                            (target, kind[:-1] if kind != "agencies" else "agency",
                                             label.strip(), quote, MODEL, iso()))
+                        # What the last reading found stays while its quote still stands in the text
+                        # and passes the same rules; this reading adds to it (prune_tags says why).
+                        for o in before if ai else []:
+                            kind = KINDS.get(o["kind"])
+                            if not kind or (kind in ("controls", "agencies") and target in positions) \
+                                    or (url, o["kind"], o["value"]) in pulled \
+                                    or (o["kind"], o["value"], o["evidence"]) in refused:
+                                continue
+                            if agreed({kind: {o["value"]: o["evidence"]}}, doc_norm, kind,
+                                      jurisdictions.get(target, ""), raw=raw, code=code):
+                                db.execute("INSERT OR IGNORE INTO tags(target,kind,value,evidence,model,tagged_at) "
+                                           "VALUES(?,?,?,?,?,?)", (target, o["kind"], o["value"], o["evidence"],
+                                                                   o["model"], o["tagged_at"]))
                         db.execute("INSERT OR REPLACE INTO tag_runs(target,text_hash,ai_related,tagged_at,error) "
                                    "VALUES(?,?,?,?,NULL)", (target, h, 1 if ai else 0, iso()))
                         done += 1
@@ -407,6 +449,7 @@ def run(db, state, mode):
     state["message"] = (f"{done} tagged, {errors} errors, {max(0, backlog - done)} still queued, "
                         f"{used_today + done} of {DAY_CAP} today"
                         + (f"; dropped {dropped} unsupported labels" if dropped else "")
+                        + (f"; put back {restored} confirmed labels" if restored else "")
                         + (f"; stopped at {SECONDS}s" if ran_out else "")
                         + f"; {checked}")
     if work and errors == len(work):

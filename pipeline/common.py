@@ -694,8 +694,10 @@ SUFFIXES = re.compile(
 
 # A bill that lets "district attorneys, county counsels, city attorneys and city prosecutors" enforce
 # it names one class of local official four ways, and counted apart they read as four agencies.
-LOCAL_PROSECUTORS = re.compile(r"\b(district|city|county|public|local) (attorneys|prosecutors|counsels)\b|"
-                               r"\bprosecuting attorneys\b", re.I)
+# One at a time as well: California's SB 295 named "California District Attorney", "California County
+# Counsel" and "California City Attorney" as three offices.
+LOCAL_PROSECUTORS = re.compile(r"\b(district|city|county|public|local) (attorneys?|prosecutors?|counsels?)\b|"
+                               r"\bprosecuting attorneys?\b", re.I)
 
 
 STATE_NAMES = ("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
@@ -709,11 +711,22 @@ STATE_NAMES = ("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colora
 # "Pennsylvania Attorney General" and once as "Pennsylvania Office of Attorney General", and Hawaii's
 # as its Attorney General and its "Department of the Attorney General".
 AG_OFFICE = re.compile(r"\b(?:Office|Department) of (?:the )?Attorney General\b|\bAttorney General's Office\b")
+# The same for an official's office: New Jersey's "Office of Secretary of Higher Education" is its
+# Secretary of Higher Education, and the office of the governor is the governor.
+OFFICIAL_OFFICE = re.compile(r"\bOffice of (?:the )?(?=(?:Lieutenant )?Governor\b|Secretary of\b)")
 # A proper name the tagger left in lower case ("Colorado civil rights division"). A plural is a
 # class of offices ("California health care professional licensing boards") and keeps its case.
 LOWER_OFFICE = re.compile(r"[a-z][a-z ]* (?:division|department|commission|board|office|bureau|agency|authority|"
                           r"council|cabinet)")
 SMALL_WORDS = {"of", "and", "the", "for", "on", "in"}
+# A state's government, or its agencies at large, is not an office. The check let one through as
+# "Iowa state government (enforcement authority for civil penalties)".
+GENERIC_OFFICE = re.compile(r"(?i)(?:the )?(?:state )?(?:government|agency|agencies|officials?|state)")
+# An office named with its state after it, "Medical Board of California", is the California Medical
+# Board. Only an office's own word goes before the state, so the University of California stays itself.
+OF_STATE = re.compile(r"((?:.+ )?(?:Board|Commission|Department|Office|Division|Agency|Authority|Council|Bureau|Cabinet|"
+                      r"Administration|Governor|Attorney General|Comptroller|Treasurer|Auditor|Commissioner|"
+                      r"Secretary of State))\s+of (?:the State of )?(" + "|".join(STATE_NAMES) + ")")
 
 
 def office_label(name, where=None):
@@ -734,12 +747,19 @@ def office_label(name, where=None):
     bare = re.sub(r"\s*\([^)]*\)", "", name).strip()
     if bare != name and (not bare or bare in STATE_NAMES or bare.lower() in ("state", "federal", "the state")):
         return ""
-    name = AG_OFFICE.sub("Attorney General", bare)
+    name = OFFICIAL_OFFICE.sub("", AG_OFFICE.sub("Attorney General", bare))
+    if GENERIC_OFFICE.fullmatch(name):
+        return ""
+    after = OF_STATE.fullmatch(name)
+    if after and not name.startswith(after.group(2) + " "):
+        name = f"{after.group(2)} {after.group(1)}"
     for state in STATE_NAMES:
         if name.startswith(state + " "):
             rest = name[len(state) + 1:]
             rest = re.sub(rf"\s+of (?:the State of )?{state}$", "", rest)
             rest = re.sub(r"^State (?=Department\b)", "", rest)
+            if GENERIC_OFFICE.fullmatch(rest):
+                return ""
             if LOWER_OFFICE.fullmatch(rest):
                 rest = " ".join(w if w in SMALL_WORDS else w.capitalize() for w in rest.split())
             name = f"{state} {rest}"

@@ -217,6 +217,13 @@ def reported(filings):
                if r.get("self") or (r["client_key"], r["year"], r["quarter"]) not in own)
 
 
+def new_this_week(m, today):
+    """Introduced in the seven days through today: the same week as the last step of the running
+    total drawn beside the count. Counted from the day a week back as well, the front page said 28
+    new this week under a chart that rose by 26."""
+    return (today - dt.timedelta(days=7)).isoformat() < (m["introduced_date"] or "") <= today.isoformat()
+
+
 def export(db, out_dir, base=""):
     out = pathlib.Path(out_dir)
     (out / "public").mkdir(parents=True, exist_ok=True)
@@ -225,7 +232,9 @@ def export(db, out_dir, base=""):
     fear_by, control_by = {f["slug"]: f for f in fears}, {c["slug"]: c for c in controls}
     kw = fear_keywords()
     today = now().date()
-    week_ago = (today - dt.timedelta(days=7)).isoformat()
+
+    def this_week(m):
+        return new_this_week(m, today)
 
     # ---------------- measures and their agreed tags
     tags = collections.defaultdict(lambda: {"fear": set(), "control": set(), "agency": set()})
@@ -437,7 +446,7 @@ def export(db, out_dir, base=""):
             "codes": sorted({m["jurisdiction"] for m in ms}),
             "congress": sum(1 for m in ms if m["jurisdiction"] in FEDERAL),
             "federal": any(m["jurisdiction"] in FEDERAL for m in ms),
-            "new_week": sum(1 for m in ms if (m["introduced_date"] or "") >= week_ago),
+            "new_week": sum(1 for m in ms if this_week(m)),
             "filings": filings_by_fear[slug], "advocacy": advocacy_by_fear.get(slug, 0), "statements": post_fears[slug],
             "news30": int(news30.get(slug, 0)), "wiki30": int(wiki30.get(slug, 0)),
             # An article on file and no readership yet are different things. A fear added today has
@@ -484,7 +493,7 @@ def export(db, out_dir, base=""):
     runs_key = f"runs:{today.isoformat()}"
     runs_today = (kv_get(db, runs_key, 0) or 0) + 1
     kv_set(db, runs_key, runs_today)
-    new_week = sum(1 for m in measures if (m["introduced_date"] or "") >= week_ago)
+    new_week = sum(1 for m in measures if this_week(m))
     jurisdictions = {m["jurisdiction"] for m in measures}
     n_states, other_places, _ = where_counted(jurisdictions)
     beyond = and_list(other_places + [federal_word(jurisdictions)])

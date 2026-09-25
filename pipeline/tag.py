@@ -55,9 +55,19 @@ def call(key, system, user, max_tokens=700, model=None):
 
 
 def parse_json(text):
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
+    """The JSON object a reply opens with. An object followed by a note or a second object is read for
+    its first: taken from the first brace to the last, it would not parse, and New York's RAISE Act
+    went unread on 25 September for that ("Extra data: line 11 column 4")."""
+    start = text.find("{")
+    if start < 0:
         raise ValueError("no JSON in reply")
+    try:
+        found, _ = json.JSONDecoder().raw_decode(text, start)
+        if isinstance(found, dict):
+            return found
+    except ValueError:
+        pass
+    m = re.search(r"\{.*\}", text, re.S)
     return json.loads(m.group(0))
 
 

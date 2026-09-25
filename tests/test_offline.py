@@ -2823,6 +2823,15 @@ def check_frontier_reread():
     finally:
         tagging.call = real
     assert len(said) == 2 and all("critical harm" in u for u in said), "the tagger was not told what the fear includes"
+    # An answer that adds a note, or a second object, after its JSON is read for the first object.
+    assert tagging.parse_json('{"ai_related": true, "fears": ["x"]}\n\nNote: {"also": 1}') == \
+        {"ai_related": True, "fears": ["x"]}, "an answer with a note after its JSON went unread"
+    assert tagging.parse_json('Here it is:\n```json\n{"a": {"b": "c"}}\n```') == {"a": {"b": "c"}}
+    try:
+        tagging.parse_json("no object here")
+        raise AssertionError("an answer with no JSON was taken for one")
+    except ValueError:
+        pass
     tmp = pathlib.Path(tempfile.mkdtemp())
     db = connect(tmp / "t.db")
     for mid, title in (("os-raise", "Relates to the training and use of artificial intelligence frontier models"),

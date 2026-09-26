@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-23",
+ "headline": "New Jersey lets BPU demand data center usage reports",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nNew Jersey gives the BPU the power to demand semi-annual water and energy usage reports from data center owners and operators. Passed.\n\n108 measures in 20 jurisdictions would require a company to file reports with a government body, or hand them over on demand.\n\n163 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.\n\n2,007 measures tracked. 389 carry a control, and they would hand new power to 82 offices.",
+ "image": "state/brief/2026-09-23.png",
+ "alt": "A card from the AI Fear Report headed: New Jersey lets BPU demand data center usage reports. New Jersey gives the BPU the power to demand semi-annual water and energy usage reports from data center owners and operators. 108 measures in 20 jurisdictions would require a company to file reports with a government body, or hand them over on demand. 163 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.",
+ "lines": [
+  {
+   "target": "os-0d838dba-c280-43cc-9c05-d24c7508bf4b",
+   "sentence": "New Jersey gives the BPU the power to demand semi-annual water and energy usage reports from data center owners and operators.",
+   "quote": "requires data center owners and operators to submit semi-annual water and energy usage reports to BPU",
+   "office": "",
+   "controls": "mandatory-reporting",
+   "fears": "",
+   "jurisdiction": "New Jersey",
+   "url": "https://openstates.org/nj/bills/222/S3379/",
+   "status": "passed",
+   "action": "Approved P.L.2026, c.75.",
+   "kind": "bill"
+  },
+  {
+   "target": "control:mandatory-reporting:108",
+   "sentence": "108 measures in 20 jurisdictions would require a company to file reports with a government body, or hand them over on demand.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Mandatory reporting",
+   "head": "108 measures in 20 jurisdictions: reports companies must file with the government",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:deepfakes:163",
+   "sentence": "163 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Deepfakes",
+   "head": "163 measures name the same fear: Deepfakes",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 2007,
+  "controlled": 389,
+  "offices": 82
+ }
+}

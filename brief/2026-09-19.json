@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-19",
+ "headline": "9 measures in nine jurisdictions: permission needed to build AI",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nNine measures in nine jurisdictions would require government permission before an AI system may be built or deployed.\n\n125 measures in 28 jurisdictions would create an AI office, or hand an existing one new authority over AI.\n\n195 named offices would gain a power over AI. The one named most often is the New Jersey Board of Public Utilities, in eight measures.\n\n1,435 measures tracked. 508 carry a control. 195 offices hold one.",
+ "image": "state/brief/2026-09-19.png",
+ "alt": "A card from the AI Fear Report headed: 9 measures in nine jurisdictions: permission needed to build AI. Nine measures in nine jurisdictions would require government permission before an AI system may be built or deployed. 125 measures in 28 jurisdictions would create an AI office, or hand an existing one new authority over AI. 195 named offices would gain a power over AI. The one named most often is the New Jersey Board of Public Utilities, in eight measures.",
+ "lines": [
+  {
+   "target": "control:license-to-build:9",
+   "sentence": "Nine measures in nine jurisdictions would require government permission before an AI system may be built or deployed.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "fears": "",
+   "meta": "License to build",
+   "head": "9 measures in nine jurisdictions: permission needed to build AI",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "control:new-agency-powers:125",
+   "sentence": "125 measures in 28 jurisdictions would create an AI office, or hand an existing one new authority over AI.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "New agency powers",
+   "head": "125 measures in 28 jurisdictions: new authority over AI for a government body",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "offices:195",
+   "sentence": "195 named offices would gain a power over AI. The one named most often is the New Jersey Board of Public Utilities, in eight measures.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "",
+   "head": "195 offices would gain a power over AI",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 1435,
+  "controlled": 508,
+  "offices": 195
+ }
+}

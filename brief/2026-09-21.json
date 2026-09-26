@@ -1,0 +1,49 @@
+{
+ "edition": "2026-09-21",
+ "headline": "California Attorney General Can Request Companion Chatbot Audit Reports",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nCalifornia gives the Attorney General the power to, for cause, request and obtain a copy of an audit report from the operator of a companion chatbot. Passed. It cites the fear that children are talking to chatbots.\n\n78 measures in 17 jurisdictions would require a company to file reports with a government body, or hand them over on demand.\n\n123 measures in 35 jurisdictions name the same fear: Deepfakes.\n\n1,353 measures tracked. 297 carry a control, and they would hand new power to 55 offices.",
+ "image": "state/brief/2026-09-21.png",
+ "alt": "A card from the AI Fear Report headed: California Attorney General Can Request Companion Chatbot Audit Reports. California gives the Attorney General the power to, for cause, request and obtain a copy of an audit report from the operator of a companion chatbot. 78 measures in 17 jurisdictions would require a company to file reports with a government body, or hand them over on demand. 123 measures in 35 jurisdictions name the same fear: Deepfakes.",
+ "lines": [
+  {
+   "target": "os-c68f34c9-2172-4fd8-9af3-0a537c35de0d",
+   "sentence": "California gives the Attorney General the power to, for cause, request and obtain a copy of an audit report from the operator of a companion chatbot.",
+   "quote": "authorize the Attorney General to, for cause, request and obtain a copy of an AI child safety audit report from the operator",
+   "office": "",
+   "controls": "mandatory-reporting",
+   "fears": "kids-chatbots",
+   "jurisdiction": "California",
+   "url": "https://openstates.org/ca/bills/20252026/SB1119/",
+   "status": "passed"
+  },
+  {
+   "target": "control:mandatory-reporting:78",
+   "sentence": "78 measures in 17 jurisdictions would require a company to file reports with a government body, or hand them over on demand.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Mandatory reporting",
+   "head": "78 measures in 17 jurisdictions: reports companies must file with the government",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:deepfakes:123",
+   "sentence": "123 measures in 35 jurisdictions name the same fear: Deepfakes.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Deepfakes",
+   "head": "123 measures name the same fear: Deepfakes",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 1353,
+  "controlled": 297,
+  "offices": 55
+ }
+}

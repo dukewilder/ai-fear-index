@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-24",
+ "headline": "Congress would bar federal benefits for farmland data centers",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nCongress would bar federal financial benefit for the construction, expansion, or substantial rehabilitation of data centers on prime farmland and other certain farmland. Not passed.\n\n104 measures in 30 jurisdictions would pause data centers, or add conditions on building and running them.\n\n65 measures in 20 jurisdictions cite the fear that data centers are taking the power and the water.\n\n2,071 measures tracked. 401 carry a control, and they would hand new power to 88 offices.",
+ "image": "state/brief/2026-09-24.png",
+ "alt": "A card from the AI Fear Report headed: Congress would bar federal benefits for farmland data centers. Congress would bar federal financial benefit for the construction, expansion, or substantial rehabilitation of data centers on prime farmland and other certain farmland. 104 measures in 30 jurisdictions would pause data centers, or add conditions on building and running them. 65 measures in 20 jurisdictions cite the fear that data centers are taking the power and the water.",
+ "lines": [
+  {
+   "target": "us-119-hr-10169",
+   "sentence": "Congress would bar federal financial benefit for the construction, expansion, or substantial rehabilitation of data centers on prime farmland and other certain farmland.",
+   "quote": "prohibit the provision of Federal financial benefit for the construction, expansion, or substantial rehabilitation of data centers on prime farmland",
+   "office": "",
+   "controls": "data-center-limits",
+   "fears": "",
+   "jurisdiction": "Congress",
+   "url": "https://www.congress.gov/bill/119th-congress/house-bill/10169",
+   "status": "pending",
+   "action": "Referred to the House Committee on Energy and Commerce.",
+   "kind": "bill"
+  },
+  {
+   "target": "control:data-center-limits:104",
+   "sentence": "104 measures in 30 jurisdictions would pause data centers, or add conditions on building and running them.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Data center limits",
+   "head": "104 measures in 30 jurisdictions: limits on building data centers",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:power-bills:65",
+   "sentence": "65 measures in 20 jurisdictions cite the fear that data centers are taking the power and the water.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Power bills and data centers",
+   "head": "65 measures name the same fear: Power bills and data centers",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 2071,
+  "controlled": 401,
+  "offices": 88
+ }
+}

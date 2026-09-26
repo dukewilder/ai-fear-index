@@ -1,0 +1,340 @@
+{
+ "at": "2026-09-26T06:16:16+00:00",
+ "read": 418,
+ "uncovered_measures": 321,
+ "floor": 200,
+ "uncovered": [
+  {
+   "phrase": "economic development",
+   "measures": 14,
+   "places": 7,
+   "change": 0
+  },
+  {
+   "phrase": "civil action",
+   "measures": 11,
+   "places": 5,
+   "change": 0
+  },
+  {
+   "phrase": "social media",
+   "measures": 9,
+   "places": 5,
+   "change": 0
+  },
+  {
+   "phrase": "consumer protection",
+   "measures": 9,
+   "places": 5,
+   "change": 0
+  },
+  {
+   "phrase": "critical infrastructure",
+   "measures": 8,
+   "places": 5,
+   "change": 0
+  },
+  {
+   "phrase": "risk management",
+   "measures": 6,
+   "places": 5,
+   "change": 0
+  },
+  {
+   "phrase": "pilot program",
+   "measures": 14,
+   "places": 4,
+   "change": 0
+  },
+  {
+   "phrase": "small businesses",
+   "measures": 9,
+   "places": 4,
+   "change": 0
+  },
+  {
+   "phrase": "disclosure requirements",
+   "measures": 6,
+   "places": 4,
+   "change": 0
+  },
+  {
+   "phrase": "publicly available",
+   "measures": 5,
+   "places": 4,
+   "change": 0
+  },
+  {
+   "phrase": "local governments",
+   "measures": 5,
+   "places": 4,
+   "change": -2
+  },
+  {
+   "phrase": "tax exemption",
+   "measures": 11,
+   "places": 3,
+   "change": -1
+  },
+  {
+   "phrase": "bring civil",
+   "measures": 8,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "best practices",
+   "measures": 7,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "local government",
+   "measures": 7,
+   "places": 3,
+   "change": -1
+  },
+  {
+   "phrase": "automated decision",
+   "measures": 7,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "bring civil action",
+   "measures": 6,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "school district",
+   "measures": 6,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "national security",
+   "measures": 6,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "working group",
+   "measures": 6,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "development deployment",
+   "measures": 6,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "civil penalties",
+   "measures": 5,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "minimum requirements",
+   "measures": 5,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "retaliating against",
+   "measures": 5,
+   "places": 3,
+   "change": 0
+  },
+  {
+   "phrase": "public safety",
+   "measures": 5,
+   "places": 3,
+   "change": 0
+  }
+ ],
+ "missed": [
+  {
+   "fear": "self-driving",
+   "measures": 34,
+   "examples": [
+    "Transportation Department, National Highway Traffic Safety Administration Proposed rule",
+    "New York A 11500",
+    "Congress H.R. 8870",
+    "New York S 10413",
+    "New York S 10473"
+   ]
+  },
+  {
+   "fear": "power-bills",
+   "measures": 25,
+   "examples": [
+    "Congress H.R. 9340",
+    "Delaware SB 312",
+    "South Carolina H 5484",
+    "Ohio SB 381",
+    "California AB 2383"
+   ]
+  },
+  {
+   "fear": "copyright",
+   "measures": 8,
+   "examples": [
+    "Congress H.R. 8994",
+    "Hawaii HB 2357",
+    "Congress H.R. 6461",
+    "Congress S. 2997",
+    "New York S 6955"
+   ]
+  },
+  {
+   "fear": "privacy",
+   "measures": 8,
+   "examples": [
+    "Congress H.R. 7757",
+    "California AB 2027",
+    "Oregon HB 4103",
+    "Virginia HJ 32",
+    "California SCR 82"
+   ]
+  },
+  {
+   "fear": "surveillance",
+   "measures": 6,
+   "examples": [
+    "Congress S. 1053",
+    "Massachusetts H 1946",
+    "Massachusetts S 1053",
+    "Massachusetts SD 838",
+    "Massachusetts S 35"
+   ]
+  },
+  {
+   "fear": "deepfakes",
+   "measures": 4,
+   "examples": [
+    "Ohio HB 1000",
+    "Hawaii SB 2076",
+    "New York S 8391",
+    "Ohio HB 185"
+   ]
+  },
+  {
+   "fear": "kids-chatbots",
+   "measures": 4,
+   "examples": [
+    "Congress H.R. 7757",
+    "Virginia SB 796",
+    "California SB 867",
+    "California SB 300"
+   ]
+  },
+  {
+   "fear": "ai-care-decisions",
+   "measures": 4,
+   "examples": [
+    "Oregon HB 4054",
+    "Virginia HB 669",
+    "Congress S. 2997",
+    "California AB 489"
+   ]
+  },
+  {
+   "fear": "algorithmic-pricing",
+   "measures": 4,
+   "examples": [
+    "Virginia HB 1252",
+    "Virginia HB 1252",
+    "Virginia SB 1400",
+    "Virginia HB 1870"
+   ]
+  },
+  {
+   "fear": "ai-companions",
+   "measures": 3,
+   "examples": [
+    "Congress H.R. 7757",
+    "California AB 1988",
+    "California SB 300"
+   ]
+  },
+  {
+   "fear": "ai-therapists",
+   "measures": 2,
+   "examples": [
+    "New York A 9106",
+    "New York S 8484"
+   ]
+  },
+  {
+   "fear": "bias",
+   "measures": 1,
+   "examples": [
+    "Congress S. 2997"
+   ]
+  },
+  {
+   "fear": "misinformation",
+   "measures": 1,
+   "examples": [
+    "Congress S. 2912"
+   ]
+  },
+  {
+   "fear": "china-race",
+   "measures": 1,
+   "examples": [
+    "Congress H.R. 1122"
+   ]
+  }
+ ],
+ "sponsor_words": [
+  {
+   "word": "consumer",
+   "titles": 72,
+   "places": 25
+  },
+  {
+   "word": "government",
+   "titles": 34,
+   "places": 14
+  },
+  {
+   "word": "standards",
+   "titles": 29,
+   "places": 14
+  },
+  {
+   "word": "security",
+   "titles": 22,
+   "places": 10
+  },
+  {
+   "word": "risk",
+   "titles": 19,
+   "places": 11
+  },
+  {
+   "word": "fair",
+   "titles": 16,
+   "places": 8
+  },
+  {
+   "word": "safe",
+   "titles": 8,
+   "places": 5
+  },
+  {
+   "word": "governing",
+   "titles": 7,
+   "places": 4
+  },
+  {
+   "word": "governmental",
+   "titles": 6,
+   "places": 4
+  }
+ ]
+}

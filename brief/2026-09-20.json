@@ -1,0 +1,49 @@
+{
+ "edition": "2026-09-20",
+ "headline": "California puts AI auditors under Government Operations Agency registration",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nCalifornia puts AI auditors under registration with the Government Operations Agency starting January 1, 2029, and prohibits unregistered persons from conducting covered AI audits. Passed.\n\n11 measures in nine states would have an AI service check the identity or age of the people who use it.\n\n133 measures in 35 jurisdictions name the same fear: Deepfakes.\n\n1,378 measures tracked. 505 carry a control. 174 offices hold one.",
+ "image": "state/brief/2026-09-20.png",
+ "alt": "A card from the AI Fear Report headed: California puts AI auditors under Government Operations Agency registration. California puts AI auditors under registration with the Government Operations Agency starting January 1, 2029, and prohibits unregistered persons from conducting covered AI audits. Held by California Government Operations Agency. 11 measures in nine states would have an AI service check the identity or age of the people who use it. 133 measures in 35 jurisdictions name the same fear: Deepfakes.",
+ "lines": [
+  {
+   "target": "os-b5fdcde9-7610-4a22-8334-8180f567a091",
+   "sentence": "California puts AI auditors under registration with the Government Operations Agency starting January 1, 2029, and prohibits unregistered persons from conducting covered AI audits.",
+   "quote": "prohibit an unregistered person from offering, selling, or conducting a covered AI audit",
+   "office": "California Government Operations Agency",
+   "controls": "labeling-mandates|license-to-build|mandatory-reporting|new-agency-powers",
+   "fears": "",
+   "jurisdiction": "California",
+   "url": "https://openstates.org/ca/bills/20252026/AB1405/",
+   "status": "passed"
+  },
+  {
+   "target": "control:id-age-checks:11",
+   "sentence": "11 measures in nine states would have an AI service check the identity or age of the people who use it.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "ID checks for users",
+   "head": "11 measures in nine states: ID checks on people who use AI",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:deepfakes:133",
+   "sentence": "133 measures in 35 jurisdictions name the same fear: Deepfakes.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Deepfakes",
+   "head": "133 measures name the same fear: Deepfakes",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 1378,
+  "controlled": 505,
+  "offices": 174
+ }
+}

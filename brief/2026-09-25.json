@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-25",
+ "headline": "Pennsylvania would let Attorney General penalize frontier developers",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nPennsylvania would give the Attorney General the power to penalize frontier developers that fail to address critical incidents and catastrophic risks from their models. Not passed. It cites the fear that AI might get away from the people running it.\n\n71 measures in 20 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers.\n\n161 measures in 42 jurisdictions cite the fear that anyone can now fake anyone.\n\n2,065 measures tracked. 670 carry a control, and they would hand new power to 64 offices.",
+ "image": "state/brief/2026-09-25.png",
+ "alt": "A card from the AI Fear Report headed: Pennsylvania would let Attorney General penalize frontier developers. Pennsylvania would give the Attorney General the power to penalize frontier developers that fail to address critical incidents and catastrophic risks from their models. Held by Pennsylvania Attorney General. 71 measures in 20 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers. 161 measures in 42 jurisdictions cite the fear that anyone can now fake anyone.",
+ "lines": [
+  {
+   "target": "os-d46d3ad3-6ea1-4735-ba86-b810ea00f00e",
+   "sentence": "Pennsylvania would give the Attorney General the power to penalize frontier developers that fail to address critical incidents and catastrophic risks from their models.",
+   "quote": "establishing standards for frontier developers in addressing critical safety incidents and catastrophic risks",
+   "office": "Pennsylvania Attorney General",
+   "controls": "new-agency-powers",
+   "fears": "loss-of-control",
+   "jurisdiction": "Pennsylvania",
+   "url": "https://openstates.org/pa/bills/2025-2026/HB2800/",
+   "status": "pending",
+   "action": "Referred to Communications & Technology",
+   "kind": "bill"
+  },
+  {
+   "target": "control:new-agency-powers:71",
+   "sentence": "71 measures in 20 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "New agency powers",
+   "head": "71 measures in 20 jurisdictions: new authority over AI or data centers for a government body",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:deepfakes:161",
+   "sentence": "161 measures in 42 jurisdictions cite the fear that anyone can now fake anyone.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Deepfakes",
+   "head": "161 measures name the same fear: Deepfakes",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 2065,
+  "controlled": 670,
+  "offices": 64
+ }
+}

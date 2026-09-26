@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-22",
+ "headline": "Pennsylvania would put commercial data centers under the Department",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nPennsylvania would put commercial data centers under the Department of Environmental Protection, which would decide whether a polluted or diminished water supply has been restored or replaced. Not passed.\n\n91 measures in 21 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers.\n\n149 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.\n\n1,900 measures tracked. 379 carry a control, and they would hand new power to 81 offices.",
+ "image": "state/brief/2026-09-22.png",
+ "alt": "A card from the AI Fear Report headed: Pennsylvania would put commercial data centers under the Department. Pennsylvania would put commercial data centers under the Department of Environmental Protection, which would decide whether a polluted or diminished water supply has been restored or replaced. Held by Pennsylvania Department of Environmental Protection. 91 measures in 21 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers. 149 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.",
+ "lines": [
+  {
+   "target": "os-66bb0b59-93b0-4aa8-bd16-aecb15aef97d",
+   "sentence": "Pennsylvania would put commercial data centers under the Department of Environmental Protection, which would decide whether a polluted or diminished water supply has been restored or replaced.",
+   "quote": "requiring commercial data centers to restore or replace a polluted or diminutive water supply",
+   "office": "Pennsylvania Department of Environmental Protection",
+   "controls": "new-agency-powers",
+   "fears": "",
+   "jurisdiction": "Pennsylvania",
+   "url": "https://openstates.org/pa/bills/2025-2026/HB2760/",
+   "status": "pending",
+   "action": "Referred to Environmental & Natural Resource Protection",
+   "kind": "bill"
+  },
+  {
+   "target": "control:new-agency-powers:91",
+   "sentence": "91 measures in 21 jurisdictions would create an AI office, or hand an existing one new authority over AI or data centers.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "New agency powers",
+   "head": "91 measures in 21 jurisdictions: new authority over AI or data centers for a government body",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:deepfakes:149",
+   "sentence": "149 measures in 38 jurisdictions cite the fear that anyone can now fake anyone.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Deepfakes",
+   "head": "149 measures name the same fear: Deepfakes",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 1900,
+  "controlled": 379,
+  "offices": 81
+ }
+}

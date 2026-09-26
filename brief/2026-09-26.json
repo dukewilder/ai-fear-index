@@ -1,0 +1,51 @@
+{
+ "edition": "2026-09-26",
+ "headline": "California would put AI violation under Medical Board jurisdiction",
+ "text": "Here is how your fear of AI is being used to centralize power today.\n\nCalifornia would put a physician's violation of the artificial intelligence provisions under the jurisdiction of the Medical Board of California or the Osteopathic Medical Board of California. Sent to the governor. It cites the fear that an algorithm decides whether you get treated.\n\n379 measures in 48 jurisdictions would ban or restrict a use of AI, or make one a crime.\n\n64 measures in 29 jurisdictions cite the fear that an algorithm decides whether you get treated.\n\n2,212 measures tracked. 748 carry a control, and they would hand new power to 101 offices.",
+ "image": "state/brief/2026-09-26.png",
+ "alt": "A card from the AI Fear Report headed: California would put AI violation under Medical Board jurisdiction. California would put a physician's violation of the artificial intelligence provisions under the jurisdiction of the Medical Board of California or the Osteopathic Medical Board of California. Held by Medical Board of California. 379 measures in 48 jurisdictions would ban or restrict a use of AI, or make one a crime. 64 measures in 29 jurisdictions cite the fear that an algorithm decides whether you get treated.",
+ "lines": [
+  {
+   "target": "os-cb82093c-0c07-48f6-a228-90b42def8a2b",
+   "sentence": "California would put a physician's violation of the artificial intelligence provisions under the jurisdiction of the Medical Board of California or the Osteopathic Medical Board of California.",
+   "quote": "would make a violation of these provisions by a physician subject to the jurisdiction of the Medical Board of California",
+   "office": "Medical Board of California",
+   "controls": "use-restrictions",
+   "fears": "ai-care-decisions",
+   "jurisdiction": "California",
+   "url": "https://openstates.org/ca/bills/20252026/AB1979/",
+   "status": "pending",
+   "action": "Enrolled and presented to the Governor at 4 p.m.",
+   "kind": "bill"
+  },
+  {
+   "target": "control:use-restrictions:379",
+   "sentence": "379 measures in 48 jurisdictions would ban or restrict a use of AI, or make one a crime.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "Use limits",
+   "head": "379 measures in 48 jurisdictions: bans and limits on uses of AI",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  },
+  {
+   "target": "fear:ai-care-decisions:64",
+   "sentence": "64 measures in 29 jurisdictions cite the fear that an algorithm decides whether you get treated.",
+   "quote": "",
+   "office": "",
+   "controls": "",
+   "meta": "AI deciding care",
+   "head": "64 measures name the same fear: AI deciding care",
+   "jurisdiction": "",
+   "url": "",
+   "status": ""
+  }
+ ],
+ "totals": {
+  "measures": 2212,
+  "controlled": 748,
+  "offices": 101
+ }
+}
